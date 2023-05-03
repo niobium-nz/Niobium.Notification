@@ -6,7 +6,7 @@ variables:
   azureServiceConnection: 'niobium-emailnotification'
   resourceGroupName: 'niobium-emailnotification'
   functionAppName: 'Niobium.EmailNotification.FuncApp'
-  vmImageName: 'windows-latest'
+  vmImageName: 'windows-2022'
   workingDirectory: '$(System.DefaultWorkingDirectory)/'
   templateFile: './main.bicep'
 
@@ -18,7 +18,6 @@ stages:
   - job: Build
     displayName: Build
     pool:
-      name: 'Azure Pipelines'
       vmImage: $(vmImageName)
 
     steps:
@@ -57,7 +56,6 @@ stages:
     displayName: Deploy
     environment: 'production'
     pool:
-      name: 'Azure Pipelines'
       vmImage: $(vmImageName)
 
     strategy:
