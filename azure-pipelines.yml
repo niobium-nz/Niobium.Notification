@@ -18,6 +18,7 @@ stages:
   - job: Build
     displayName: Build
     pool:
+      name: 'Azure Pipelines'
       vmImage: $(vmImageName)
 
     steps:
@@ -56,6 +57,7 @@ stages:
     displayName: Deploy
     environment: 'production'
     pool:
+      name: 'Azure Pipelines'
       vmImage: $(vmImageName)
 
     strategy:
