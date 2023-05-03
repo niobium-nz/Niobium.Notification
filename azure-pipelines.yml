@@ -6,7 +6,7 @@ variables:
   azureServiceConnection: 'niobium-emailnotification'
   resourceGroupName: 'niobium-emailnotification'
   functionAppName: 'Niobium.EmailNotification.FuncApp'
-  vmImageName: 'windows-2022'
+  vmImageName: 'windows-latest'
   workingDirectory: '$(System.DefaultWorkingDirectory)/'
   templateFile: './main.bicep'
 
