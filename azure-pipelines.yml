@@ -54,19 +54,18 @@ stages:
   jobs:
   - deployment: Deploy
     displayName: Deploy
-    environment: 'development'
+    environment: 'production'
     pool:
       vmImage: $(vmImageName)
 
     strategy:
       runOnce:
         deploy:
-
           steps:
           - task: AzureResourceManagerTemplateDeployment@3
             inputs:
               deploymentScope: 'Resource Group'
-              azureResourceManagerConnection: '$(serviceConnectionId)'
+              azureResourceManagerConnection: '$(azureServiceConnection)'
               action: 'Create Or Update Resource Group'
               resourceGroupName: '$(resourceGroupName)'
               location: '$(location)'
