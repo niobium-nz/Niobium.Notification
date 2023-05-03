@@ -2,7 +2,7 @@ trigger:
 - master
 
 variables:
-  azureSubscription: 'bc068dc9-7aa8-499d-83ce-be392eef880c'
+  serviceConnectionId: 'be833375-311c-4ff9-9df6-d38673df744f'
   azureServiceConnection: 'niobium-emailnotification'
   resourceGroupName: 'niobium-emailnotification'
   functionAppName: 'Niobium.EmailNotification.FuncApp'
@@ -21,6 +21,11 @@ stages:
       vmImage: $(vmImageName)
 
     steps:
+    - task: UseDotNet@2
+      displayName: 'Use .NET sdk 7.x'
+      inputs:
+        version: 7.x
+
     - task: DotNetCoreCLI@2
       displayName: Build
       inputs:
@@ -61,7 +66,7 @@ stages:
           - task: AzureResourceManagerTemplateDeployment@3
             inputs:
               deploymentScope: 'Resource Group'
-              azureResourceManagerConnection: '$(azureServiceConnection)'
+              azureResourceManagerConnection: '$(serviceConnectionId)'
               action: 'Create Or Update Resource Group'
               resourceGroupName: '$(resourceGroupName)'
               location: '$(location)'
@@ -74,7 +79,7 @@ stages:
           - task: AzureFunctionApp@1
             displayName: 'Azure functions app deploy'
             inputs:
-              azureSubscription: '$(azureSubscription)'
+              azureSubscription: '$(serviceConnectionId)'
               resourceGroupName: '$(resourceGroupName)'
               appType: functionApp
               appName: $(functionAppName)
