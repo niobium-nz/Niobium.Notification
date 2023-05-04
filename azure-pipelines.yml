@@ -49,11 +49,13 @@ stages:
         archiveType: zip
         archiveFile: $(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip
         replaceExistingArchive: true
+    - task: CopyFiles@2
+      displayName: 'Stage Bicep template'
+      inputs:
+        Contents: '$(workingDirectory)/$(templateFile)'
+        TargetFolder: $(Build.ArtifactStagingDirectory)
 
-    - publish: $(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip
-      artifact: drop
-      
-    - publish: $(Build.ArtifactStagingDirectory)/$(templateFile)
+    - publish: $(Build.ArtifactStagingDirectory)/*
       artifact: drop
 
 - stage: Deploy
