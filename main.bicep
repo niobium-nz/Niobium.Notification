@@ -23,10 +23,10 @@ param appInsightsLocation string = resourceGroup().location
 ])
 param runtime string = 'dotnet'
 
-var functionAppName = appName
-var hostingPlanName = appName
-var applicationInsightsName = appName
-var storageAccountName = '${appName}Storage'
+var functionAppName = '${appName}Func'
+var hostingPlanName = '${appName}Plan'
+var applicationInsightsName = '${appName}Insights'
+var storageAccountName = toLower('${appName}Store')
 var functionWorkerRuntime = runtime
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2022-05-01' = {
