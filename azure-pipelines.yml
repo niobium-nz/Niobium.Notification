@@ -2,13 +2,14 @@ trigger:
 - master
 
 variables:
+  buildConfiguration: 'Release'
   serviceConnectionId: 'be833375-311c-4ff9-9df6-d38673df744f'
   azureServiceConnection: 'niobium-emailnotification'
   resourceGroupName: 'niobium-emailnotification'
   functionAppName: 'Niobium.EmailNotification.FuncApp'
   vmImageName: 'windows-latest'
   workingDirectory: '$(System.DefaultWorkingDirectory)/'
-  templateFile: './main.bicep'
+  templateFile: 'main.bicep'
 
 stages:
 - stage: Build
@@ -31,8 +32,14 @@ stages:
       inputs:
         command: 'build'
         projects: |
-          $(workingDirectory)/*.csproj
-        arguments: --output $(System.DefaultWorkingDirectory)/publish_output --configuration Release
+          $(workingDirectory)/**/*.csproj
+        arguments: --output $(System.DefaultWorkingDirectory)/publish_output --configuration $(buildConfiguration)
+
+    - task: DotNetCoreCLI@2
+      inputs:
+        command: test
+        projects: '$(workingDirectory)/**/*Tests/*.csproj'
+        arguments: '--configuration $(buildConfiguration)'
 
     - task: ArchiveFiles@2
       displayName: 'Archive files'
@@ -44,6 +51,9 @@ stages:
         replaceExistingArchive: true
 
     - publish: $(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip
+      artifact: drop
+      
+    - publish: $(Build.ArtifactStagingDirectory)/$(templateFile)
       artifact: drop
 
 - stage: Deploy
@@ -70,7 +80,7 @@ stages:
               resourceGroupName: '$(resourceGroupName)'
               location: '$(location)'
               templateLocation: 'Linked artifact'
-              csmFile: '$(templateFile)'
+              csmFile: '$(Pipeline.Workspace)/drop/$(templateFile)'
               overrideParameters: '-appName $(functionAppName)'
               deploymentMode: 'Incremental'
               deploymentName: 'DeployPipelineTemplate'
