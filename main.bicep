@@ -19,9 +19,10 @@ param appInsightsLocation string = resourceGroup().location
 @allowed([
   'node'
   'dotnet'
+  'dotnet-isolated'
   'java'
 ])
-param runtime string = 'dotnet'
+param runtime string = 'dotnet-isolated'
 
 var functionAppName = '${appName}Func'
 var hostingPlanName = '${appName}Plan'
