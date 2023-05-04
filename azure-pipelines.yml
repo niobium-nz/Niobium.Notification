@@ -36,6 +36,7 @@ stages:
         arguments: --output $(System.DefaultWorkingDirectory)/publish_output --configuration $(buildConfiguration)
 
     - task: DotNetCoreCLI@2
+      displayName: Test
       inputs:
         command: test
         projects: '$(workingDirectory)/**/*Tests/*.csproj'
@@ -75,6 +76,7 @@ stages:
         deploy:
           steps:
           - task: AzureResourceManagerTemplateDeployment@3
+            displayName: 'Infrastructure Provisioning'
             inputs:
               deploymentScope: 'Resource Group'
               azureResourceManagerConnection: '$(azureServiceConnection)'
