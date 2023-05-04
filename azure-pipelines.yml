@@ -93,5 +93,5 @@ stages:
               azureSubscription: '$(serviceConnectionId)'
               resourceGroupName: '$(resourceGroupName)'
               appType: functionApp
-              appName: $(functionAppName)
+              appName: '$(functionAppName)Func'
               package: '$(Pipeline.Workspace)/drop/$(Build.BuildId).zip'
