@@ -1,11 +1,32 @@
 {
-    "version": "2.0",
-    "logging": {
-        "applicationInsights": {
-            "samplingSettings": {
-                "isEnabled": true,
-                "excludedTypes": "Request"
-            }
-        }
+  "version": "2.0",
+  "logging": {
+    "applicationInsights": {
+      "samplingSettings": {
+        "isEnabled": true,
+        "excludedTypes": "Request"
+      }
     }
+  },
+  "AppSettings": {
+    "Email": {
+      "From": {
+        "Email": "no-reply@niobium.co.nz",
+        "Name": "Niobium Notifier"
+      },
+      "To": {
+        "test1": {
+          "Email": "wen.han@outlook.com",
+          "Name": "Wen Han"
+        }
+      },
+      "Subject": {
+        "test1": "New Message",
+        "test2": "You've got new notification'"
+      },
+      "Template": {
+        "test1": "You have a message from {{NAME}} {{CONTACT}}:\n\n{{MESSAGE}}"
+      }
+    }
+  }
 }
