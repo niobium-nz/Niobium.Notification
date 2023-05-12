@@ -21,7 +21,7 @@ namespace Niobium.EmailNotification
             this.logger = loggerFactory.CreateLogger<SendGridEmailSender>();
         }
 
-        public async Task<bool> SendEmailAsync(string tenant, string message, string name, string contact)
+        public async Task<bool> SendEmailAsync(string tenant, string message, string? name, string? contact)
         {
             if (String.IsNullOrWhiteSpace(tenant))
             {
@@ -55,9 +55,9 @@ namespace Niobium.EmailNotification
             return response.IsSuccessStatusCode;
         }
 
-        private static string ComposeEmailContent(string template, string message, string name, string contact)
+        private static string ComposeEmailContent(string template, string message, string? name, string? contact)
             => template.Replace(TEMPLATE_NAME, name ?? String.Empty)
                 .Replace(TEMPLATE_CONTACT, contact ?? String.Empty)
-                .Replace(TEMPLATE_MESSAGE, message ?? String.Empty);
+                .Replace(TEMPLATE_MESSAGE, message);
     }
 }
