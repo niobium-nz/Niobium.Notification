@@ -4,12 +4,20 @@ namespace Niobium.EmailNotification
 {
     public class EmailOptions
     {
-        public EmailAddress? From { get; set; }
+        public EmailOptions(EmailAddress from, EmailAddress to, string subject, string template)
+        {
+            this.From = from;
+            this.To = to;
+            this.Subject = subject;
+            this.Template = template;
+        }
 
-        public Dictionary<string, EmailAddress>? To { get; set; }
+        public EmailAddress From { get; set; }
 
-        public Dictionary<string, string>? Subject { get; set; }
+        public EmailAddress To { get; set; }
 
-        public Dictionary<string, string>? Template { get; set; }
+        public string Subject { get; set; }
+
+        public string Template { get; set; }
     }
 }

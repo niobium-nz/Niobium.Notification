@@ -92,6 +92,14 @@ resource functionApp 'Microsoft.Web/sites@2021-03-01' = {
           name: 'FUNCTIONS_WORKER_RUNTIME'
           value: functionWorkerRuntime
         }
+        {
+          name: 'From:Email'
+          value: 'no-reply@niobium.co.nz'
+        }
+        {
+          name: 'From:Name'
+          value: 'Niobium Notification Sender'
+        }
       ]
       ftpsState: 'FtpsOnly'
       minTlsVersion: '1.2'
