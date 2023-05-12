@@ -8,13 +8,17 @@ namespace Niobium.EmailNotification
         public Guid? ID { get; set; }
 
         [Required]
+        [MaxLength(50)]
         public string? Tenant { get; set; }
 
         [Required]
+        [MaxLength(3000)]
         public string? Message { get; set; }
 
+        [MaxLength(50)]
         public string? Name { get; set; }
 
+        [MaxLength(50)]
         public string? Contact { get; set; }
     }
 }

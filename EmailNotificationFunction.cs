@@ -1,5 +1,5 @@
-using System.ComponentModel.DataAnnotations;
 using System.Net;
+using System.Text.Encodings.Web;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 
@@ -8,8 +8,13 @@ namespace Niobium.EmailNotification
     public class EmailNotificationFunction
     {
         private readonly IEmailSender sender;
+        private readonly HtmlEncoder encoder;
 
-        public EmailNotificationFunction(IEmailSender sender) => this.sender = sender;
+        public EmailNotificationFunction(IEmailSender sender, HtmlEncoder encoder)
+        {
+            this.sender = sender;
+            this.encoder = encoder;
+        }
 
         [Function(nameof(Notification))]
         public async Task<HttpResponseData> Notification([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req, CancellationToken cancellationToken)
@@ -20,27 +25,30 @@ namespace Niobium.EmailNotification
                 return req.CreateResponse(HttpStatusCode.BadRequest);
             }
 
-            var validationResults = new List<ValidationResult>();
-            var validates = Validator.TryValidateObject(request, new ValidationContext(request), validationResults, true);
-            if (!validates)
+            var badRequest = await req.ValidateAsync(request, cancellationToken);
+            if (badRequest != null)
             {
-                var response = req.CreateResponse();
-                await response.WriteAsJsonAsync(validationResults, cancellationToken);
-                response.StatusCode = HttpStatusCode.BadRequest;
-                return response;
+                return badRequest;
             }
 
             ArgumentNullException.ThrowIfNull(request.ID);
             ArgumentNullException.ThrowIfNull(request.Tenant);
             ArgumentNullException.ThrowIfNull(request.Message);
 
-            var success = await this.sender.SendEmailAsync(request.Tenant, request.Message, request.Name, request.Contact);
-            if (!success)
+            request.Message = this.encoder.Encode(request.Message);
+
+            if (request.Name != null)
             {
-                return req.CreateResponse(HttpStatusCode.InternalServerError);
+                request.Name = this.encoder.Encode(request.Name);
             }
 
-            return req.CreateResponse(HttpStatusCode.Created);
+            if (request.Contact != null)
+            {
+                request.Contact = this.encoder.Encode(request.Contact);
+            }
+
+            var success = await this.sender.SendEmailAsync(request.Tenant, request.Message, request.Name, request.Contact);
+            return !success ? req.CreateResponse(HttpStatusCode.InternalServerError) : req.CreateResponse(HttpStatusCode.Created);
         }
     }
 }
