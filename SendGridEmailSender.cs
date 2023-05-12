@@ -1,25 +1,24 @@
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using SendGrid;
 using SendGrid.Helpers.Mail;
 
 namespace Niobium.EmailNotification
 {
-    public class EmailSender
+    internal class SendGridEmailSender : IEmailSender
     {
         private const string TEMPLATE_NAME = "{{NAME}}";
         private const string TEMPLATE_CONTACT = "{{CONTACT}}";
         private const string TEMPLATE_MESSAGE = "{{MESSAGE}}";
 
+        private readonly TenantConfigurationProvider configuration;
         private readonly ISendGridClient client;
         private readonly ILogger logger;
-        private readonly EmailOptions options;
 
-        public EmailSender(IOptions<EmailOptions> emailOptions, ISendGridClient sendGridClient, ILoggerFactory loggerFactory)
+        public SendGridEmailSender(TenantConfigurationProvider configuration, ISendGridClient sendGridClient, ILoggerFactory loggerFactory)
         {
+            this.configuration = configuration;
             this.client = sendGridClient;
-            this.logger = loggerFactory.CreateLogger<EmailSender>();
-            this.options = emailOptions.Value;
+            this.logger = loggerFactory.CreateLogger<SendGridEmailSender>();
         }
 
         public async Task<bool> SendEmailAsync(string tenant, string message, string name, string contact)
@@ -34,17 +33,16 @@ namespace Niobium.EmailNotification
                 throw new ArgumentException($"'{nameof(message)}' cannot be null or whitespace.", nameof(message));
             }
 
-            var subject = GetTenantConfig(tenant, this.options.Subject);
-            var to = GetTenantConfig(tenant, this.options.To);
-            var content = this.ComposeEmailContent(tenant, message, name, contact);
+            var options = this.configuration.GetOptions(tenant);
+            var content = ComposeEmailContent(options.Template, message, name, contact);
 
             var request = new SendGridMessage
             {
-                From = this.options.From,
-                Subject = subject,
+                From = options.From,
+                Subject = options.Subject,
                 PlainTextContent = content
             };
-            request.AddTo(to);
+            request.AddTo(options.To);
 
             var response = await this.client.SendEmailAsync(request);
 
@@ -57,15 +55,9 @@ namespace Niobium.EmailNotification
             return response.IsSuccessStatusCode;
         }
 
-        private string ComposeEmailContent(string tenant, string message, string name, string contact)
-        {
-            var template = GetTenantConfig(tenant, this.options.Template);
-            return template.Replace(TEMPLATE_NAME, name ?? string.Empty)
-                .Replace(TEMPLATE_CONTACT, contact ?? string.Empty)
-                .Replace(TEMPLATE_MESSAGE, message ?? string.Empty);
-        }
-
-        private static T GetTenantConfig<T>(string tenant, Dictionary<string, T>? configStore)
-            => configStore != null && !configStore.ContainsKey(tenant) ? configStore[tenant] : throw new ArgumentException($"Tenant doesn't get correctly configured: {tenant}");
+        private static string ComposeEmailContent(string template, string message, string name, string contact)
+            => template.Replace(TEMPLATE_NAME, name ?? String.Empty)
+                .Replace(TEMPLATE_CONTACT, contact ?? String.Empty)
+                .Replace(TEMPLATE_MESSAGE, message ?? String.Empty);
     }
 }

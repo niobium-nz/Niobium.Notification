@@ -1,4 +1,3 @@
-using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Niobium.EmailNotification;
@@ -8,11 +7,11 @@ var host = new HostBuilder()
     .ConfigureFunctionsWorkerDefaults()
     .ConfigureServices((context, services) =>
     {
-        services.AddSendGrid(options =>
-            options.ApiKey = context.Configuration["SENDGRID_APIKEY"]
+        _ = services.AddSendGrid(options =>
+            options.ApiKey = "test1"
         );
-        services.Configure<EmailOptions>(context.Configuration.GetSection("Email"));
-        services.AddTransient<EmailSender>();
+        _ = services.AddTransient<IEmailSender, SendGridEmailSender>();
+        _ = services.AddTransient<TenantConfigurationProvider>();
     })
     .Build();
 

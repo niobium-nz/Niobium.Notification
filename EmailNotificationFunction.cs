@@ -5,9 +5,9 @@ namespace Niobium.EmailNotification
 {
     public class EmailNotificationFunction
     {
-        private readonly EmailSender sender;
+        private readonly IEmailSender sender;
 
-        public EmailNotificationFunction(EmailSender sender) => this.sender = sender;
+        public EmailNotificationFunction(IEmailSender sender) => this.sender = sender;
 
         [Function(nameof(Notification))]
         public async Task Notification([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req, CancellationToken cancellationToken)
