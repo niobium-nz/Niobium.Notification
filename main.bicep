@@ -93,6 +93,18 @@ resource functionApp 'Microsoft.Web/sites@2021-03-01' = {
           value: functionWorkerRuntime
         }
         {
+          name: 'GOOGLE_CLOUD_PROJECT_ID'
+          value: 'niobium-1683970500451'
+        }
+        {
+          name: 'GOOGLE_RECAPTCHA_SITE_KEY'
+          value: '6LeNiAYmAAAAADgZxxt7YUf8HvZok8YBvg6w80X2'
+        }
+        {
+          name: 'GOOGLE_RECAPTCHA_PASS_THRESHOLD'
+          value: '0.9'
+        }
+        {
           name: 'From:Email'
           value: 'no-reply@niobium.co.nz'
         }
