@@ -20,5 +20,9 @@ namespace Niobium.EmailNotification
 
         [MaxLength(50)]
         public string? Contact { get; set; }
+
+        [Required]
+        [MaxLength(500)]
+        public string? Token { get; set; }
     }
 }

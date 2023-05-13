@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Net;
 using System.Text.Encodings.Web;
 using Microsoft.Azure.Functions.Worker;
@@ -9,11 +10,13 @@ namespace Niobium.EmailNotification
     {
         private readonly IEmailSender sender;
         private readonly HtmlEncoder encoder;
+        private readonly IVisitorRiskAssessor assessor;
 
-        public EmailNotificationFunction(IEmailSender sender, HtmlEncoder encoder)
+        public EmailNotificationFunction(IEmailSender sender, HtmlEncoder encoder, IVisitorRiskAssessor assessor)
         {
             this.sender = sender;
             this.encoder = encoder;
+            this.assessor = assessor;
         }
 
         [Function(nameof(Notification))]
@@ -34,6 +37,20 @@ namespace Niobium.EmailNotification
             ArgumentNullException.ThrowIfNull(request.ID);
             ArgumentNullException.ThrowIfNull(request.Tenant);
             ArgumentNullException.ThrowIfNull(request.Message);
+            ArgumentNullException.ThrowIfNull(request.Token);
+
+            var lowRisk = await assessor.AssessAsync(request.Token, "contact-us", cancellationToken);
+            if (!lowRisk)
+            {
+                var response = req.CreateResponse();
+                var validationResults = new ValidationResult[]
+                {
+                    new ValidationResult("You are unable to prove that you are a human.", new string[]{ nameof(request.Token) }),
+                };
+                await response.WriteAsJsonAsync(validationResults, cancellationToken);
+                response.StatusCode = HttpStatusCode.BadRequest;
+                return response;
+            }
 
             request.Message = this.encoder.Encode(request.Message);
 
@@ -47,7 +64,7 @@ namespace Niobium.EmailNotification
                 request.Contact = this.encoder.Encode(request.Contact);
             }
 
-            var success = await this.sender.SendEmailAsync(request.Tenant, request.Message, request.Name, request.Contact);
+            var success = await this.sender.SendEmailAsync(request.Tenant, request.Message, request.Name, request.Contact, cancellationToken);
             return !success ? req.CreateResponse(HttpStatusCode.InternalServerError) : req.CreateResponse(HttpStatusCode.Created);
         }
     }

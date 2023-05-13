@@ -21,7 +21,7 @@ namespace Niobium.EmailNotification
             this.logger = loggerFactory.CreateLogger<SendGridEmailSender>();
         }
 
-        public async Task<bool> SendEmailAsync(string tenant, string message, string? name, string? contact)
+        public async Task<bool> SendEmailAsync(string tenant, string message, string? name, string? contact, CancellationToken cancellationToken)
         {
             if (String.IsNullOrWhiteSpace(tenant))
             {
@@ -44,7 +44,7 @@ namespace Niobium.EmailNotification
             };
             request.AddTo(options.To);
 
-            var response = await this.client.SendEmailAsync(request);
+            var response = await this.client.SendEmailAsync(request, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
             {
