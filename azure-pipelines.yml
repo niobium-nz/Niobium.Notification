@@ -48,53 +48,63 @@ stages:
       functionAppName: $[dependencies.Infrastructure.outputs['infrastructureOutputs.functionAppName']]
       keyVaultUrl: $[dependencies.Infrastructure.outputs['infrastructureOutputs.keyVaultUrl']]
       storageAccountConnectionString: $[dependencies.Infrastructure.outputs['infrastructureOutputs.storageAccountConnectionString']]
-  steps:
+    steps:
     - checkout: none
     - task: AzureAppServiceSettings@1
-      displayName: 'Update AppSettings'
-      inputs:
+        displayName: 'Update AppSettings'
+        inputs:
         azureSubscription: $(serviceConnection)
         appName: $(functionAppName)
         resourceGroupName: $(serviceConnection)
         appSettings: |
-          [
+            [
             {
-              "name": "STORAGE_ACCOUNT",
-              "value": "$(storageAccountConnectionString)",
-              "slotSetting": false
+                "name": "STORAGE_ACCOUNT",
+                "value": "$(storageAccountConnectionString)",
+                "slotSetting": false
             },
             {
-              "name": "KEY_VAULT_ENDPOINT",
-              "value": "$(keyVaultUrl)",
-              "slotSetting": false
+                "name": "KEY_VAULT_ENDPOINT",
+                "value": "$(keyVaultUrl)",
+                "slotSetting": false
             },
             {
-              "name": "GOOGLE_CLOUD_PROJECT_ID",
-              "value": "niobium-1683970500451",
-              "slotSetting": false
+                "name": "SENDGRID_API_KEY",
+                "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/SENDGRID-API-KEY/)",
+                "slotSetting": false
             },
             {
-              "name": "GOOGLE_RECAPTCHA_SITE_KEY",
-              "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/GOOGLE-RECAPTCHA-SITE-KEY/)",
-              "slotSetting": false
+                "name": "GOOGLE_CLOUD_PROJECT_ID",
+                "value": "niobium-1683970500451",
+                "slotSetting": false
             },
             {
-              "name": "GOOGLE_RECAPTCHA_PASS_THRESHOLD",
-              "value": "0.9",
-              "slotSetting": false
+                "name": "GOOGLE_RECAPTCHA_SITE_KEY",
+                "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/GOOGLE-RECAPTCHA-SITE-KEY/)",
+                "slotSetting": false
             },
             {
-              "name": "From:Email",
-              "value": "no-reply@niobium.co.nz",
-              "slotSetting": false
+                "name": "GOOGLE_RECAPTCHA_JSON_CREDENTIALS",
+                "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/GOOGLE-RECAPTCHA-JSON-CREDENTIALS/)",
+                "slotSetting": false
             },
             {
-              "name": "From:Name",
-              "value": "Niobium Notification Sender",
-              "slotSetting": false
+                "name": "GOOGLE_RECAPTCHA_PASS_THRESHOLD",
+                "value": "0.9",
+                "slotSetting": false
+            },
+            {
+                "name": "From:Email",
+                "value": "no-reply@niobium.co.nz",
+                "slotSetting": false
+            },
+            {
+                "name": "From:Name",
+                "value": "Niobium Notification Sender",
+                "slotSetting": false
             }
-          ]
-      
+            ]
+
   - template: pipelines/jobs/FunctionAppDeploy.yml@devops
     parameters:
       serviceConnectionId: $(serviceConnectionId)
