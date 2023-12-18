@@ -1,99 +1,103 @@
+name: '1.0$(Rev:.r)-prerelease'
 trigger:
 - master
 
 variables:
-  buildConfiguration: 'Release'
+  buildAgentVmImage: 'windows-latest'
+  serviceConnection: 'niobium-emailnotification'
   serviceConnectionId: 'be833375-311c-4ff9-9df6-d38673df744f'
-  azureServiceConnection: 'niobium-emailnotification'
-  resourceGroupName: 'niobium-emailnotification'
-  functionAppName: 'NiobiumEmailNotify'
-  vmImageName: 'windows-latest'
-  workingDirectory: '$(System.DefaultWorkingDirectory)/'
-  templateFile: 'main.bicep'
+
+pool:
+  vmImage: $(buildAgentVmImage)
+
+resources: 
+  repositories:
+  - repository: devops
+    endpoint: CodRepo
+    type: git
+    name: cod/Cod.Infrastructures
+    ref: master
 
 stages:
-- stage: Build
-  displayName: Build stage
-
+- stage: Production
   jobs:
-  - job: Build
-    displayName: Build
+  - template: pipelines/jobs/FunctionAppBuild.yml@devops
+    parameters:
+      buildAgentVmImage: $(buildAgentVmImage)
+      dotnetVersion: '8.x'
+
+  - template: pipelines/jobs/FunctionAppInfrastructure.yml@devops
+    parameters:
+      azureServiceConnection: $(serviceConnection)
+      resourceGroupName: $(serviceConnection)
+      appNamePrefix: 'NiobiumNotify'
+      buildAgentVmImage: $(buildAgentVmImage)
+      enableKeyVault: true
+      enableStagingSlot: true
+      functionRuntime: 'dotnet-isolated'
+      checkoutDevopsStep:
+        checkout: devops
+        
+  - job: Configuration
+    dependsOn:
+      - Infrastructure
+    condition: succeeded()
     pool:
-      vmImage: $(vmImageName)
-
-    steps:
-    - task: UseDotNet@2
-      displayName: 'Use .NET sdk 7.x'
+      vmImage: $(buildAgentVmImage)
+    variables:
+      functionAppName: $[dependencies.Infrastructure.outputs['infrastructureOutputs.functionAppName']]
+      keyVaultUrl: $[dependencies.Infrastructure.outputs['infrastructureOutputs.keyVaultUrl']]
+      storageAccountConnectionString: $[dependencies.Infrastructure.outputs['infrastructureOutputs.storageAccountConnectionString']]
+  steps:
+    - checkout: none
+    - task: AzureAppServiceSettings@1
+      displayName: 'Update AppSettings'
       inputs:
-        version: 7.x
-
-    - task: DotNetCoreCLI@2
-      displayName: Build
-      inputs:
-        command: 'build'
-        projects: |
-          $(workingDirectory)/**/*.csproj
-        arguments: --output $(System.DefaultWorkingDirectory)/publish_output --configuration $(buildConfiguration)
-
-    - task: DotNetCoreCLI@2
-      displayName: Test
-      inputs:
-        command: test
-        projects: '$(workingDirectory)/**/*Tests/*.csproj'
-        arguments: '--configuration $(buildConfiguration)'
-
-    - task: ArchiveFiles@2
-      displayName: 'Archive files'
-      inputs:
-        rootFolderOrFile: '$(System.DefaultWorkingDirectory)/publish_output'
-        includeRootFolder: false
-        archiveType: zip
-        archiveFile: $(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip
-        replaceExistingArchive: true
-    - task: CopyFiles@2
-      displayName: 'Stage Bicep template'
-      inputs:
-        Contents: '$(workingDirectory)/$(templateFile)'
-        TargetFolder: $(Build.ArtifactStagingDirectory)
-
-    - publish: $(Build.ArtifactStagingDirectory)
-      artifact: drop
-
-- stage: Deploy
-  displayName: Deploy stage
-  dependsOn: Build
-  condition: succeeded()
-
-  jobs:
-  - deployment: Deploy
-    displayName: Deploy
-    environment: 'production'
-    pool:
-      vmImage: $(vmImageName)
-
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - task: AzureResourceManagerTemplateDeployment@3
-            displayName: 'Infrastructure Provisioning'
-            inputs:
-              deploymentScope: 'Resource Group'
-              azureResourceManagerConnection: '$(azureServiceConnection)'
-              action: 'Create Or Update Resource Group'
-              resourceGroupName: '$(resourceGroupName)'
-              location: '$(location)'
-              templateLocation: 'Linked artifact'
-              csmFile: '$(Pipeline.Workspace)/drop/$(templateFile)'
-              overrideParameters: '-appName $(functionAppName)'
-              deploymentMode: 'Incremental'
-              deploymentName: 'DeployPipelineTemplate'
-
-          - task: AzureFunctionApp@1
-            displayName: 'Azure functions app deploy'
-            inputs:
-              azureSubscription: '$(serviceConnectionId)'
-              resourceGroupName: '$(resourceGroupName)'
-              appType: functionApp
-              appName: '$(functionAppName)Func'
-              package: '$(Pipeline.Workspace)/drop/$(Build.BuildId).zip'
+        azureSubscription: $(serviceConnection)
+        appName: $(functionAppName)
+        resourceGroupName: $(serviceConnection)
+        appSettings: |
+          [
+            {
+              "name": "STORAGE_ACCOUNT",
+              "value": "$(storageAccountConnectionString)",
+              "slotSetting": false
+            },
+            {
+              "name": "KEY_VAULT_ENDPOINT",
+              "value": "$(keyVaultUrl)",
+              "slotSetting": false
+            },
+            {
+              "name": "GOOGLE_CLOUD_PROJECT_ID",
+              "value": "niobium-1683970500451",
+              "slotSetting": false
+            },
+            {
+              "name": "GOOGLE_RECAPTCHA_SITE_KEY",
+              "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/GOOGLE-RECAPTCHA-SITE-KEY/)",
+              "slotSetting": false
+            },
+            {
+              "name": "GOOGLE_RECAPTCHA_PASS_THRESHOLD",
+              "value": "0.9",
+              "slotSetting": false
+            },
+            {
+              "name": "From:Email",
+              "value": "no-reply@niobium.co.nz",
+              "slotSetting": false
+            },
+            {
+              "name": "From:Name",
+              "value": "Niobium Notification Sender",
+              "slotSetting": false
+            }
+          ]
+      
+  - template: pipelines/jobs/FunctionAppDeploy.yml@devops
+    parameters:
+      serviceConnectionId: $(serviceConnectionId)
+      resourceGroupName: $(serviceConnection)
+      buildAgentVmImage: $(buildAgentVmImage)
+      enableStagingSlot: true
