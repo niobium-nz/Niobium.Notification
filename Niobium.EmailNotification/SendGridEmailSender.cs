@@ -1,39 +1,40 @@
+using System.Text.Encodings.Web;
 using Microsoft.Extensions.Logging;
 using SendGrid;
 using SendGrid.Helpers.Mail;
 
 namespace Niobium.EmailNotification
 {
-    internal class SendGridEmailSender : IEmailSender
+    internal class SendGridEmailSender(
+        TenantConfigurationProvider configuration,
+        ISendGridClient sendGridClient,
+        HtmlEncoder encoder,
+        ILoggerFactory loggerFactory)
+        : IEmailSender
     {
         private const string TEMPLATE_NAME = "{{NAME}}";
         private const string TEMPLATE_CONTACT = "{{CONTACT}}";
         private const string TEMPLATE_MESSAGE = "{{MESSAGE}}";
-
-        private readonly TenantConfigurationProvider configuration;
-        private readonly ISendGridClient client;
-        private readonly ILogger logger;
-
-        public SendGridEmailSender(TenantConfigurationProvider configuration, ISendGridClient sendGridClient, ILoggerFactory loggerFactory)
-        {
-            this.configuration = configuration;
-            this.client = sendGridClient;
-            this.logger = loggerFactory.CreateLogger<SendGridEmailSender>();
-        }
+        private readonly ILogger logger = loggerFactory.CreateLogger<SendGridEmailSender>();
 
         public async Task<bool> SendEmailAsync(string tenant, string message, string? name, string? contact, CancellationToken cancellationToken)
         {
-            if (String.IsNullOrWhiteSpace(tenant))
+            ArgumentNullException.ThrowIfNull(tenant);
+            ArgumentNullException.ThrowIfNull(message);
+
+            message = encoder.Encode(message);
+
+            if (name != null)
             {
-                throw new ArgumentException($"'{nameof(tenant)}' cannot be null or whitespace.", nameof(tenant));
+                name = encoder.Encode(name);
             }
 
-            if (String.IsNullOrWhiteSpace(message))
+            if (contact != null)
             {
-                throw new ArgumentException($"'{nameof(message)}' cannot be null or whitespace.", nameof(message));
+                contact = encoder.Encode(contact);
             }
 
-            var options = this.configuration.GetOptions(tenant);
+            var options = configuration.GetOptions(tenant);
             var content = ComposeEmailContent(options.Template, message, name, contact);
 
             var request = new SendGridMessage
@@ -44,7 +45,7 @@ namespace Niobium.EmailNotification
             };
             request.AddTo(options.To);
 
-            var response = await this.client.SendEmailAsync(request, cancellationToken);
+            var response = await sendGridClient.SendEmailAsync(request, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
             {
