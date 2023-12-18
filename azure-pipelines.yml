@@ -34,6 +34,7 @@ stages:
       buildAgentVmImage: $(buildAgentVmImage)
       enableKeyVault: true
       enableStagingSlot: true
+      allowedOrigins: ['*']
       functionRuntime: 'dotnet-isolated'
       checkoutDevopsStep:
         checkout: devops
