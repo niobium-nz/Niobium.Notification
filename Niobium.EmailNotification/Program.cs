@@ -15,14 +15,18 @@ var host = new HostBuilder()
         s.ConfigureFunctionsApplicationInsights();
 
         s.AddSendGrid(options =>
-            options.ApiKey = "FROMKEYVAULT"
+            options.ApiKey = Environment.GetEnvironmentVariable("SENDGRID_API_KEY")
         );
         s.AddTransient<IVisitorRiskAssessor, GoogleReCaptchaRiskAssessor>();
         s.AddTransient<IEmailSender, SendGridEmailSender>();
         s.AddTransient<TenantConfigurationProvider>();
         s.AddSingleton(HtmlEncoder.Create(
             allowedRanges: [UnicodeRanges.BasicLatin, UnicodeRanges.CjkUnifiedIdeographs]));
-        s.AddSingleton(new RecaptchaEnterpriseServiceClientBuilder { JsonCredentials = "FROMKEYVAULT" }.Build());
+        s.AddSingleton(new RecaptchaEnterpriseServiceClientBuilder
+        { 
+            JsonCredentials = Environment.GetEnvironmentVariable("GOOGLE_RECAPTCHA_JSON_CREDENTIALS")
+        }.Build()
+        );
     })
     .Build();
 
