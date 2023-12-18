@@ -51,8 +51,8 @@ stages:
     steps:
     - checkout: none
     - task: AzureAppServiceSettings@1
-        displayName: 'Update AppSettings'
-        inputs:
+      displayName: 'Update AppSettings'
+      inputs:
         azureSubscription: $(serviceConnection)
         appName: $(functionAppName)
         resourceGroupName: $(serviceConnection)
