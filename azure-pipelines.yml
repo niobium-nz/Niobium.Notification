@@ -57,7 +57,7 @@ stages:
         appName: $(functionAppName)
         resourceGroupName: $(serviceConnection)
         appSettings: |
-            [
+          [
             {
                 "name": "STORAGE_ACCOUNT",
                 "value": "$(storageAccountConnectionString)",
@@ -103,7 +103,7 @@ stages:
                 "value": "Niobium Notification Sender",
                 "slotSetting": false
             }
-            ]
+          ]
 
   - template: pipelines/jobs/FunctionAppDeploy.yml@devops
     parameters:
