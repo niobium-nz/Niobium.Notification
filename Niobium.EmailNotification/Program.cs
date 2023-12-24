@@ -13,7 +13,7 @@ var host = new HostBuilder()
     .ConfigureFunctionsWebApplication()
 #if DEBUG
     .ConfigureAppConfiguration(builder =>
-        builder.SetBasePath(new FileInfo(Assembly.GetExecutingAssembly().Location).DirectoryName)
+        builder.SetBasePath(new FileInfo(Assembly.GetExecutingAssembly().Location).DirectoryName ?? throw new Exception())
         .AddJsonFile("local.settings.json", optional: true, reloadOnChange: true))
 #endif
     .ConfigureServices(s =>
