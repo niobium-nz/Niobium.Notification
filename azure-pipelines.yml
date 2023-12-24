@@ -1,4 +1,4 @@
-name: '1.0$(Rev:.r)-prerelease'
+name: '1.0$(Rev:.r)'
 trigger:
 - master
 
@@ -22,20 +22,14 @@ stages:
 - stage: Production
   jobs:
   - template: pipelines/jobs/FunctionAppBuild.yml@devops
-    parameters:
-      buildAgentVmImage: $(buildAgentVmImage)
-      dotnetVersion: '8.x'
-
   - template: pipelines/jobs/FunctionAppInfrastructure.yml@devops
     parameters:
       azureServiceConnection: $(serviceConnection)
       resourceGroupName: $(serviceConnection)
       appNamePrefix: 'NiobiumNotify'
-      buildAgentVmImage: $(buildAgentVmImage)
       enableKeyVault: true
       enableStagingSlot: true
       allowedOrigins: ['*']
-      functionRuntime: 'dotnet-isolated'
       checkoutDevopsStep:
         checkout: devops
         
@@ -57,8 +51,14 @@ stages:
         azureSubscription: $(serviceConnection)
         appName: $(functionAppName)
         resourceGroupName: $(serviceConnection)
+        slotName: 'staging'
         appSettings: |
           [
+            {
+              "name": "WEBSITE_USE_PLACEHOLDER_DOTNETISOLATED",
+              "value": "1",
+              "slotSetting": false
+            },
             {
                 "name": "STORAGE_ACCOUNT",
                 "value": "$(storageAccountConnectionString)",
@@ -110,5 +110,26 @@ stages:
     parameters:
       serviceConnectionId: $(serviceConnectionId)
       resourceGroupName: $(serviceConnection)
-      buildAgentVmImage: $(buildAgentVmImage)
       enableStagingSlot: true
+        
+  - job: GoLive
+    dependsOn:
+      - Infrastructure
+      - Configuration
+      - Deploy
+    condition: succeeded()
+    pool:
+      vmImage: $(buildAgentVmImage)
+    variables:
+      functionAppName: $[dependencies.Infrastructure.outputs['infrastructureOutputs.functionAppName']]
+    steps:
+    - checkout: none
+    - task: AzureAppServiceManage@0
+      displayName: 'Update AppSettings'
+      inputs:
+        azureSubscription: $(serviceConnection)
+        ResourceGroupName: $(serviceConnection)
+        WebAppName: $(functionAppName)
+        Action: 'Swap Slots'
+        SourceSlot: 'staging'
+        SwapWithProduction: true 
