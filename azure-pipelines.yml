@@ -29,7 +29,7 @@ stages:
       appNamePrefix: 'NiobiumNotify'
       enableKeyVault: true
       enableStagingSlot: true
-      allowedOrigins: ['*']
+      allowedOrigins: '*'
       checkoutDevopsStep:
         checkout: devops
         
