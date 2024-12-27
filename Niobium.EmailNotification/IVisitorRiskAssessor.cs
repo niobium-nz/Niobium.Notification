@@ -2,6 +2,6 @@ namespace Niobium.EmailNotification
 {
     public interface IVisitorRiskAssessor
     {
-        Task<bool> AssessAsync(string token, string action, CancellationToken cancellationToken);
+        Task<bool> AssessAsync(Guid requestID, string tenant, string token, string? remoteIP, CancellationToken cancellationToken);
     }
 }

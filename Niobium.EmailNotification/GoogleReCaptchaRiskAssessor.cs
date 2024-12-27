@@ -1,64 +1,67 @@
-using Google.Api.Gax.ResourceNames;
-using Google.Cloud.RecaptchaEnterprise.V1;
-using Microsoft.Extensions.Configuration;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Niobium.EmailNotification
 {
-    internal class GoogleReCaptchaRiskAssessor : IVisitorRiskAssessor
+    internal class GoogleReCaptchaRiskAssessor(
+        HttpClient httpClient,
+        IOptions<EmailNotificationOptions> options,
+        ILogger<GoogleReCaptchaRiskAssessor> logger)
+        : IVisitorRiskAssessor
     {
-        private const string GOOGLE_CLOUD_PROJECT_ID = "GOOGLE_CLOUD_PROJECT_ID";
-        private const string GOOGLE_RECAPTCHA_SITE_KEY = "GOOGLE_RECAPTCHA_SITE_KEY";
-        private const string GOOGLE_RECAPTCHA_PASS_THRESHOLD = "GOOGLE_RECAPTCHA_PASS_THRESHOLD";
-        private readonly ILogger logger;
-        private readonly RecaptchaEnterpriseServiceClient client;
-        private readonly IConfiguration configuration;
-
-        public GoogleReCaptchaRiskAssessor(RecaptchaEnterpriseServiceClient client, IConfiguration configuration, ILoggerFactory loggerFactory)
+        private static readonly JsonSerializerOptions SERIALIZATION_OPTIONS = new()
         {
-            this.logger = loggerFactory.CreateLogger<GoogleReCaptchaRiskAssessor>();
-            this.client = client;
-            this.configuration = configuration;
+            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+        };
+
+        public async Task<bool> AssessAsync(Guid requestID, string tenant, string token, string? clientIP, CancellationToken cancellationToken)
+        {
+            var secret = options.Value.Secrets[tenant]
+                ?? throw new ApplicationException($"Missing tenant secret: {tenant}");
+
+            List<KeyValuePair<string, string>> parameters = new([
+                new KeyValuePair<string, string>("secret", secret),
+                new KeyValuePair<string, string>("response", token),
+            ]);
+            if (!string.IsNullOrWhiteSpace(clientIP))
+            {
+                parameters.Add(new KeyValuePair<string, string>("remoteip", clientIP));
+            }
+            var payload = new FormUrlEncodedContent(parameters);
+
+            using var response = await httpClient.PostAsync("recaptcha/api/siteverify", payload, cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                logger.LogError($"Error response {response.StatusCode} from Google ReCaptcha on request {requestID}.");
+                return false;
+            }
+
+            var respbody = await response.Content.ReadAsStringAsync(cancellationToken);
+            var result = Deserialize<GoogleReCaptchaResult>(respbody);
+            if (result == null)
+            {
+                logger.LogError($"Error deserializing Google ReCaptcha response: {respbody} on request {requestID}.");
+                return false;
+            }
+
+            return result.Success && result.Hostname.ToLower() == tenant;
         }
 
-        public async Task<bool> AssessAsync(string token, string action, CancellationToken cancellationToken)
+        private static T Deserialize<T>(string json) => System.Text.Json.JsonSerializer.Deserialize<T>(json, SERIALIZATION_OPTIONS)!;
+
+        class GoogleReCaptchaResult
         {
-            var projectID = this.configuration[GOOGLE_CLOUD_PROJECT_ID];
-            var recaptchaSiteKey = this.configuration[GOOGLE_RECAPTCHA_SITE_KEY];
+            public required bool Success { get; set; }
 
-            var projectName = new ProjectName(projectID);
+            public DateTimeOffset ChallengeTs { get; set; }
 
-            var createAssessmentRequest = new CreateAssessmentRequest
-            {
-                Assessment = new Assessment
-                {
-                    Event = new Event
-                    {
-                        SiteKey = recaptchaSiteKey,
-                        Token = token,
-                        ExpectedAction = action
-                    },
-                },
-                ParentAsProjectName = projectName
-            };
+            public required string Hostname { get; set; }
 
-            var response = await this.client.CreateAssessmentAsync(createAssessmentRequest, cancellationToken);
+            public required double Score { get; set; }
 
-            if (!response.TokenProperties.Valid)
-            {
-                this.logger.LogError($"The CreateAssessment call failed because the token was: {response.TokenProperties.InvalidReason}");
-                return false;
-            }
-
-            // Check if the expected action was executed.
-            if (response.TokenProperties.Action != action)
-            {
-                this.logger.LogError($"The action attribute in the reCAPTCHA tag does not match the action you are expecting to score as the action attribute in reCAPTCHA tag is: {response.TokenProperties.Action}. ");
-                return false;
-            }
-
-            var score = (decimal)response.RiskAnalysis.Score;
-            return score >= Decimal.Parse(this.configuration[GOOGLE_RECAPTCHA_PASS_THRESHOLD]);
+            public required string Action { get; set; }
         }
     }
 }
