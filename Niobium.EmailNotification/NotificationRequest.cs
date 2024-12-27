@@ -5,7 +5,7 @@ namespace Niobium.EmailNotification
     public class NotificationRequest
     {
         [Required]
-        public Guid? ID { get; set; }
+        public Guid ID { get; set; }
 
         [Required]
         [MaxLength(50)]
@@ -13,7 +13,7 @@ namespace Niobium.EmailNotification
 
         [Required]
         [MaxLength(3000)]
-        public string? Message { get; set; }
+        public required string Message { get; set; }
 
         [MaxLength(50)]
         public string? Name { get; set; }
@@ -22,7 +22,7 @@ namespace Niobium.EmailNotification
         public string? Contact { get; set; }
 
         [Required]
-        [MaxLength(500)]
-        public string? Token { get; set; }
+        [MaxLength(5000)]
+        public required string Token { get; set; }
     }
 }

@@ -60,48 +60,43 @@ stages:
               "slotSetting": false
             },
             {
-                "name": "STORAGE_ACCOUNT",
-                "value": "$(storageAccountConnectionString)",
+                "name": "ResendServiceOptions:APIKey",
+                "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/RESEND-API-KEY/)",
                 "slotSetting": false
             },
             {
-                "name": "KEY_VAULT_ENDPOINT",
-                "value": "$(keyVaultUrl)",
+                "name": "EmailNotificationOptions:From",
+                "value": "noreply@niobium.co.nz",
                 "slotSetting": false
             },
             {
-                "name": "SENDGRID_API_KEY",
-                "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/SENDGRID-API-KEY/)",
+                "name": "EmailNotificationOptions:Subject",
+                "value": "New customer message",
                 "slotSetting": false
             },
             {
-                "name": "GOOGLE_CLOUD_PROJECT_ID",
-                "value": "niobium-1683970500451",
+                "name": "EmailNotificationOptions:Template",
+                "value": "From {{NAME}} ({{CONTACT}}): {{MESSAGE}}",
                 "slotSetting": false
             },
             {
-                "name": "GOOGLE_RECAPTCHA_SITE_KEY",
-                "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/GOOGLE-RECAPTCHA-SITE-KEY/)",
+                "name": "EmailNotificationOptions:Recipients:www.edennoodlesbar.co.nz",
+                "value": "yannkeynes@hotmail.com",
                 "slotSetting": false
             },
             {
-                "name": "GOOGLE_RECAPTCHA_JSON_CREDENTIALS",
-                "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/GOOGLE-RECAPTCHA-JSON-CREDENTIALS/)",
+                "name": "EmailNotificationOptions:Secrets:www.edennoodlesbar.co.nz",
+                "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/RECAPTCHA-WWW-EDENNOODLESBAR-CO-NZ/)",
                 "slotSetting": false
             },
             {
-                "name": "GOOGLE_RECAPTCHA_PASS_THRESHOLD",
-                "value": "0.9",
+                "name": "EmailNotificationOptions:Recipients:www.joychicbar.co.nz",
+                "value": "yannkeynes@hotmail.com",
                 "slotSetting": false
             },
             {
-                "name": "From:Email",
-                "value": "no-reply@niobium.co.nz",
-                "slotSetting": false
-            },
-            {
-                "name": "From:Name",
-                "value": "Niobium Notification Sender",
+                "name": "EmailNotificationOptions:Secrets:www.joychicbar.co.nz",
+                "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/RECAPTCHA-WWW-JOYCHICBAR-CO-NZ/)",
                 "slotSetting": false
             }
           ]
