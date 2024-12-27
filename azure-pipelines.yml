@@ -21,7 +21,7 @@ resources:
 stages:
 - stage: Production
   jobs:
-  - template: pipelines/jobs/FunctionAppBuild.yml@devops
+  - template: pipelines/jobs/GenericDotnetBuild.yml@devops
   - template: pipelines/jobs/FunctionAppInfrastructure.yml@devops
     parameters:
       azureServiceConnection: $(serviceConnection)
