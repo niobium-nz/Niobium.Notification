@@ -103,7 +103,7 @@ stages:
 
   - template: pipelines/jobs/FunctionAppDeploy.yml@devops
     parameters:
-      serviceConnectionId: $(serviceConnectionId)
+      serviceConnection: $(serviceConnectionId)
       resourceGroupName: $(serviceConnection)
       enableStagingSlot: true
         
