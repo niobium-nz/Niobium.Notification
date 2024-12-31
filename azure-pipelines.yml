@@ -5,7 +5,6 @@ trigger:
 variables:
   buildAgentVmImage: 'windows-latest'
   serviceConnection: 'niobium-emailnotification'
-  serviceConnectionId: 'be833375-311c-4ff9-9df6-d38673df744f'
 
 pool:
   vmImage: $(buildAgentVmImage)
@@ -22,6 +21,9 @@ stages:
 - stage: Production
   jobs:
   - template: pipelines/jobs/GenericDotnetBuild.yml@devops
+    parameters:
+      projectToPublish: '**/Elebit.Platform.API.csproj'
+
   - template: pipelines/jobs/FunctionAppInfrastructure.yml@devops
     parameters:
       azureServiceConnection: $(serviceConnection)
@@ -103,7 +105,7 @@ stages:
 
   - template: pipelines/jobs/FunctionAppDeploy.yml@devops
     parameters:
-      serviceConnection: $(serviceConnectionId)
+      serviceConnection: $(serviceConnection)
       resourceGroupName: $(serviceConnection)
       enableStagingSlot: true
         
