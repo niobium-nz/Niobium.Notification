@@ -22,7 +22,7 @@ stages:
   jobs:
   - template: pipelines/jobs/GenericDotnetBuild.yml@devops
     parameters:
-      projectToPublish: '**/Elebit.Platform.API.csproj'
+      projectToPublish: '**/Niobium.EmailNotification.csproj'
 
   - template: pipelines/jobs/FunctionAppInfrastructure.yml@devops
     parameters:
