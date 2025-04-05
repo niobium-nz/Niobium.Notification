@@ -1,7 +1,10 @@
 using System.Reflection;
 using System.Text.Encodings.Web;
 using System.Text.Unicode;
+using Cod.Database.StorageTable;
+using Cod.Platform;
 using Cod.Platform.Notification.Email.Resend;
+using Cod.Platform.StorageTable;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,6 +23,9 @@ var host = new HostBuilder()
         s.AddApplicationInsightsTelemetryWorkerService();
         s.ConfigureFunctionsApplicationInsights();
 
+        s.AddDatabase(ctx.Configuration.GetRequiredSection(nameof(StorageTableOptions)))
+         .PostConfigure<StorageTableOptions>(opt => opt.EnableInteractiveIdentity = ctx.Configuration.IsDevelopmentEnvironment());
+
         s.AddNotification(ctx.Configuration.GetRequiredSection(nameof(ResendServiceOptions)));
         s.Configure<EmailNotificationOptions>((settings) =>
         {
@@ -32,6 +38,12 @@ var host = new HostBuilder()
             httpClient.BaseAddress = new Uri("https://www.google.com/");
         })
         .AddStandardResilienceHandler();
-    }).Build();
+    })
+    .UseDefaultServiceProvider((_, options) =>
+    {
+        options.ValidateScopes = true;
+        options.ValidateOnBuild = true;
+    })
+    .Build();
 
 host.Run();

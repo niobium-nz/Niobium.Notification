@@ -46,7 +46,7 @@ namespace Niobium.EmailNotification
                 return false;
             }
 
-            return result.Success && result.Hostname.ToLower() == tenant;
+            return result.Success && result.Hostname.Equals(tenant, StringComparison.CurrentCultureIgnoreCase);
         }
 
         private static T Deserialize<T>(string json) => System.Text.Json.JsonSerializer.Deserialize<T>(json, SERIALIZATION_OPTIONS)!;

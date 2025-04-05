@@ -34,17 +34,55 @@ stages:
       allowedOrigins: '*'
       checkoutDevopsStep:
         checkout: devops
-        
-  - job: Configuration
-    dependsOn:
+
+  - job: Database
+    dependsOn: 
       - Infrastructure
     condition: succeeded()
     pool:
       vmImage: $(buildAgentVmImage)
     variables:
+      functionAppPrincipalId: $[dependencies.Infrastructure.outputs['infrastructureOutputs.functionAppPrincipalId']]
+    steps:
+    - checkout: devops
+    - template: pipelines/steps/newStorageAccount.yml@devops
+      parameters:
+        azureServiceConnection: $(serviceConnection)
+        resourceGroupName: $(resourceGroupName)
+        storageAccountName: 'niobiumemaildb'
+        contributorPrincipalId: $(functionAppPrincipalId)
+
+  - job: Messaging
+    dependsOn: 
+      - Infrastructure
+    condition: succeeded()
+    pool:
+      vmImage: $(buildAgentVmImage)
+    variables:
+      functionAppPrincipalId: $[dependencies.Infrastructure.outputs['infrastructureOutputs.functionAppPrincipalId']]
+    steps:
+    - checkout: devops
+    - template: pipelines/steps/newServiceBus.yml@devops
+      parameters:
+        azureServiceConnection: $(serviceConnection)
+        resourceGroupName: $(resourceGroupName)
+        serviceBusNamespaceName: 'niobiumemailsb'
+        serviceBusQueueName: 'subscribed'
+        dataOwnerPrincipalId: $(functionAppPrincipalId)
+
+  - job: Configuration
+    dependsOn:
+      - Infrastructure
+      - Database
+      - Messaging
+    condition: succeeded()
+    pool:
+      vmImage: $(buildAgentVmImage)
+    variables:
       functionAppName: $[dependencies.Infrastructure.outputs['infrastructureOutputs.functionAppName']]
+      databaseFQDN: $[dependencies.Database.outputs['newStorageAccountProperties.tableFQDN']]
       keyVaultUrl: $[dependencies.Infrastructure.outputs['infrastructureOutputs.keyVaultUrl']]
-      storageAccountConnectionString: $[dependencies.Infrastructure.outputs['infrastructureOutputs.storageAccountConnectionString']]
+      serviceBusFQDN: $[dependencies.Messaging.outputs['newServiceBusProperties.fullyQualifiedNamespace']]
     steps:
     - checkout: none
     - task: AzureAppServiceSettings@1
@@ -56,6 +94,16 @@ stages:
         slotName: 'staging'
         appSettings: |
           [
+            {
+              "name": "ServiceBusOptions:FullyQualifiedNamespace",
+              "value": "$(serviceBusFQDN)",
+              "slotSetting": false
+            },
+            {
+              "name": "StorageTableOptions:FullyQualifiedDomainName",
+              "value": "$(databaseFQDN)",
+              "slotSetting": false
+            },
             {
               "name": "WEBSITE_USE_PLACEHOLDER_DOTNETISOLATED",
               "value": "1",
