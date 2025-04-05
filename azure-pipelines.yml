@@ -82,8 +82,18 @@ stages:
                 "slotSetting": false
             },
             {
+                "name": "EmailNotificationOptions:Recipients:www.edennoodleshamilton.co.nz",
+                "value": "marketing@edennoodleshamilton.co.nz",
+                "slotSetting": false
+            },
+            {
+                "name": "EmailNotificationOptions:Secrets:www.edennoodleshamilton.co.nz",
+                "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/RECAPTCHA-WWW-EDENNOODLESHAMILTON-CO-NZ/)",
+                "slotSetting": false
+            },
+            {
                 "name": "EmailNotificationOptions:Recipients:www.edennoodlesbar.co.nz",
-                "value": "yannkeynes@hotmail.com",
+                "value": "market@edennoodlesbar.co.nz",
                 "slotSetting": false
             },
             {
@@ -93,7 +103,7 @@ stages:
             },
             {
                 "name": "EmailNotificationOptions:Recipients:www.joychicbar.co.nz",
-                "value": "yannkeynes@hotmail.com",
+                "value": "marketing@joychicbar.co.nz",
                 "slotSetting": false
             },
             {
