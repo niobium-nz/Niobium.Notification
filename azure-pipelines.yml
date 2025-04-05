@@ -48,7 +48,7 @@ stages:
     - template: pipelines/steps/newStorageAccount.yml@devops
       parameters:
         azureServiceConnection: $(serviceConnection)
-        resourceGroupName: $(resourceGroupName)
+        resourceGroupName: $(serviceConnection)
         storageAccountName: 'niobiumemaildb'
         contributorPrincipalId: $(functionAppPrincipalId)
 
@@ -65,7 +65,7 @@ stages:
     - template: pipelines/steps/newServiceBus.yml@devops
       parameters:
         azureServiceConnection: $(serviceConnection)
-        resourceGroupName: $(resourceGroupName)
+        resourceGroupName: $(serviceConnection)
         serviceBusNamespaceName: 'niobiumemailsb'
         serviceBusQueueName: 'subscribed'
         dataOwnerPrincipalId: $(functionAppPrincipalId)
