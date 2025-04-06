@@ -4,14 +4,13 @@ namespace Niobium.EmailNotification
 {
     public class Subscription
     {
-        private const char TENANT_SPLITOR = '@';
-        private const char SOURCE_SPLITOR = '|';
+        private const char SPLITOR = '|';
 
         [EntityKey(EntityKeyKind.PartitionKey)]
-        public required string Tenant { get; set; }
+        public required string Belonging { get; set; }
 
         [EntityKey(EntityKeyKind.RowKey)]
-        public required string ID { get; set; }
+        public required string Email { get; set; }
 
         [EntityKey(EntityKeyKind.Timestamp)]
         public DateTimeOffset? Timestamp { get; set; }
@@ -23,28 +22,30 @@ namespace Niobium.EmailNotification
 
         public string? LastName { get; set; }
 
-        public required string Email { get; set; }
+        public string? Source { get; set; }
 
-        public bool Disabled { get; set; }
+        public required DateTimeOffset Subscribed { get; set; }
 
-        public string GetSource()
+        public DateTimeOffset? Unsubscribed { get; set; }
+
+        public string GetTenant()
         {
-            return ID.Split(SOURCE_SPLITOR, 2, StringSplitOptions.RemoveEmptyEntries)[0];
+            return Belonging.Split(SPLITOR, 2, StringSplitOptions.RemoveEmptyEntries)[0];
         }
 
-        public void SetSource(string source)
+        public string GetCampaign()
         {
-            ID = BuildID(source);
+            return Belonging.Split(SPLITOR, 2, StringSplitOptions.RemoveEmptyEntries)[1];
         }
 
         public string GetFullID()
         {
-            return $"{ID}{TENANT_SPLITOR}{Tenant}";
+            return $"{Belonging}{SPLITOR}{Email}";
         }
 
-        public static string BuildID(string source)
+        public static string BuildBelonging(string tenant, string campaign)
         {
-            return $"{source.Trim()}{SOURCE_SPLITOR}{Guid.NewGuid()}";
+            return $"{tenant.Trim().ToLowerInvariant()}{SPLITOR}{campaign.Trim()}";
         }
     }
 }

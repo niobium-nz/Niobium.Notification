@@ -11,7 +11,10 @@ namespace Niobium.EmailNotification
         public string? Tenant { get; set; }
 
         [MaxLength(30)]
-        public required string Source { get; set; }
+        public required string Campaign { get; set; }
+
+        [MaxLength(30)]
+        public string? Source { get; set; }
 
         [Required]
         [MaxLength(50)]
