@@ -36,6 +36,7 @@ namespace Niobium.EmailNotification
                 }
             }
 
+            request.Format();
             var validationResults = new List<ValidationResult>();
             var validates = Validator.TryValidateObject(request, new ValidationContext(request), validationResults, true);
             if (!validates)
@@ -60,7 +61,7 @@ namespace Niobium.EmailNotification
                 Email = request.Email,
                 Disabled = false,
             };
-            
+
             await repo.CreateAsync(newSubscription, cancellationToken: cancellationToken);
             await queue.EnqueueAsync(new MessagingEntry<Subscription>
             {

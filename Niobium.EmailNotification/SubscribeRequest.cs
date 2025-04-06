@@ -27,5 +27,24 @@ namespace Niobium.EmailNotification
         [Required]
         [MaxLength(5000)]
         public required string Captcha { get; set; }
+
+        public void Format()
+        {
+            Source = Source.Trim();
+            FirstName = FirstName.Trim().ToUpperInvariant();
+
+            if (LastName != null)
+            {
+                LastName = LastName.Trim().ToUpperInvariant();
+            }
+
+            if (Tenant != null)
+            {
+                Tenant = Tenant.Trim().ToLowerInvariant();
+            }
+
+            Email = Email.Trim().ToLowerInvariant();
+            Captcha = Captcha.Trim();
+        }
     }
 }
