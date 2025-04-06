@@ -54,15 +54,16 @@ namespace Niobium.EmailNotification
 
             var newSubscription = new Subscription
             {
-                Tenant = tenant,
-                ID = Subscription.BuildID(request.Source),
+                Belonging = Subscription.BuildBelonging(tenant, request.Campaign),
+                Email = request.Email,
                 FirstName = request.FirstName,
                 LastName = request.LastName,
-                Email = request.Email,
-                Disabled = false,
+                Source = request.Source,
+                Subscribed = DateTimeOffset.UtcNow,
+                Unsubscribed = null,
             };
 
-            await repo.CreateAsync(newSubscription, cancellationToken: cancellationToken);
+            await repo.CreateAsync(newSubscription, replaceIfExist: true, cancellationToken: cancellationToken);
             await queue.EnqueueAsync(new MessagingEntry<Subscription>
             {
                 ID = newSubscription.GetFullID(),
