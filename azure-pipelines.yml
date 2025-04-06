@@ -67,7 +67,7 @@ stages:
         azureServiceConnection: $(serviceConnection)
         resourceGroupName: $(serviceConnection)
         serviceBusNamespaceName: 'niobiumemailsb'
-        serviceBusQueueName: 'subscribed'
+        serviceBusQueueName: 'subscription'
         dataOwnerPrincipalId: $(functionAppPrincipalId)
 
   - job: Configuration

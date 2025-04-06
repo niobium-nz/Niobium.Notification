@@ -44,7 +44,7 @@ namespace Niobium.EmailNotification
 
         public static string BuildID(string source)
         {
-            return $"{source.Trim().ToUpperInvariant()}{SOURCE_SPLITOR}{Guid.NewGuid()}";
+            return $"{source.Trim()}{SOURCE_SPLITOR}{Guid.NewGuid()}";
         }
     }
 }
