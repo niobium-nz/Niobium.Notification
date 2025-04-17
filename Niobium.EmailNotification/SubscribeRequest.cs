@@ -33,7 +33,10 @@ namespace Niobium.EmailNotification
 
         public void Format()
         {
-            Source = Source.Trim();
+            if (Source != null)
+            {
+                Source = Source.Trim();
+            }
             FirstName = FirstName.Trim().ToUpperInvariant();
 
             if (LastName != null)
