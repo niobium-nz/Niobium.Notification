@@ -110,8 +110,13 @@ stages:
               "slotSetting": false
             },
             {
-                "name": "ResendServiceOptions:APIKey",
+                "name": "ResendServiceOptions:GlobalAPIKey",
                 "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/RESEND-API-KEY/)",
+                "slotSetting": false
+            },
+            {
+                "name": "ResendServiceOptions:DomainScopedAPIKeys:edennoodleshamilton.co.nz",
+                "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/RESEND-API-KEY-EDENNOODLESHAMILTON-CO-NZ/)",
                 "slotSetting": false
             },
             {
