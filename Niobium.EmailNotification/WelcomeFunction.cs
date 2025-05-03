@@ -30,10 +30,13 @@ namespace Niobium.EmailNotification
                 cancellationToken: cancellationToken);
             ArgumentNullException.ThrowIfNull(template);
 
+            var unsubscribeEndpoint = request.GetTenant().Replace("www.", "api.");
+            var unsubscribeLink = $"https://{unsubscribeEndpoint}/unsubscribe?email={request.Email}&tenant={request.GetTenant()}&campaign={request.GetCampaign()}";
+
             var body = template.HTML
                 .Replace("{{FIRST_NAME}}", request.FirstName)
-                .Replace("{{LAST_NAME}}", request.LastName)
-                .Replace("{{TENANT}}", request.GetTenant());
+                .Replace("{{LAST_NAME}}", request.LastName ?? string.Empty)
+                .Replace("{{UNSUBSCRIBE_LINK}}", unsubscribeLink);
 
             var success = await sender.SendAsync(
                 template.From,
