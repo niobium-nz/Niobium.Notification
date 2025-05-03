@@ -43,6 +43,9 @@ namespace Niobium.EmailNotification
             return $"{Belonging}{SPLITOR}{Email}";
         }
 
+        public static string BuildPartitionKey(string tenant, string campaign) => BuildBelonging(tenant, campaign);
+        public static string BuildRowKey(string email) => email.Trim().ToLowerInvariant();
+
         public static string BuildBelonging(string tenant, string campaign)
         {
             return $"{tenant.Trim().ToLowerInvariant()}{SPLITOR}{campaign.Trim()}";
