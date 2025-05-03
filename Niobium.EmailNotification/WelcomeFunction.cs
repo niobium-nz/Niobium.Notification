@@ -1,3 +1,4 @@
+using System.Net;
 using Azure.Messaging.ServiceBus;
 using Cod;
 using Cod.Messaging.ServiceBus;
@@ -30,8 +31,9 @@ namespace Niobium.EmailNotification
                 cancellationToken: cancellationToken);
             ArgumentNullException.ThrowIfNull(template);
 
+            var urlEncodedEmail = WebUtility.UrlEncode(request.Email);
             var unsubscribeEndpoint = request.GetTenant().Replace("www.", "api.");
-            var unsubscribeLink = $"https://{unsubscribeEndpoint}/unsubscribe?email={request.Email}&tenant={request.GetTenant()}&campaign={request.GetCampaign()}";
+            var unsubscribeLink = $"https://{unsubscribeEndpoint}/api/unsubscribe?email={urlEncodedEmail}&tenant={request.GetTenant()}&campaign={request.GetCampaign()}";
 
             var body = template.HTML
                 .Replace("{{FIRST_NAME}}", request.FirstName)
