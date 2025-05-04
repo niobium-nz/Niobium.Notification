@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
@@ -8,7 +9,7 @@ namespace Niobium.EmailNotification
     public class SubscribeFromGoogleAdsFunction(ILogger<SubscribeFromGoogleAdsFunction> logger)
     {
         [Function(nameof(SubscribeFromGoogleAds))]
-        public IActionResult SubscribeFromGoogleAds(
+        public async Task<IActionResult> SubscribeFromGoogleAds(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequest req)
         {
             // log all query parameters
@@ -26,9 +27,8 @@ namespace Niobium.EmailNotification
             }
 
             // log JSON request body
-            req.Body.Position = 0;
             using var reader = new StreamReader(req.Body);
-            var body = reader.ReadToEnd();
+            var body = await reader.ReadToEndAsync();
             logger.LogInformation($"Request body: {body}");
 
             return new OkResult();
