@@ -37,7 +37,7 @@ namespace Niobium.EmailNotification
             var unsubscribeEndpoint = request.GetTenant().Replace("www.", "api.");
             var unsubscribeLink = $"https://{unsubscribeEndpoint}/api/unsubscribe?email={urlEncodedEmail}&tenant={request.GetTenant()}&campaign={request.GetCampaign()}";
 
-            var htmlTemplatePath = $"emailtemplates/{request.GetTenant()}/{request.GetCampaign()}.html";
+            var htmlTemplatePath = $"{request.GetTenant()}/{request.GetCampaign()}.html";
             string htmlTemplate;
             using var stream = await fileService.GetAsync("emailtemplates", htmlTemplatePath, cancellationToken: cancellationToken)
                 ?? throw new Cod.ApplicationException(InternalError.InternalServerError, $"Missing email template: {htmlTemplatePath}");
