@@ -20,7 +20,7 @@ namespace Niobium.EmailNotification
 
         public required string Subject { get; set; }
 
-        public required string HTML { get; set; }
+        public required string Blob { get; set; }
 
         public static string BuildParitionKey(string tenant)
         {
