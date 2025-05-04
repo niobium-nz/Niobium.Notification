@@ -16,7 +16,9 @@ namespace Niobium.EmailNotification
         [EntityKey(EntityKeyKind.ETag)]
         public string? ETag { get; set; }
 
-        public required string From { get; set; }
+        public string? FromDisplayName { get; set; }
+
+        public required string FromAddress { get; set; }
 
         public required string Subject { get; set; }
 
