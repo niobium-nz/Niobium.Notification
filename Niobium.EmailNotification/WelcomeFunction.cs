@@ -1,6 +1,7 @@
 using System.Net;
 using Azure.Messaging.ServiceBus;
 using Cod;
+using Cod.File;
 using Cod.Messaging.ServiceBus;
 using Cod.Platform.Notification.Email;
 using Microsoft.Azure.Functions.Worker;
@@ -10,6 +11,7 @@ namespace Niobium.EmailNotification
 {
     public class WelcomeFunction(
         IRepository<Template> repo,
+        IFileService fileService,
         IEmailNotificationClient sender,
         ILogger<WelcomeFunction> logger)
     {
@@ -35,7 +37,14 @@ namespace Niobium.EmailNotification
             var unsubscribeEndpoint = request.GetTenant().Replace("www.", "api.");
             var unsubscribeLink = $"https://{unsubscribeEndpoint}/api/unsubscribe?email={urlEncodedEmail}&tenant={request.GetTenant()}&campaign={request.GetCampaign()}";
 
-            var body = template.HTML
+            var htmlTemplatePath = $"emailtemplates/{request.GetTenant()}/{request.GetCampaign()}.html";
+            string htmlTemplate;
+            using var stream = await fileService.GetAsync("emailtemplates", htmlTemplatePath, cancellationToken: cancellationToken)
+                ?? throw new Cod.ApplicationException(InternalError.InternalServerError, $"Missing email template: {htmlTemplatePath}");
+            using var streamReader = new StreamReader(stream);
+            htmlTemplate = await streamReader.ReadToEndAsync(cancellationToken: cancellationToken);
+
+            var body = htmlTemplate
                 .Replace("{{FIRST_NAME}}", request.FirstName)
                 .Replace("{{LAST_NAME}}", request.LastName ?? string.Empty)
                 .Replace("{{UNSUBSCRIBE_LINK}}", unsubscribeLink);
@@ -48,7 +57,7 @@ namespace Niobium.EmailNotification
                 cancellationToken);
             if (!success)
             {
-                var error = $"Failed sending email to {template.HTML} for {request.GetCampaign()} by {request.GetTenant()}.";
+                var error = $"Failed sending email to {request.Email} for {request.GetCampaign()} by {request.GetTenant()}.";
                 logger.LogError(error);
                 throw new Cod.ApplicationException(InternalError.InternalServerError, internalMessage: error);
             }

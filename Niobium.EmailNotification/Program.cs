@@ -2,8 +2,10 @@ using System.Reflection;
 using System.Text.Encodings.Web;
 using System.Text.Unicode;
 using Cod.Database.StorageTable;
+using Cod.File.Blob;
 using Cod.Messaging.ServiceBus;
 using Cod.Platform;
+using Cod.Platform.Blob;
 using Cod.Platform.Notification.Email.Resend;
 using Cod.Platform.StorageTable;
 using Microsoft.Azure.Functions.Worker;
@@ -21,14 +23,19 @@ var host = new HostBuilder()
 #endif
     .ConfigureServices((ctx, s) =>
     {
+        var isDevelopment = ctx.Configuration.IsDevelopmentEnvironment();
+
         s.AddApplicationInsightsTelemetryWorkerService();
         s.ConfigureFunctionsApplicationInsights();
 
         s.AddDatabase(ctx.Configuration.GetRequiredSection(nameof(StorageTableOptions)))
-         .PostConfigure<StorageTableOptions>(opt => opt.EnableInteractiveIdentity = ctx.Configuration.IsDevelopmentEnvironment());
+         .PostConfigure<StorageTableOptions>(opt => opt.EnableInteractiveIdentity = isDevelopment);
+
+        s.AddFile(ctx.Configuration.GetRequiredSection(nameof(StorageBlobOptions)))
+         .PostConfigure<StorageBlobOptions>(opt => opt.EnableInteractiveIdentity = isDevelopment);
 
         s.AddMessaging(ctx.Configuration.GetRequiredSection(nameof(ServiceBusOptions)))
-         .PostConfigure<ServiceBusOptions>(opt => opt.EnableInteractiveIdentity = ctx.Configuration.IsDevelopmentEnvironment());
+         .PostConfigure<ServiceBusOptions>(opt => opt.EnableInteractiveIdentity = isDevelopment);
 
         s.AddNotification(ctx.Configuration.GetRequiredSection(nameof(ResendServiceOptions)));
         s.Configure<EmailNotificationOptions>((settings) =>
