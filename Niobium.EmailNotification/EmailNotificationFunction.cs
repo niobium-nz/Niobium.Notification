@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Net;
+using System.Net.Mail;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using Cod.Platform;
@@ -73,7 +74,7 @@ namespace Niobium.EmailNotification
                 .Replace(TEMPLATE_MESSAGE, message);
 
             var success = await sender.SendAsync(
-                options.Value.From,
+                new EmailAddress { Address = options.Value.From },
                 [recipient],
                 options.Value.Subject,
                 notification,

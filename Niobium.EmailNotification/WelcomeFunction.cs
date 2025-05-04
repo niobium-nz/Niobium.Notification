@@ -50,7 +50,7 @@ namespace Niobium.EmailNotification
                 .Replace("{{UNSUBSCRIBE_LINK}}", unsubscribeLink);
 
             var success = await sender.SendAsync(
-                template.From,
+                new EmailAddress { Address = template.FromAddress, DisplayName = template.FromDisplayName },
                 [request.Email],
                 template.Subject,
                 body,
