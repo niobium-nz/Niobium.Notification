@@ -45,8 +45,8 @@ namespace Niobium.EmailNotification
             htmlTemplate = await streamReader.ReadToEndAsync(cancellationToken: cancellationToken);
 
             var body = htmlTemplate
-                .Replace("{{FIRST_NAME}}", request.FirstName)
-                .Replace("{{LAST_NAME}}", request.LastName ?? string.Empty)
+                .Replace("{{FIRST_NAME}}", request.FirstName.ToUpperInvariant())
+                .Replace("{{LAST_NAME}}", string.IsNullOrWhiteSpace(request.LastName) ? string.Empty : request.LastName.ToUpperInvariant())
                 .Replace("{{UNSUBSCRIBE_LINK}}", unsubscribeLink);
 
             var success = await sender.SendAsync(
