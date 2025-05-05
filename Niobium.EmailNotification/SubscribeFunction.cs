@@ -1,7 +1,5 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
-using Cod;
-using Cod.Messaging;
 using Cod.Platform;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -9,22 +7,16 @@ using Microsoft.Azure.Functions.Worker;
 
 namespace Niobium.EmailNotification
 {
-    public class SubscribeFunction(
-        IRepository<Subscription> repo,
-        IMessagingBroker<Subscription> queue,
-        IVisitorRiskAssessor assessor)
+    public class SubscribeFunction(Func<SubscriptionDomain> domainFactory, IVisitorRiskAssessor assessor)
     {
-        private static readonly JsonSerializerOptions serializationOptions = new()
-        {
-            PropertyNameCaseInsensitive = true
-        };
+        private static readonly JsonSerializerOptions serializationOptions = new(JsonSerializerDefaults.Web);
 
         [Function(nameof(Subscribe))]
         public async Task<IActionResult> Subscribe(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequest req,
             CancellationToken cancellationToken)
         {
-            var request = await System.Text.Json.JsonSerializer.DeserializeAsync<SubscribeRequest>(req.Body, options: serializationOptions, cancellationToken: cancellationToken);
+            var request = await JsonSerializer.DeserializeAsync<SubscribeRequest>(req.Body, options: serializationOptions, cancellationToken: cancellationToken);
             ArgumentNullException.ThrowIfNull(request);
 
             if (string.IsNullOrWhiteSpace(request.Tenant))
@@ -52,24 +44,8 @@ namespace Niobium.EmailNotification
                 return new ForbidResult();
             }
 
-            var newSubscription = new Subscription
-            {
-                Belonging = Subscription.BuildBelonging(tenant, request.Campaign),
-                Email = request.Email,
-                FirstName = request.FirstName,
-                LastName = request.LastName,
-                Source = request.Source,
-                Subscribed = DateTimeOffset.UtcNow,
-                Unsubscribed = null,
-            };
-
-            await repo.CreateAsync(newSubscription, replaceIfExist: true, cancellationToken: cancellationToken);
-            await queue.EnqueueAsync(new MessagingEntry<Subscription>
-            {
-                ID = newSubscription.GetFullID(),
-                Value = newSubscription,
-            });
-
+            var domain = domainFactory();
+            await domain.SubscribeAsync(tenant, request.Campaign, request.Email, request.FirstName, request.LastName, request.Source, cancellationToken: cancellationToken);
             return new OkResult();
         }
     }
