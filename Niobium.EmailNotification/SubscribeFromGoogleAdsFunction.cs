@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Niobium.EmailNotification
 {
-    public class SubscribeFromGoogleAdsFunction(ILogger<SubscribeFromGoogleAdsFunction> logger)
+    public class SubscribeFromGoogleAdsFunction(Func<SubscriptionDomain> domainFactory, ILogger<SubscribeFromGoogleAdsFunction> logger)
     {
         private const string Source = "Google";
         private const string Tenant = "www.edennoodleshamilton.co.nz";
@@ -15,15 +15,14 @@ namespace Niobium.EmailNotification
         private const string FullNameColumnID = "FULL_NAME";
         private const string EmailColumnID = "EMAIL";
 
-        private static readonly JsonSerializerOptions serializationOptions = new(JsonSerializerDefaults.Web);
+        private static readonly JsonSerializerOptions snakeCaseSerializationOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
 
         [Function(nameof(SubscribeFromGoogleAds))]
         public async Task<IActionResult> SubscribeFromGoogleAds(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequest req,
-            Func<SubscriptionDomain> domainFactory,
             CancellationToken cancellationToken)
         {
-            var request = await JsonSerializer.DeserializeAsync<GoogleAdsLeadForm>(req.Body, options: serializationOptions, cancellationToken: cancellationToken);
+            var request = await JsonSerializer.DeserializeAsync<GoogleAdsLeadForm>(req.Body, options: snakeCaseSerializationOptions, cancellationToken: cancellationToken);
             if (request == null)
             {
                 return new BadRequestResult();
@@ -48,9 +47,21 @@ namespace Niobium.EmailNotification
 
             var emailValue = email.StringValue.Trim().ToLowerInvariant();
             var nameValue = fullName.StringValue.Trim();
+            var nameParts = nameValue.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            string firstName;
+            string? lastName = null;
+            if (nameParts.Length > 1)
+            {
+                firstName = nameParts[0];
+                lastName = string.Join(' ', nameParts.Skip(1));
+            }
+            else
+            {
+                firstName = nameParts[0];
+            }
 
             var domain = domainFactory();
-            await domain.SubscribeAsync(Tenant, Campaign, emailValue, nameValue, null, Source, cancellationToken);
+            await domain.SubscribeAsync(Tenant, Campaign, emailValue, firstName, lastName, Source, cancellationToken);
             logger.LogInformation($"Created subscription: {nameValue} <{emailValue}>");
             return new OkResult();
         }
