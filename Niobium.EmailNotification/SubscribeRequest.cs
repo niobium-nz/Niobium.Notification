@@ -37,11 +37,11 @@ namespace Niobium.EmailNotification
             {
                 Source = Source.Trim();
             }
-            FirstName = FirstName.Trim().ToUpperInvariant();
+            FirstName = FirstName.Trim();
 
             if (LastName != null)
             {
-                LastName = LastName.Trim().ToUpperInvariant();
+                LastName = LastName.Trim();
             }
 
             if (Tenant != null)
