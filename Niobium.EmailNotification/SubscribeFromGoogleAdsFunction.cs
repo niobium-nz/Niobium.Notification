@@ -61,7 +61,7 @@ namespace Niobium.EmailNotification
             }
 
             var domain = domainFactory();
-            await domain.SubscribeAsync(Tenant, Campaign, emailValue, firstName, lastName, Source, cancellationToken);
+            await domain.SubscribeAsync(Tenant, Campaign, emailValue, firstName, lastName, Source, null, cancellationToken);
             logger.LogInformation($"Created subscription: {nameValue} <{emailValue}>");
             return new OkResult();
         }

@@ -45,7 +45,7 @@ namespace Niobium.EmailNotification
             }
 
             var domain = domainFactory();
-            await domain.SubscribeAsync(tenant, request.Campaign, request.Email, request.FirstName, request.LastName, request.Source, cancellationToken: cancellationToken);
+            await domain.SubscribeAsync(tenant, request.Campaign, request.Email, request.FirstName, request.LastName, request.Source, clientIP, cancellationToken: cancellationToken);
             return new OkResult();
         }
     }

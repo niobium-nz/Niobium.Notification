@@ -28,6 +28,8 @@ namespace Niobium.EmailNotification
 
         public DateTimeOffset? Unsubscribed { get; set; }
 
+        public string? IP { get; set; }
+
         public string GetTenant()
         {
             return Belonging.Split(SPLITOR, 2, StringSplitOptions.RemoveEmptyEntries)[0];
