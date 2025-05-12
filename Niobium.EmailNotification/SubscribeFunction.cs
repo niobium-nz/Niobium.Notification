@@ -37,15 +37,15 @@ namespace Niobium.EmailNotification
             }
 
             var tenant = request.Tenant!;
-            var clientIP = req.GetRemoteIP();
-            var lowRisk = await assessor.AssessAsync(request.ID, tenant, request.Captcha, clientIP, cancellationToken);
+            var clientIP = req.GetRemoteIPs();
+            var lowRisk = await assessor.AssessAsync(request.ID, tenant, request.Captcha, clientIP.FirstOrDefault(), cancellationToken);
             if (!lowRisk)
             {
                 return new ForbidResult();
             }
 
             var domain = domainFactory();
-            await domain.SubscribeAsync(tenant, request.Campaign, request.Email, request.FirstName, request.LastName, request.Source, clientIP, cancellationToken: cancellationToken);
+            await domain.SubscribeAsync(tenant, request.Campaign, request.Email, request.FirstName, request.LastName, request.Source, string.Join(',', clientIP), cancellationToken: cancellationToken);
             return new OkResult();
         }
     }
