@@ -96,6 +96,11 @@ stages:
         appSettings: |
           [
             {
+              "name": "AzureWebJobs.Welcome.Disabled",
+              "value": "1",
+              "slotSetting": true
+            },
+            {
               "name": "ServiceBusOptions:FullyQualifiedNamespace",
               "value": "$(serviceBusFQDN)",
               "slotSetting": false
