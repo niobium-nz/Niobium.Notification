@@ -1,6 +1,6 @@
-namespace Niobium.EmailNotification
+namespace Niobium.Notification
 {
-    internal class GoogleAdsLeadForm
+    public class GoogleAdsLeadForm
     {
         public required string LeadID { get; set; }
 

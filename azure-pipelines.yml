@@ -2,10 +2,22 @@ name: '1.0$(Rev:.r)'
 trigger:
 - master
 
+parameters:
+- name: updateInfrastructure
+  type: boolean
+  default: false
+  displayName: Update Infrastructure
+  values:
+    - true
+    - false
+
 variables:
   buildAgentVmImage: 'windows-latest'
   serviceConnection: 'niobium-emailnotification'
-
+  resourceGroupName: 'niobium-emailnotification'
+  appName: 'NiobiumNotifyFunc'
+  enableStagingSlot: true
+  
 pool:
   vmImage: $(buildAgentVmImage)
 
@@ -22,15 +34,17 @@ stages:
   jobs:
   - template: pipelines/jobs/GenericDotnetBuild.yml@devops
     parameters:
-      projectToPublish: '**/Niobium.EmailNotification.csproj'
+      nugetVSTSFeedID: 'Niobium/niobium'
+      projectToPublish: '**/Niobium.Notification.Functions.csproj'
 
   - template: pipelines/jobs/FunctionAppInfrastructure.yml@devops
     parameters:
+      enabled: ${{ parameters.updateInfrastructure }}
       azureServiceConnection: $(serviceConnection)
-      resourceGroupName: $(serviceConnection)
-      appNamePrefix: 'NiobiumNotify'
+      resourceGroupName: $(resourceGroupName)
+      appName: $(appName)
       enableKeyVault: true
-      enableStagingSlot: true
+      enableStagingSlot: ${{ variables.enableStagingSlot }}
       allowedOrigins: '*'
       checkoutDevopsStep:
         checkout: devops
@@ -65,7 +79,7 @@ stages:
     - template: pipelines/steps/newServiceBus.yml@devops
       parameters:
         azureServiceConnection: $(serviceConnection)
-        resourceGroupName: $(serviceConnection)
+        resourceGroupName: $(resourceGroupName)
         serviceBusNamespaceName: 'niobiumemailsb'
         serviceBusQueueName: 'subscription'
         dataOwnerPrincipalId: $(functionAppPrincipalId)
@@ -79,26 +93,30 @@ stages:
     pool:
       vmImage: $(buildAgentVmImage)
     variables:
-      functionAppName: $[dependencies.Infrastructure.outputs['infrastructureOutputs.functionAppName']]
       databaseFQDN: $[dependencies.StorageAccount.outputs['newStorageAccountProperties.tableFQDN']]
       blobFQDN: $[dependencies.StorageAccount.outputs['newStorageAccountProperties.blobFQDN']]
       keyVaultUrl: $[dependencies.Infrastructure.outputs['infrastructureOutputs.keyVaultUrl']]
       serviceBusFQDN: $[dependencies.Messaging.outputs['newServiceBusProperties.fullyQualifiedNamespace']]
     steps:
     - checkout: none
+    - pwsh: Write-Output "##vso[task.setvariable variable=slotName;]production"
+      displayName: "Deploy to Production"
+      condition: eq('${{ variables.enableStagingSlot }}', false)
+    - pwsh: Write-Output "##vso[task.setvariable variable=slotName;]staging"
+      displayName: "Deploy to Staging"
+      condition: eq('${{ variables.enableStagingSlot }}', true)
     - task: AzureAppServiceSettings@1
       displayName: 'Update AppSettings'
       inputs:
         azureSubscription: $(serviceConnection)
-        appName: $(functionAppName)
-        resourceGroupName: $(serviceConnection)
-        slotName: 'staging'
+        appName: $(appName)
+        resourceGroupName: $(resourceGroupName)
         appSettings: |
           [
             {
-              "name": "AzureWebJobs.Welcome.Disabled",
+              "name": "WEBSITE_USE_PLACEHOLDER_DOTNETISOLATED",
               "value": "1",
-              "slotSetting": true
+              "slotSetting": false
             },
             {
               "name": "ServiceBusOptions:FullyQualifiedNamespace",
@@ -116,91 +134,91 @@ stages:
               "slotSetting": false
             },
             {
-              "name": "WEBSITE_USE_PLACEHOLDER_DOTNETISOLATED",
-              "value": "1",
-              "slotSetting": false
-            },
-            {
-                "name": "ResendServiceOptions:GlobalAPIKey",
-                "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/RESEND-API-KEY/)",
-                "slotSetting": false
-            },
-            {
-                "name": "ResendServiceOptions:DomainScopedAPIKeys:edennoodleshamilton.co.nz",
-                "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/RESEND-API-KEY-EDENNOODLESHAMILTON-CO-NZ/)",
-                "slotSetting": false
-            },
-            {
-                "name": "EmailNotificationOptions:From",
+                "name": "NotificationOptions:From",
                 "value": "noreply@niobium.co.nz",
                 "slotSetting": false
             },
             {
-                "name": "EmailNotificationOptions:Subject",
+                "name": "NotificationOptions:Subject",
                 "value": "New customer message",
                 "slotSetting": false
             },
             {
-                "name": "EmailNotificationOptions:Template",
+                "name": "NotificationOptions:Template",
                 "value": "From {{NAME}} ({{CONTACT}}): {{MESSAGE}}",
                 "slotSetting": false
             },
             {
-                "name": "EmailNotificationOptions:Recipients:www.edennoodleshamilton.co.nz",
+                "name": "NotificationOptions:Recipients:www.edennoodleshamilton.co.nz",
                 "value": "marketing@edennoodleshamilton.co.nz",
                 "slotSetting": false
             },
             {
-                "name": "EmailNotificationOptions:Secrets:www.edennoodleshamilton.co.nz",
-                "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/RECAPTCHA-WWW-EDENNOODLESHAMILTON-CO-NZ/)",
-                "slotSetting": false
-            },
-            {
-                "name": "EmailNotificationOptions:Recipients:www.edennoodlesbar.co.nz",
+                "name": "NotificationOptions:Recipients:www.edennoodlesbar.co.nz",
                 "value": "market@edennoodlesbar.co.nz",
                 "slotSetting": false
             },
             {
-                "name": "EmailNotificationOptions:Secrets:www.edennoodlesbar.co.nz",
-                "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/RECAPTCHA-WWW-EDENNOODLESBAR-CO-NZ/)",
-                "slotSetting": false
-            },
-            {
-                "name": "EmailNotificationOptions:Recipients:www.joychicbar.co.nz",
+                "name": "NotificationOptions:Recipients:www.joychicbar.co.nz",
                 "value": "marketing@joychicbar.co.nz",
                 "slotSetting": false
             },
             {
-                "name": "EmailNotificationOptions:Secrets:www.joychicbar.co.nz",
+                "name": "CaptchaOptions:Secrets:www.edennoodleshamilton.co.nz",
+                "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/RECAPTCHA-WWW-EDENNOODLESHAMILTON-CO-NZ/)",
+                "slotSetting": true
+            },
+            {
+                "name": "CaptchaOptions:Secrets:www.edennoodlesbar.co.nz",
+                "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/RECAPTCHA-WWW-EDENNOODLESBAR-CO-NZ/)",
+                "slotSetting": true
+            },
+            {
+                "name": "CaptchaOptions:Secrets:www.joychicbar.co.nz",
                 "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/RECAPTCHA-WWW-JOYCHICBAR-CO-NZ/)",
-                "slotSetting": false
+                "slotSetting": true
+            },
+            {
+                "name": "ResendServiceOptions:DomainScopedAPIKeys:edennoodleshamilton.co.nz",
+                "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/RESEND-API-KEY-EDENNOODLESHAMILTON-CO-NZ/)",
+                "slotSetting": true
+            },
+            {
+                "name": "ResendServiceOptions:GlobalAPIKey",
+                "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/RESEND-API-KEY/)",
+                "slotSetting": true
+            }
+          ]
+    - task: AzureAppServiceSettings@1
+      displayName: 'Update AppSettings'
+      inputs:
+        azureSubscription: $(serviceConnection)
+        appName: $(appName)
+        slotName: $(slotName)
+        resourceGroupName: $(resourceGroupName)
+        appSettings: |
+          [
+            {
+              "name": "ResendServiceOptions:GlobalAPIKey",
+              "value": "012345678901234567890123456789AB",
+              "slotSetting": true
+            },
+            {
+              "name": "CaptchaOptions:IsEnabled",
+              "value": "false",
+              "slotSetting": true
+            },
+            {
+              "name": "AzureWebJobs.Welcome.Disabled",
+              "value": "true",
+              "slotSetting": true
             }
           ]
 
   - template: pipelines/jobs/FunctionAppDeploy.yml@devops
     parameters:
+      appName: $(appName)
       serviceConnection: $(serviceConnection)
-      resourceGroupName: $(serviceConnection)
-      enableStagingSlot: true
-        
-  - job: GoLive
-    dependsOn:
-      - Infrastructure
-      - Configuration
-      - Deploy
-    condition: succeeded()
-    pool:
-      vmImage: $(buildAgentVmImage)
-    variables:
-      functionAppName: $[dependencies.Infrastructure.outputs['infrastructureOutputs.functionAppName']]
-    steps:
-    - checkout: none
-    - task: AzureAppServiceManage@0
-      displayName: 'Update AppSettings'
-      inputs:
-        azureSubscription: $(serviceConnection)
-        ResourceGroupName: $(serviceConnection)
-        WebAppName: $(functionAppName)
-        Action: 'Swap Slots'
-        SourceSlot: 'staging'
-        SwapWithProduction: true 
+      resourceGroupName: $(resourceGroupName)
+      enableStagingSlot: ${{ variables.enableStagingSlot }}
+      autoSwapSlots: true

@@ -1,6 +1,6 @@
 using Cod;
 
-namespace Niobium.EmailNotification
+namespace Niobium.Notification
 {
     public class SubscriptionDomain(Lazy<IRepository<Subscription>> repository, IEnumerable<IDomainEventHandler<IDomain<Subscription>>> eventHandlers)
         : GenericDomain<Subscription>(repository, eventHandlers)

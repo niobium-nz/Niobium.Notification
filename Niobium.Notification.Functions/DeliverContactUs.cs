@@ -1,19 +1,19 @@
 using System.ComponentModel.DataAnnotations;
 using System.Net;
-using System.Net.Mail;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using Cod.Platform;
+using Cod.Platform.Captcha.ReCaptcha;
 using Cod.Platform.Notification.Email;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Options;
 
-namespace Niobium.EmailNotification
+namespace Niobium.Notification.Functions
 {
-    public class EmailNotificationFunction(
-        IOptions<EmailNotificationOptions> options,
+    public class DeliverContactUs(
+        IOptions<NotificationOptions> options,
         HtmlEncoder encoder,
         IEmailNotificationClient sender,
         IVisitorRiskAssessor assessor)

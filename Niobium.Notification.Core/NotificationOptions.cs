@@ -1,6 +1,6 @@
-namespace Niobium.EmailNotification
+namespace Niobium.Notification
 {
-    public class EmailNotificationOptions
+    public class NotificationOptions
     {
         public required string From { get; set; }
 

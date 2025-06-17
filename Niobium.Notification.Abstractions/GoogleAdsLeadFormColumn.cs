@@ -1,6 +1,6 @@
-namespace Niobium.EmailNotification
+namespace Niobium.Notification
 {
-    internal class GoogleAdsLeadFormColumn
+    public class GoogleAdsLeadFormColumn
     {
         public required string ColumnID { get; set; }
 

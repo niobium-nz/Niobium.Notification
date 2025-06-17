@@ -7,16 +7,16 @@ using Cod.Platform.Notification.Email;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 
-namespace Niobium.EmailNotification
+namespace Niobium.Notification.Functions
 {
-    public class WelcomeFunction(
+    public class Welcome(
         IRepository<Template> repo,
         IFileService fileService,
         IEmailNotificationClient sender,
-        ILogger<WelcomeFunction> logger)
+        ILogger<Welcome> logger)
     {
         [Function(nameof(Welcome))]
-        public async Task Welcome(
+        public async Task Run(
             [ServiceBusTrigger("subscription", AutoCompleteMessages = true, Connection = nameof(ServiceBusOptions))]
             ServiceBusReceivedMessage message,
             CancellationToken cancellationToken)
