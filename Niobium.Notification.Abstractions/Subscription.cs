@@ -1,6 +1,6 @@
 using Cod;
 
-namespace Niobium.EmailNotification
+namespace Niobium.Notification
 {
     public class Subscription
     {

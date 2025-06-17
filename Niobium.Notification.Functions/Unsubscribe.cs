@@ -3,12 +3,12 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 
-namespace Niobium.EmailNotification
+namespace Niobium.Notification.Functions
 {
-    public class UnsubscribeFunction(IRepository<Subscription> repo)
+    public class Unsubscribe(IRepository<Subscription> repo)
     {
         [Function(nameof(Unsubscribe))]
-        public async Task<IActionResult> Unsubscribe(
+        public async Task<IActionResult> Run(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequest req,
             [FromQuery(Name = "email")] string email,
             [FromQuery(Name = "tenant")] string tenant,

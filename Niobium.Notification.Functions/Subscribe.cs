@@ -1,18 +1,19 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 using Cod.Platform;
+using Cod.Platform.Captcha.ReCaptcha;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 
-namespace Niobium.EmailNotification
+namespace Niobium.Notification.Functions
 {
-    public class SubscribeFunction(Func<SubscriptionDomain> domainFactory, IVisitorRiskAssessor assessor)
+    public class Subscribe(Func<SubscriptionDomain> domainFactory, IVisitorRiskAssessor assessor)
     {
         private static readonly JsonSerializerOptions serializationOptions = new(JsonSerializerDefaults.Web);
 
         [Function(nameof(Subscribe))]
-        public async Task<IActionResult> Subscribe(
+        public async Task<IActionResult> Run(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequest req,
             CancellationToken cancellationToken)
         {

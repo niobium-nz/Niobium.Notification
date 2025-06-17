@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace Niobium.EmailNotification
+namespace Niobium.Notification
 {
     public class SubscribeRequest
     {

@@ -4,9 +4,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 
-namespace Niobium.EmailNotification
+namespace Niobium.Notification.Functions
 {
-    public class SubscribeFromGoogleAdsFunction(Func<SubscriptionDomain> domainFactory, ILogger<SubscribeFromGoogleAdsFunction> logger)
+    public class SubscribeFromGoogleAds(Func<SubscriptionDomain> domainFactory, ILogger<SubscribeFromGoogleAds> logger)
     {
         private const string Source = "Google";
         private const string Tenant = "www.edennoodleshamilton.co.nz";
@@ -18,7 +18,7 @@ namespace Niobium.EmailNotification
         private static readonly JsonSerializerOptions snakeCaseSerializationOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
 
         [Function(nameof(SubscribeFromGoogleAds))]
-        public async Task<IActionResult> SubscribeFromGoogleAds(
+        public async Task<IActionResult> Run(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequest req,
             CancellationToken cancellationToken)
         {
