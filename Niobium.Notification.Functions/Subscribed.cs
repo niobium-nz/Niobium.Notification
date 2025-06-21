@@ -1,0 +1,28 @@
+using Azure.Messaging.ServiceBus;
+using Cod.Messaging;
+using Cod.Messaging.ServiceBus;
+using Microsoft.Azure.Functions.Worker;
+using Microsoft.Extensions.Logging;
+
+namespace Niobium.Notification.Functions
+{
+    public class Subscribed(
+        IExternalEventAdaptor<Subscription, SubscribedEvent> adaptor,
+        ILogger<Subscribed> logger)
+    {
+        [Function(nameof(Subscribed))]
+        public async Task Run(
+            [ServiceBusTrigger("subscribedevent", AutoCompleteMessages = true, Connection = nameof(ServiceBusOptions))]
+            ServiceBusReceivedMessage message,
+            CancellationToken cancellationToken)
+        {
+            if (!message.TryParse(out SubscribedEvent? evt, out var rawBody))
+            {
+                logger.LogError($"Failed to parse message {message.MessageId}: {rawBody}");
+                return;
+            }
+
+            await adaptor.OnEvent(evt, cancellationToken);
+        }
+    }
+}

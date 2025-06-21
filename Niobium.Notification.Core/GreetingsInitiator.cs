@@ -1,32 +1,23 @@
 using System.Net;
-using Azure.Messaging.ServiceBus;
 using Cod;
 using Cod.File;
-using Cod.Messaging.ServiceBus;
 using Cod.Platform.Notification.Email;
-using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 
-namespace Niobium.Notification.Functions
+namespace Niobium.Notification
 {
-    public class Welcome(
+    internal class GreetingsInitiator(
         IRepository<Template> repo,
         IFileService fileService,
         IEmailNotificationClient sender,
-        ILogger<Welcome> logger)
+        ILogger<GreetingsInitiator> logger)
+        : DomainEventHandler<SubscriptionDomain, SubscribedEvent>
     {
-        [Function(nameof(Welcome))]
-        public async Task Run(
-            [ServiceBusTrigger("subscription", AutoCompleteMessages = true, Connection = nameof(ServiceBusOptions))]
-            ServiceBusReceivedMessage message,
-            CancellationToken cancellationToken)
-        {
-            if (!message.TryParse(out Subscription? request, out var rawBody))
-            {
-                logger.LogWarning($"Invalid request: {rawBody}");
-                return;
-            }
+        protected override DomainEventAudience EventSource => DomainEventAudience.External;
 
+        public async override Task HandleCoreAsync(SubscribedEvent e, CancellationToken cancellationToken)
+        {
+            var request = e.Subscription;
             var template = await repo.RetrieveAsync(
                 Template.BuildParitionKey(request.GetTenant()),
                 Template.BuildRowKey(request.GetCampaign()),
@@ -47,8 +38,7 @@ namespace Niobium.Notification.Functions
             var body = htmlTemplate
                 .Replace("{{FIRST_NAME}}", request.FirstName.ToUpperInvariant())
                 .Replace("{{LAST_NAME}}", string.IsNullOrWhiteSpace(request.LastName) ? string.Empty : request.LastName.ToUpperInvariant())
-                .Replace("{{UNSUBSCRIBE_LINK}}", unsubscribeLink);
-
+            .Replace("{{UNSUBSCRIBE_LINK}}", unsubscribeLink);
             var success = await sender.SendAsync(
                 new EmailAddress { Address = template.FromAddress, DisplayName = template.FromDisplayName },
                 [request.Email],

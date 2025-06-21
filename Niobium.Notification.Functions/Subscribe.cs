@@ -1,14 +1,19 @@
-using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
+using Cod;
 using Cod.Platform;
 using Cod.Platform.Captcha.ReCaptcha;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
+using Microsoft.Extensions.Logging;
+using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace Niobium.Notification.Functions
 {
-    public class Subscribe(Func<SubscriptionDomain> domainFactory, IVisitorRiskAssessor assessor)
+    public class Subscribe(
+        Func<SubscriptionDomain> domainFactory,
+        IVisitorRiskAssessor assessor,
+        ILogger<Subscribe> logger)
     {
         private static readonly JsonSerializerOptions serializationOptions = new(JsonSerializerDefaults.Web);
 
@@ -17,8 +22,11 @@ namespace Niobium.Notification.Functions
             [HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequest req,
             CancellationToken cancellationToken)
         {
-            var request = await JsonSerializer.DeserializeAsync<SubscribeRequest>(req.Body, options: serializationOptions, cancellationToken: cancellationToken);
-            ArgumentNullException.ThrowIfNull(request);
+            var request = await JsonSerializer.DeserializeAsync<SubscribeCommand>(req.Body, options: serializationOptions, cancellationToken: cancellationToken);
+            if (request == null)
+            {
+                return new BadRequestResult();
+            }
 
             if (string.IsNullOrWhiteSpace(request.Tenant))
             {
@@ -29,24 +37,25 @@ namespace Niobium.Notification.Functions
                 }
             }
 
-            request.Format();
-            var validationResults = new List<ValidationResult>();
-            var validates = Validator.TryValidateObject(request, new ValidationContext(request), validationResults, true);
-            if (!validates)
+            request.TryValidate(out var validationState);
+            if (!validationState.IsValid)
             {
-                return new BadRequestObjectResult(validationResults);
+                logger.LogWarning("Validation failed for order request: {Errors}", JsonSerializer.Serialize(validationState.ToDictionary(), serializationOptions));
+                return validationState.MakeResponse();
             }
 
-            var tenant = request.Tenant!;
-            var clientIP = req.GetRemoteIPs();
-            var lowRisk = await assessor.AssessAsync(request.ID, tenant, request.Captcha, clientIP.FirstOrDefault(), cancellationToken);
-            if (!lowRisk)
+            if (request.Captcha == null)
             {
                 return new ForbidResult();
             }
 
-            var domain = domainFactory();
-            await domain.SubscribeAsync(tenant, request.Campaign, request.Email, request.FirstName, request.LastName, request.Source, string.Join(',', clientIP), cancellationToken: cancellationToken);
+            var risk = await req.AssessRiskAsync(assessor, request.ID, request.Captcha, logger, cancellationToken);
+            if (risk != null)
+            {
+                return risk;
+            }
+
+            await domainFactory().SubscribeAsync(request.Tenant!, request.Campaign, request.Email, request.FirstName, request.LastName, request.Source, req.GetRemoteIP(), cancellationToken: cancellationToken);
             return new OkResult();
         }
     }

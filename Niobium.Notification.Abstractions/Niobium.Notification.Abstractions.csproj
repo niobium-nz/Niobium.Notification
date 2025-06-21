@@ -29,5 +29,6 @@
 
   <ItemGroup>
     <PackageReference Include="Cod.Abstractions" Version="2.2.76" />
+    <PackageReference Include="Cod.Messaging" Version="2.2.76" />
   </ItemGroup>
 </Project>
