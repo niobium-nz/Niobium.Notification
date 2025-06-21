@@ -1,8 +1,9 @@
 using System.ComponentModel.DataAnnotations;
+using Cod;
 
 namespace Niobium.Notification
 {
-    public class SubscribeRequest
+    public class SubscribeCommand : IUserInput
     {
         [Required]
         public Guid ID { get; set; }
@@ -27,11 +28,10 @@ namespace Niobium.Notification
         [EmailAddress]
         public required string Email { get; set; }
 
-        [Required]
         [MaxLength(5000)]
-        public required string Captcha { get; set; }
+        public string? Captcha { get; set; }
 
-        public void Format()
+        public void Sanitize()
         {
             if (Source != null)
             {
@@ -50,7 +50,11 @@ namespace Niobium.Notification
             }
 
             Email = Email.Trim().ToLowerInvariant();
-            Captcha = Captcha.Trim();
+
+            if (Captcha != null)
+            {
+                Captcha = Captcha.Trim();
+            }
         }
     }
 }

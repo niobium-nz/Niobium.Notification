@@ -81,7 +81,7 @@ stages:
         azureServiceConnection: $(serviceConnection)
         resourceGroupName: $(resourceGroupName)
         serviceBusNamespaceName: 'niobiumemailsb'
-        serviceBusQueueNames: ['cmdsubscribe', 'evtsubscribed']
+        serviceBusQueueNames: ['subscribecommand', 'subscribedevent']
         dataOwnerPrincipalId: $(functionAppPrincipalId)
 
   - job: Configuration
@@ -209,7 +209,12 @@ stages:
               "slotSetting": true
             },
             {
-              "name": "AzureWebJobs.Welcome.Disabled",
+              "name": "AzureWebJobs.Subscribed.Disabled",
+              "value": "true",
+              "slotSetting": true
+            },
+            {
+              "name": "AzureWebJobs.SubscribeCommandConsumer.Disabled",
               "value": "true",
               "slotSetting": true
             }

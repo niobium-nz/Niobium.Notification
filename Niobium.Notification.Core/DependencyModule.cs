@@ -1,6 +1,7 @@
 using System.Text.Encodings.Web;
 using System.Text.Unicode;
 using Cod;
+using Cod.Messaging;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Niobium.Notification
@@ -20,7 +21,9 @@ namespace Niobium.Notification
 
             services.AddSingleton(HtmlEncoder.Create(allowedRanges: [UnicodeRanges.BasicLatin, UnicodeRanges.CjkUnifiedIdeographs]));
             services.AddDomain<SubscriptionDomain, Subscription>();
-            services.AddDomainEventHandler<WelcomeSubscriptionTrigger, Subscription>();
+            services.AddDomainEventHandler<SubscribedEventAdaptor, Subscription>();
+            services.AddDomainEventHandler<GreetingsInitiator, Subscription>();
+            services.EnableExternalEvent<Subscription, SubscribedEvent>();
 
             return services;
         }
