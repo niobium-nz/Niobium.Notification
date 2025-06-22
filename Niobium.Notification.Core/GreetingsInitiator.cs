@@ -22,7 +22,11 @@ namespace Niobium.Notification
                 Template.BuildParitionKey(request.GetTenant()),
                 Template.BuildRowKey(request.GetCampaign()),
                 cancellationToken: cancellationToken);
-            ArgumentNullException.ThrowIfNull(template);
+            if (template == null)
+            {
+                logger.LogWarning($"Missing email template for {request.GetCampaign()} by {request.GetTenant()}");
+                return;
+            }
 
             var urlEncodedEmail = WebUtility.UrlEncode(request.Email);
             var unsubscribeEndpoint = request.GetTenant().Replace("www.", "api.");
