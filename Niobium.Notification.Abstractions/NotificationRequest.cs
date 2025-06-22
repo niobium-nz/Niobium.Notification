@@ -5,7 +5,7 @@ namespace Niobium.Notification
     public class NotificationRequest
     {
         [Required]
-        public Guid ID { get; set; }
+        public string ID { get; set; }
 
         [Required]
         [MaxLength(50)]

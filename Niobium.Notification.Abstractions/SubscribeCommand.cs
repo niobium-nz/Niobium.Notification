@@ -1,13 +1,11 @@
 using System.ComponentModel.DataAnnotations;
 using Cod;
+using Cod.Messaging;
 
 namespace Niobium.Notification
 {
-    public class SubscribeCommand : IUserInput
+    public class SubscribeCommand : DomainEvent, IUserInput
     {
-        [Required]
-        public Guid ID { get; set; }
-
         [MaxLength(50)]
         public string? Tenant { get; set; }
 
@@ -15,7 +13,7 @@ namespace Niobium.Notification
         public required string Campaign { get; set; }
 
         [MaxLength(30)]
-        public string? Source { get; set; }
+        public string? Track { get; set; }
 
         [Required]
         [MaxLength(50)]
@@ -33,9 +31,9 @@ namespace Niobium.Notification
 
         public void Sanitize()
         {
-            if (Source != null)
+            if (Track != null)
             {
-                Source = Source.Trim();
+                Track = Track.Trim();
             }
             FirstName = FirstName.Trim();
 

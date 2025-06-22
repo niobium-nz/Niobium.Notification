@@ -36,7 +36,7 @@ namespace Niobium.Notification.Functions
                 return;
             }
 
-            await domainFactory().SubscribeAsync(evt.Tenant!, evt.Campaign, evt.Email, evt.FirstName, evt.LastName, evt.Source, cancellationToken: cancellationToken);
+            await domainFactory().SubscribeAsync(evt.Tenant!, evt.Campaign, evt.Email, evt.FirstName, evt.LastName, evt.Track, cancellationToken: cancellationToken);
         }
     }
 }
