@@ -23,7 +23,7 @@ namespace Niobium.Notification
             services.AddDomain<SubscriptionDomain, Subscription>();
             services.AddDomainEventHandler<SubscribedEventAdaptor, Subscription>();
             services.AddDomainEventHandler<GreetingsInitiator, Subscription>();
-            services.EnableExternalEvent<Subscription, SubscribedEvent>();
+            services.EnableExternalEvent<SubscribedEvent, Subscription>();
 
             return services;
         }
