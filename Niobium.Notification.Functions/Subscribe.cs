@@ -55,7 +55,7 @@ namespace Niobium.Notification.Functions
                 return risk;
             }
 
-            await domainFactory().SubscribeAsync(request.Tenant!, request.Campaign, request.Email, request.FirstName, request.LastName, request.Source, req.GetRemoteIP(), cancellationToken: cancellationToken);
+            await domainFactory().SubscribeAsync(request.Tenant!, request.Campaign, request.Email, request.FirstName, request.LastName, request.Track, req.GetRemoteIP(), cancellationToken: cancellationToken);
             return new OkResult();
         }
     }
