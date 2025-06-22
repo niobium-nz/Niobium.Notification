@@ -204,8 +204,8 @@ stages:
               "slotSetting": true
             },
             {
-              "name": "CaptchaOptions:IsEnabled",
-              "value": "false",
+              "name": "CaptchaOptions:IsDisabled",
+              "value": "true",
               "slotSetting": true
             },
             {
