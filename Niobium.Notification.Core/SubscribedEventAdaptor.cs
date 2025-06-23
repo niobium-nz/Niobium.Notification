@@ -7,11 +7,15 @@ namespace Niobium.Notification
     {
         public async override Task HandleCoreAsync(EntityChangedEvent<Subscription> e, CancellationToken cancellationToken)
         {
-            await queue.EnqueueAsync(new MessagingEntry<SubscribedEvent>
+            if (e.ChangeType.HasFlag(EntityChangeType.Created))
             {
-                ID = e.NewEntity.GetFullID(),
-                Value = new SubscribedEvent { Subscription = e.NewEntity },
-            }, cancellationToken: cancellationToken);
+                await queue.EnqueueAsync(new MessagingEntry<SubscribedEvent>
+                {
+                    ID = e.Entity.GetFullID(),
+                    Value = new SubscribedEvent { Subscription = e.Entity },
+                }, cancellationToken: cancellationToken);
+            }
+            
         }
     }
 }
