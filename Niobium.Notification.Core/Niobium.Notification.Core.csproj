@@ -22,9 +22,9 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.6" />
-    <PackageReference Include="Cod.Messaging" Version="2.2.86" />
-    <PackageReference Include="Cod.File" Version="2.2.86" />
-    <PackageReference Include="Cod.Platform.Notification.Email" Version="2.2.86" />
+    <PackageReference Include="Cod.Messaging" Version="2.2.91" />
+    <PackageReference Include="Cod.File" Version="2.2.91" />
+    <PackageReference Include="Cod.Platform.Notification.Email" Version="2.2.91" />
   </ItemGroup>
 
   <ItemGroup>
