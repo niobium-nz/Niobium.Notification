@@ -16,6 +16,10 @@ variables:
   serviceConnection: 'niobium-emailnotification'
   resourceGroupName: 'niobium-emailnotification'
   appName: 'NiobiumNotifyFunc'
+  tableDB: 'niobiumemaildb'
+  serviceBusNamespace: 'niobiumemailsb'
+  subscribeCommandQueueName: 'subscribecommand'
+  subscribedEventQueueName: 'subscribedevent'
   enableStagingSlot: true
   
 pool:
@@ -63,7 +67,7 @@ stages:
       parameters:
         azureServiceConnection: $(serviceConnection)
         resourceGroupName: $(serviceConnection)
-        storageAccountName: 'niobiumemaildb'
+        storageAccountName: $(tableDB)
         contributorPrincipalId: $(functionAppPrincipalId)
 
   - job: Messaging
@@ -80,8 +84,8 @@ stages:
       parameters:
         azureServiceConnection: $(serviceConnection)
         resourceGroupName: $(resourceGroupName)
-        serviceBusNamespaceName: 'niobiumemailsb'
-        serviceBusQueueNames: ['subscribecommand', 'subscribedevent']
+        serviceBusNamespaceName: $(serviceBusNamespace)
+        serviceBusQueueNames: [$(subscribeCommandQueueName), $(subscribedEventQueueName)]
         dataOwnerPrincipalId: $(functionAppPrincipalId)
 
   - job: Configuration
