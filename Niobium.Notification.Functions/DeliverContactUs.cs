@@ -1,7 +1,6 @@
-using System.ComponentModel.DataAnnotations;
 using System.Net;
 using System.Text.Encodings.Web;
-using System.Text.Json;
+using Cod;
 using Cod.Platform;
 using Cod.Platform.Captcha.ReCaptcha;
 using Cod.Platform.Notification.Email;
@@ -9,6 +8,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Options;
+using ApplicationException = Cod.ApplicationException;
+using InternalError = Cod.Platform.InternalError;
+using FromBodyAttribute = Microsoft.Azure.Functions.Worker.Http.FromBodyAttribute;
 
 namespace Niobium.Notification.Functions
 {
@@ -22,19 +24,12 @@ namespace Niobium.Notification.Functions
         private const string TEMPLATE_CONTACT = "{{CONTACT}}";
         private const string TEMPLATE_MESSAGE = "{{MESSAGE}}";
 
-        private static readonly JsonSerializerOptions serializationOptions = new()
-        {
-            PropertyNameCaseInsensitive = true
-        };
-
         [Function(nameof(Notification))]
         public async Task<IActionResult> Notification(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequest req,
+            [FromBody] NotificationRequest request,
             CancellationToken cancellationToken)
         {
-            var request = await JsonSerializer.DeserializeAsync<NotificationRequest>(req.Body, options: serializationOptions, cancellationToken: cancellationToken);
-            ArgumentNullException.ThrowIfNull(request);
-
             if (string.IsNullOrWhiteSpace(request.Tenant))
             {
                 var referer = req.Headers.Referer.SingleOrDefault();
@@ -44,11 +39,10 @@ namespace Niobium.Notification.Functions
                 }
             }
 
-            var validationResults = new List<ValidationResult>();
-            var validates = Validator.TryValidateObject(request, new ValidationContext(request), validationResults, true);
-            if (!validates)
+            request.TryValidate(out var validationState);
+            if (!validationState.IsValid)
             {
-                return new BadRequestObjectResult(validationResults);
+                return validationState.MakeResponse();
             }
 
             var tenant = request.Tenant!;
@@ -60,7 +54,7 @@ namespace Niobium.Notification.Functions
             }
 
             var recipient = options.Value.Recipients[tenant]
-                ?? throw new ApplicationException($"Missing tenant recipient: {tenant}");
+                ?? throw new ApplicationException(InternalError.InternalServerError, $"Missing tenant recipient: {tenant}");
 
             var message = encoder.Encode(request.Message);
             var name = request.Name ?? "unspecified";
