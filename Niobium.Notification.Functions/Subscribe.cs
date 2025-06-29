@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Cod;
 using Cod.Platform;
 using Cod.Platform.Captcha.ReCaptcha;
@@ -6,7 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
-using JsonSerializer = System.Text.Json.JsonSerializer;
+using FromBodyAttribute = Microsoft.Azure.Functions.Worker.Http.FromBodyAttribute;
 
 namespace Niobium.Notification.Functions
 {
@@ -15,47 +14,37 @@ namespace Niobium.Notification.Functions
         IVisitorRiskAssessor assessor,
         ILogger<Subscribe> logger)
     {
-        private static readonly JsonSerializerOptions serializationOptions = new(JsonSerializerDefaults.Web);
-
         [Function(nameof(Subscribe))]
         public async Task<IActionResult> Run(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequest req,
+            [FromBody] SubscribeCommand command,
             CancellationToken cancellationToken)
         {
-            var request = await JsonSerializer.DeserializeAsync<SubscribeCommand>(req.Body, options: serializationOptions, cancellationToken: cancellationToken);
-            if (request == null)
+            var tenant = req.GetTenant();
+            if (string.IsNullOrWhiteSpace(tenant))
             {
-                return new BadRequestResult();
+                return new BadRequestObjectResult(new { Error = "Tenant is required." });
             }
+            command.Tenant = tenant;
 
-            if (string.IsNullOrWhiteSpace(request.Tenant))
-            {
-                var referer = req.Headers.Referer.SingleOrDefault();
-                if (referer != null)
-                {
-                    request.Tenant = new Uri(referer).Host.ToLower();
-                }
-            }
-
-            request.TryValidate(out var validationState);
-            if (!validationState.IsValid)
-            {
-                logger.LogWarning("Validation failed for order request: {Errors}", JsonSerializer.Serialize(validationState.ToDictionary(), serializationOptions));
-                return validationState.MakeResponse();
-            }
-
-            if (request.Captcha == null)
+            if (command.Captcha == null)
             {
                 return new ForbidResult();
             }
 
-            var risk = await req.AssessRiskAsync(assessor, request.ID, request.Captcha, logger, cancellationToken);
+            command.TryValidate(out var validationState);
+            if (!validationState.IsValid)
+            {
+                return validationState.MakeResponse();
+            }
+
+            var risk = await req.AssessRiskAsync(assessor, command.ID, command.Captcha, logger, cancellationToken);
             if (risk != null)
             {
                 return risk;
             }
 
-            await domainFactory().SubscribeAsync(request.Tenant!, request.Campaign, request.Email, request.FirstName, request.LastName, request.Track, req.GetRemoteIP(), cancellationToken: cancellationToken);
+            await domainFactory().SubscribeAsync(command.Tenant, command.Campaign, command.Email, command.FirstName, command.LastName, command.Track, req.GetRemoteIP(), cancellationToken: cancellationToken);
             return new OkResult();
         }
     }
