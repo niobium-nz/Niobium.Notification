@@ -4,15 +4,13 @@ using Cod.Platform.Captcha.ReCaptcha;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
-using Microsoft.Extensions.Logging;
 using FromBodyAttribute = Microsoft.Azure.Functions.Worker.Http.FromBodyAttribute;
 
 namespace Niobium.Notification.Functions
 {
     public class Subscribe(
         Func<SubscriptionDomain> domainFactory,
-        IVisitorRiskAssessor assessor,
-        ILogger<Subscribe> logger)
+        IVisitorRiskAssessor assessor)
     {
         [Function(nameof(Subscribe))]
         public async Task<IActionResult> Run(
@@ -38,11 +36,7 @@ namespace Niobium.Notification.Functions
                 return validationState.MakeResponse();
             }
 
-            var risk = await req.AssessRiskAsync(assessor, command.ID, command.Captcha, logger, cancellationToken);
-            if (risk != null)
-            {
-                return risk;
-            }
+            await assessor.AssessAsync(command.Captcha, requestID: command.ID, tenant: command.Tenant, cancellationToken: cancellationToken);
 
             await domainFactory().SubscribeAsync(command.Tenant, command.Campaign, command.Email, command.FirstName, command.LastName, command.Track, req.GetRemoteIP(), cancellationToken: cancellationToken);
             return new OkResult();

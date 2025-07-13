@@ -183,8 +183,8 @@ stages:
                 "slotSetting": true
             },
             {
-                "name": "ResendServiceOptions:DomainScopedAPIKeys:edennoodleshamilton.co.nz",
-                "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/RESEND-API-KEY-EDENNOODLESHAMILTON-CO-NZ/)",
+                "name": "ResendServiceOptions:DomainScopedAPIKeys:xxx.co.nz",
+                "value": "test123)",
                 "slotSetting": true
             },
             {
@@ -213,7 +213,7 @@ stages:
               "slotSetting": true
             },
             {
-              "name": "AzureWebJobs.Subscribed.Disabled",
+              "name": "AzureWebJobs.SubscribedEventConsumer.Disabled",
               "value": "true",
               "slotSetting": true
             },
