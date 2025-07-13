@@ -18,9 +18,7 @@ namespace Niobium.Notification.Functions
         IOptions<NotificationOptions> options,
         HtmlEncoder encoder,
         IEmailNotificationClient sender,
-        IVisitorRiskAssessor assessor,
-        Lazy<IHttpContextAccessor> httpContextAccessor
-        )
+        IVisitorRiskAssessor assessor)
     {
         private const string TEMPLATE_NAME = "{{NAME}}";
         private const string TEMPLATE_CONTACT = "{{CONTACT}}";
@@ -32,17 +30,6 @@ namespace Niobium.Notification.Functions
             [FromBody] NotificationRequest request,
             CancellationToken cancellationToken)
         {
-            var test1 = httpContextAccessor.Value.HttpContext?.Request.GetTenant() ??
-                throw new Exception("Tenant is not available in the request context.");
-
-            var test2 = httpContextAccessor.Value.HttpContext?.Request.GetRemoteIP() ??
-                throw new Exception("Remote IP is not available in the request context.");
-
-            if (String.IsNullOrWhiteSpace(request.Token))
-            {
-                throw new Exception("Missing captcha token in request.");
-            }
-
             var tenant = req.GetTenant();
             if (string.IsNullOrWhiteSpace(tenant))
             {
