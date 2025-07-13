@@ -24,8 +24,8 @@ namespace Niobium.Notification.Functions
         private const string TEMPLATE_CONTACT = "{{CONTACT}}";
         private const string TEMPLATE_MESSAGE = "{{MESSAGE}}";
 
-        [Function(nameof(DeliverContactUs))]
-        public async Task<IActionResult> Run(
+        [Function(nameof(Notification))]
+        public async Task<IActionResult> Notification(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequest req,
             [FromBody] NotificationRequest request,
             CancellationToken cancellationToken)
