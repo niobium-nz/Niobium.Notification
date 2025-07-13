@@ -6,11 +6,11 @@ using Microsoft.Extensions.Logging;
 
 namespace Niobium.Notification.Functions
 {
-    public class Subscribed(
+    public class SubscribedEventConsumer(
         IExternalEventAdaptor<Subscription, SubscribedEvent> adaptor,
-        ILogger<Subscribed> logger)
+        ILogger<SubscribedEventConsumer> logger)
     {
-        [Function(nameof(Subscribed))]
+        [Function(nameof(SubscribedEventConsumer))]
         public async Task Run(
             [ServiceBusTrigger("subscribedevent", AutoCompleteMessages = true, Connection = nameof(ServiceBusOptions))]
             ServiceBusReceivedMessage message,

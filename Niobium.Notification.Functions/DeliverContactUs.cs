@@ -9,8 +9,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Options;
 using ApplicationException = Cod.ApplicationException;
-using InternalError = Cod.Platform.InternalError;
 using FromBodyAttribute = Microsoft.Azure.Functions.Worker.Http.FromBodyAttribute;
+using InternalError = Cod.Platform.InternalError;
 
 namespace Niobium.Notification.Functions
 {
@@ -24,20 +24,18 @@ namespace Niobium.Notification.Functions
         private const string TEMPLATE_CONTACT = "{{CONTACT}}";
         private const string TEMPLATE_MESSAGE = "{{MESSAGE}}";
 
-        [Function(nameof(Notification))]
-        public async Task<IActionResult> Notification(
+        [Function(nameof(DeliverContactUs))]
+        public async Task<IActionResult> Run(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequest req,
             [FromBody] NotificationRequest request,
             CancellationToken cancellationToken)
         {
-            if (string.IsNullOrWhiteSpace(request.Tenant))
+            var tenant = req.GetTenant();
+            if (string.IsNullOrWhiteSpace(tenant))
             {
-                var referer = req.Headers.Referer.SingleOrDefault();
-                if (referer != null)
-                {
-                    request.Tenant = new Uri(referer).Host.ToLower();
-                }
+                return new BadRequestObjectResult(new { Error = "Tenant is required." });
             }
+            request.Tenant = tenant;
 
             request.TryValidate(out var validationState);
             if (!validationState.IsValid)
@@ -45,16 +43,10 @@ namespace Niobium.Notification.Functions
                 return validationState.MakeResponse();
             }
 
-            var tenant = request.Tenant!;
-            var clientIP = req.GetRemoteIP();
-            var lowRisk = await assessor.AssessAsync(request.ID, tenant, request.Token, clientIP, cancellationToken);
-            if (!lowRisk)
-            {
-                return new ForbidResult();
-            }
+            await assessor.AssessAsync(request.Token, requestID: request.ID.ToString(), tenant: request.Tenant, cancellationToken: cancellationToken);
 
-            var recipient = options.Value.Recipients[tenant]
-                ?? throw new ApplicationException(InternalError.InternalServerError, $"Missing tenant recipient: {tenant}");
+            var recipient = options.Value.Recipients[request.Tenant]
+                ?? throw new ApplicationException(InternalError.InternalServerError, $"Missing tenant recipient: {request.Tenant}");
 
             var message = encoder.Encode(request.Message);
             var name = request.Name ?? "unspecified";
