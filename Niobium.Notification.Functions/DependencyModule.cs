@@ -1,4 +1,5 @@
 using Cod.Messaging.ServiceBus;
+using Cod.Platform;
 using Cod.Platform.Blob;
 using Cod.Platform.Captcha.ReCaptcha;
 using Cod.Platform.ServiceBus;
@@ -35,6 +36,7 @@ namespace Niobium.Notification.Functions
             Cod.Platform.Notification.Email.Resend.DependencyModule.AddNotification(builder);
             builder.AddCaptcha();
             builder.Services.AddCore();
+            builder.UsePlatform();
         }
     }
 }
