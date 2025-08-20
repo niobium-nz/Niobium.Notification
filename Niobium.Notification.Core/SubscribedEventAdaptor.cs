@@ -3,9 +3,9 @@ using Cod.Messaging;
 
 namespace Niobium.Notification
 {
-    internal class SubscribedEventAdaptor(IMessagingBroker<SubscribedEvent> queue) : DomainEventHandler<SubscriptionDomain, EntityChangedEvent<Subscription>>
+    internal class SubscribedEventAdaptor(IMessagingBroker<SubscribedEvent> queue) : DomainEventHandler<SubscriptionDomain, EntityChangedEventArgs<Subscription>>
     {
-        public async override Task HandleCoreAsync(EntityChangedEvent<Subscription> e, CancellationToken cancellationToken)
+        public async override Task HandleCoreAsync(EntityChangedEventArgs<Subscription> e, CancellationToken cancellationToken)
         {
             if (e.ChangeType.HasFlag(EntityChangeType.Created))
             {
