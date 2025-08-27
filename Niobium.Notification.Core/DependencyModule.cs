@@ -1,7 +1,7 @@
 using System.Text.Encodings.Web;
 using System.Text.Unicode;
-using Cod;
-using Cod.Messaging;
+using Niobium;
+using Niobium.Messaging;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Niobium.Notification
