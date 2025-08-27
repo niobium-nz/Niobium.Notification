@@ -1,5 +1,5 @@
-using Cod;
-using Cod.Messaging;
+using Niobium;
+using Niobium.Messaging;
 
 namespace Niobium.Notification
 {

@@ -1,4 +1,4 @@
-using Cod.Messaging;
+using Niobium.Messaging;
 
 namespace Niobium.Notification
 {

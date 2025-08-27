@@ -1,16 +1,13 @@
 using System.Net;
 using System.Text.Encodings.Web;
-using Cod;
-using Cod.Platform;
-using Cod.Platform.Captcha.ReCaptcha;
-using Cod.Platform.Notification.Email;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Options;
-using ApplicationException = Cod.ApplicationException;
+using Niobium.Platform;
+using Niobium.Platform.Captcha.ReCaptcha;
+using Niobium.Platform.Notification.Email;
 using FromBodyAttribute = Microsoft.Azure.Functions.Worker.Http.FromBodyAttribute;
-using InternalError = Cod.Platform.InternalError;
 
 namespace Niobium.Notification.Functions
 {
@@ -31,13 +28,13 @@ namespace Niobium.Notification.Functions
             CancellationToken cancellationToken)
         {
             var tenant = req.GetTenant();
-            if (string.IsNullOrWhiteSpace(tenant))
+            if (String.IsNullOrWhiteSpace(tenant))
             {
                 return new BadRequestObjectResult(new { Error = "Tenant is required." });
             }
             request.Tenant = tenant;
 
-            request.TryValidate(out var validationState);
+            _ = request.TryValidate(out var validationState);
             if (!validationState.IsValid)
             {
                 return validationState.MakeResponse();
@@ -46,7 +43,7 @@ namespace Niobium.Notification.Functions
             var recipient = options.Value.Recipients[request.Tenant]
                 ?? throw new ApplicationException(InternalError.InternalServerError, $"Missing tenant recipient: {request.Tenant}");
 
-            await assessor.AssessAsync(request.Token, requestID: request.ID.ToString(), cancellationToken: cancellationToken);
+            _ = await assessor.AssessAsync(request.Token, requestID: request.ID.ToString(), cancellationToken: cancellationToken);
 
             var message = encoder.Encode(request.Message);
             var name = request.Name ?? "unspecified";

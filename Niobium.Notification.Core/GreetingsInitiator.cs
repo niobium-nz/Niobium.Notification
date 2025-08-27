@@ -1,7 +1,7 @@
 using System.Net;
-using Cod;
-using Cod.File;
-using Cod.Platform.Notification.Email;
+using Niobium;
+using Niobium.File;
+using Niobium.Platform.Notification.Email;
 using Microsoft.Extensions.Logging;
 
 namespace Niobium.Notification
@@ -35,7 +35,7 @@ namespace Niobium.Notification
             var htmlTemplatePath = $"{request.GetTenant()}/{request.GetCampaign()}.html";
             string htmlTemplate;
             using var stream = await fileService.GetAsync("emailtemplates", htmlTemplatePath, cancellationToken: cancellationToken)
-                ?? throw new Cod.ApplicationException(InternalError.InternalServerError, $"Missing email template: {htmlTemplatePath}");
+                ?? throw new ApplicationException(InternalError.InternalServerError, $"Missing email template: {htmlTemplatePath}");
             using var streamReader = new StreamReader(stream);
             htmlTemplate = await streamReader.ReadToEndAsync(cancellationToken: cancellationToken);
 
@@ -53,7 +53,7 @@ namespace Niobium.Notification
             {
                 var error = $"Failed sending email to {request.Email} for {request.GetCampaign()} by {request.GetTenant()}.";
                 logger.LogError(error);
-                throw new Cod.ApplicationException(InternalError.InternalServerError, internalMessage: error);
+                throw new ApplicationException(InternalError.InternalServerError, internalMessage: error);
             }
         }
     }

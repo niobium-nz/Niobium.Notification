@@ -1,6 +1,6 @@
 using Azure.Messaging.ServiceBus;
-using Cod.Messaging;
-using Cod.Messaging.ServiceBus;
+using Niobium.Messaging;
+using Niobium.Messaging.ServiceBus;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 

@@ -1,9 +1,7 @@
 using Azure.Messaging.ServiceBus;
-using Cod;
-using Cod.Messaging.ServiceBus;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
-using JsonSerializer = System.Text.Json.JsonSerializer;
+using Niobium.Messaging.ServiceBus;
 
 namespace Niobium.Notification.Functions
 {
@@ -23,16 +21,16 @@ namespace Niobium.Notification.Functions
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(evt.Tenant))
+            if (String.IsNullOrWhiteSpace(evt.Tenant))
             {
                 logger.LogError($"Failed to process message {message.MessageId} due to invalid tenant: {rawBody}");
                 return;
             }
 
-            evt.TryValidate(out var validationState);
+            _ = evt.TryValidate(out var validationState);
             if (!validationState.IsValid)
             {
-                logger.LogError($"Validation failed for order evt: {JsonSerializer.Serialize(validationState.ToDictionary())}");
+                logger.LogError($"Validation failed for order evt: {System.Text.Json.JsonSerializer.Serialize(validationState.ToDictionary())}");
                 return;
             }
 

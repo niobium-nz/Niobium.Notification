@@ -22,7 +22,7 @@ namespace Niobium.Notification.Functions
             [HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequest req,
             CancellationToken cancellationToken)
         {
-            var request = await JsonSerializer.DeserializeAsync<GoogleAdsLeadForm>(req.Body, options: snakeCaseSerializationOptions, cancellationToken: cancellationToken);
+            var request = await System.Text.Json.JsonSerializer.DeserializeAsync<GoogleAdsLeadForm>(req.Body, options: snakeCaseSerializationOptions, cancellationToken: cancellationToken);
             if (request == null)
             {
                 return new BadRequestResult();
@@ -32,16 +32,16 @@ namespace Niobium.Notification.Functions
 
             if (!request.GoogleKey.Equals(CampaignKey, StringComparison.OrdinalIgnoreCase))
             {
-                logger.LogError($"Invalid key received form from Google: {JsonSerializer.Serialize(request)}");
+                logger.LogError($"Invalid key received form from Google: {System.Text.Json.JsonSerializer.Serialize(request)}");
                 return new BadRequestResult();
             }
 
             var fullName = request.UserColumnData.SingleOrDefault(d => d.ColumnID == FullNameColumnID);
             var email = request.UserColumnData.SingleOrDefault(d => d.ColumnID == EmailColumnID);
             if (fullName == null || email == null
-                || string.IsNullOrWhiteSpace(fullName.StringValue) || string.IsNullOrWhiteSpace(email.StringValue))
+                || String.IsNullOrWhiteSpace(fullName.StringValue) || String.IsNullOrWhiteSpace(email.StringValue))
             {
-                logger.LogError($"Invalid lead received form from Google: {JsonSerializer.Serialize(request)}");
+                logger.LogError($"Invalid lead received form from Google: {System.Text.Json.JsonSerializer.Serialize(request)}");
                 return new BadRequestResult();
             }
 
@@ -53,7 +53,7 @@ namespace Niobium.Notification.Functions
             if (nameParts.Length > 1)
             {
                 firstName = nameParts[0];
-                lastName = string.Join(' ', nameParts.Skip(1));
+                lastName = String.Join(' ', nameParts.Skip(1));
             }
             else
             {
