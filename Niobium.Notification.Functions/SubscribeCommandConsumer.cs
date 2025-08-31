@@ -2,6 +2,7 @@ using Azure.Messaging.ServiceBus;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 using Niobium.Messaging.ServiceBus;
+using Niobium.Platform.ServiceBus;
 
 namespace Niobium.Notification.Functions
 {
@@ -11,7 +12,7 @@ namespace Niobium.Notification.Functions
     {
         [Function(nameof(SubscribeCommandConsumer))]
         public async Task Run(
-            [ServiceBusTrigger("subscribecommand", AutoCompleteMessages = true, Connection = nameof(ServiceBusOptions))]
+            [ServiceBusTrigger("subscribecommand", AutoCompleteMessages = true, Connection = nameof(ServiceBusTriggerOptions))]
             ServiceBusReceivedMessage message,
             CancellationToken cancellationToken)
         {

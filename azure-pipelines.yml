@@ -128,6 +128,11 @@ stages:
               "slotSetting": false
             },
             {
+              "name": "ServiceBusTriggerOptions:FullyQualifiedNamespace",
+              "value": "$(serviceBusFQDN)",
+              "slotSetting": false
+            },
+            {
               "name": "StorageTableOptions:FullyQualifiedDomainName",
               "value": "$(databaseFQDN)",
               "slotSetting": false

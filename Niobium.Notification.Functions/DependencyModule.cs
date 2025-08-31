@@ -5,6 +5,7 @@ using Niobium.Messaging.ServiceBus;
 using Niobium.Platform;
 using Niobium.Platform.Blob;
 using Niobium.Platform.Captcha.ReCaptcha;
+using Niobium.Platform.ServiceBus;
 using Niobium.Platform.StorageTable;
 
 namespace Niobium.Notification.Functions
