@@ -22,13 +22,13 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.8" />
-    <PackageReference Include="Niobium.Messaging" Version="3.0.8" />
-    <PackageReference Include="Niobium.File" Version="3.0.8" />
-    <PackageReference Include="Niobium.Platform.Notification.Email" Version="3.0.8" />
+    <PackageReference Include="Niobium.Messaging" Version="3.2.9" />
+    <PackageReference Include="Niobium.File" Version="3.2.9" />
+    <PackageReference Include="Niobium.Platform.Notification.Email" Version="3.2.9" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Niobium.Notification.Abstractions\Niobium.Notification.Abstractions.csproj" />
+    <ProjectReference Include="..\Niobium.Notification.Contracts\Niobium.Notification.Contracts.csproj" />
   </ItemGroup>
 
 </Project>
