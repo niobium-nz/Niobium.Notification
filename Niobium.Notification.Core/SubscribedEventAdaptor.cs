@@ -3,7 +3,7 @@ using Niobium.Messaging;
 
 namespace Niobium.Notification
 {
-    internal class SubscribedEventAdaptor(IMessagingBroker<SubscribedEvent> queue) : DomainEventHandler<SubscriptionDomain, EntityChangedEventArgs<Subscription>>
+    internal class SubscribedEventAdaptor(IMessagingBroker<SubscribedEvent> queue) : DomainEventHandler<IDomain<Subscription>, EntityChangedEventArgs<Subscription>>
     {
         public async override Task HandleCoreAsync(EntityChangedEventArgs<Subscription> e, CancellationToken cancellationToken)
         {

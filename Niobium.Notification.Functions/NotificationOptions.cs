@@ -1,4 +1,4 @@
-namespace Niobium.Notification
+namespace Niobium.Notification.Functions
 {
     public class NotificationOptions
     {
