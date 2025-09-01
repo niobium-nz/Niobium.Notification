@@ -22,9 +22,9 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.8" />
-    <PackageReference Include="Niobium.Messaging" Version="3.2.9" />
-    <PackageReference Include="Niobium.File" Version="3.2.9" />
-    <PackageReference Include="Niobium.Platform.Notification.Email" Version="3.2.9" />
+    <PackageReference Include="Niobium.Messaging" Version="3.2.10" />
+    <PackageReference Include="Niobium.File" Version="3.2.10" />
+    <PackageReference Include="Niobium.Platform.Notification.Email" Version="3.2.10" />
   </ItemGroup>
 
   <ItemGroup>
