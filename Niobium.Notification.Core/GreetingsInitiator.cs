@@ -11,7 +11,7 @@ namespace Niobium.Notification
         IFileService fileService,
         IEmailNotificationClient sender,
         ILogger<GreetingsInitiator> logger)
-        : DomainEventHandler<SubscriptionDomain, SubscribedEvent>
+        : DomainEventHandler<IDomain<Subscription>, SubscribedEvent>
     {
         protected override DomainEventAudience EventSource => DomainEventAudience.External;
 

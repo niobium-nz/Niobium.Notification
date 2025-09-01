@@ -1,8 +1,8 @@
 using System.Text.Encodings.Web;
 using System.Text.Unicode;
-using Niobium;
-using Niobium.Messaging;
+using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.DependencyInjection;
+using Niobium.Messaging;
 
 namespace Niobium.Notification
 {
@@ -10,22 +10,18 @@ namespace Niobium.Notification
     {
         private static volatile bool loaded;
 
-        public static IServiceCollection AddCore(this IServiceCollection services)
+        public static void AddCore(this IFunctionsWorkerApplicationBuilder builder)
         {
             if (loaded)
             {
-                return services;
+                return;
             }
 
             loaded = true;
 
-            services.AddSingleton(HtmlEncoder.Create(allowedRanges: [UnicodeRanges.BasicLatin, UnicodeRanges.CjkUnifiedIdeographs]));
-            services.AddDomain<SubscriptionDomain, Subscription>();
-            services.AddDomainEventHandler<SubscribedEventAdaptor, Subscription>();
-            services.AddDomainEventHandler<GreetingsInitiator, Subscription>();
-            services.EnableExternalEvent<SubscribedEvent, Subscription>();
-
-            return services;
+            _ = builder.Services.AddSingleton(HtmlEncoder.Create(allowedRanges: [UnicodeRanges.BasicLatin, UnicodeRanges.CjkUnifiedIdeographs]));
+            _ = builder.Services.RegisterDomainComponents(typeof(DependencyModule));
+            _ = builder.Services.EnableExternalEvent<SubscribedEvent, Subscription>();
         }
     }
 }

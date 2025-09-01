@@ -1,4 +1,3 @@
-using Niobium;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
@@ -15,7 +14,7 @@ namespace Niobium.Notification.Functions
             [FromQuery(Name = "campaign")] string campaign,
             CancellationToken cancellationToken)
         {
-            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(tenant) || string.IsNullOrWhiteSpace(campaign))
+            if (String.IsNullOrWhiteSpace(email) || String.IsNullOrWhiteSpace(tenant) || String.IsNullOrWhiteSpace(campaign))
             {
                 return new BadRequestResult();
             }
@@ -28,7 +27,7 @@ namespace Niobium.Notification.Functions
             if (subscription != null)
             {
                 subscription.Unsubscribed = DateTimeOffset.UtcNow;
-                await repo.UpdateAsync(subscription, cancellationToken: cancellationToken);
+                _ = await repo.UpdateAsync(subscription, cancellationToken: cancellationToken);
             }
 
             return new OkObjectResult("You've been successfully unsubscribed from this mailing list.");

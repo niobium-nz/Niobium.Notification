@@ -32,7 +32,7 @@ namespace Niobium.Notification.Functions
             builder.AddMessaging();
             Niobium.Platform.Notification.Email.Resend.DependencyModule.AddNotification(builder);
             builder.AddCaptcha();
-            _ = builder.Services.AddCore();
+            builder.AddCore();
             _ = builder.UsePlatform();
         }
     }
