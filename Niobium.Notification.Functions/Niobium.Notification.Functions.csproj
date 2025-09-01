@@ -13,11 +13,11 @@
   </PropertyGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
-    <PackageReference Include="Niobium.Platform.StorageTable" Version="3.2.9" />
-    <PackageReference Include="Niobium.Platform.Blob" Version="3.2.9" />
-    <PackageReference Include="Niobium.Platform.ServiceBus" Version="3.2.9" />
-    <PackageReference Include="Niobium.Platform.Notification.Email.Resend" Version="3.2.9" />
-    <PackageReference Include="Niobium.Platform.Captcha.Recaptcha" Version="3.2.9" />
+    <PackageReference Include="Niobium.Platform.StorageTable" Version="3.2.10" />
+    <PackageReference Include="Niobium.Platform.Blob" Version="3.2.10" />
+    <PackageReference Include="Niobium.Platform.ServiceBus" Version="3.2.10" />
+    <PackageReference Include="Niobium.Platform.Notification.Email.Resend" Version="3.2.10" />
+    <PackageReference Include="Niobium.Platform.Captcha.Recaptcha" Version="3.2.10" />
     <PackageReference Include="Microsoft.ApplicationInsights.WorkerService" Version="2.23.0" />
     <PackageReference Include="Microsoft.ApplicationInsights" Version="2.23.0" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker" Version="2.0.0" />
