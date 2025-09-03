@@ -118,61 +118,6 @@ stages:
         appSettings: |
           [
             {
-              "name": "WEBSITE_USE_PLACEHOLDER_DOTNETISOLATED",
-              "value": "1",
-              "slotSetting": false
-            },
-            {
-              "name": "ServiceBusOptions:FullyQualifiedNamespace",
-              "value": "$(serviceBusFQDN)",
-              "slotSetting": false
-            },
-            {
-              "name": "ServiceBusTriggerOptions:FullyQualifiedNamespace",
-              "value": "$(serviceBusFQDN)",
-              "slotSetting": false
-            },
-            {
-              "name": "StorageTableOptions:FullyQualifiedDomainName",
-              "value": "$(databaseFQDN)",
-              "slotSetting": false
-            },
-            {
-              "name": "StorageBlobOptions:FullyQualifiedDomainName",
-              "value": "$(blobFQDN)",
-              "slotSetting": false
-            },
-            {
-                "name": "NotificationOptions:From",
-                "value": "noreply@niobium.co.nz",
-                "slotSetting": false
-            },
-            {
-                "name": "NotificationOptions:Subject",
-                "value": "New customer message",
-                "slotSetting": false
-            },
-            {
-                "name": "NotificationOptions:Template",
-                "value": "From {{NAME}} ({{CONTACT}}): {{MESSAGE}}",
-                "slotSetting": false
-            },
-            {
-                "name": "NotificationOptions:Recipients:www.edennoodleshamilton.co.nz",
-                "value": "marketing@edennoodleshamilton.co.nz",
-                "slotSetting": false
-            },
-            {
-                "name": "NotificationOptions:Recipients:www.edennoodlesbar.co.nz",
-                "value": "market@edennoodlesbar.co.nz",
-                "slotSetting": false
-            },
-            {
-                "name": "NotificationOptions:Recipients:www.joychicbar.co.nz",
-                "value": "marketing@joychicbar.co.nz",
-                "slotSetting": false
-            },
-            {
                 "name": "CaptchaOptions:Secrets:www.edennoodleshamilton.co.nz",
                 "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/RECAPTCHA-WWW-EDENNOODLESHAMILTON-CO-NZ/)",
                 "slotSetting": true
@@ -226,6 +171,61 @@ stages:
               "name": "AzureWebJobs.SubscribeCommandConsumer.Disabled",
               "value": "true",
               "slotSetting": true
+            },
+            {
+              "name": "WEBSITE_USE_PLACEHOLDER_DOTNETISOLATED",
+              "value": "1",
+              "slotSetting": false
+            },
+            {
+              "name": "ServiceBusOptions:FullyQualifiedNamespace",
+              "value": "$(serviceBusFQDN)",
+              "slotSetting": false
+            },
+            {
+              "name": "ServiceBusTriggerOptions:FullyQualifiedNamespace",
+              "value": "$(serviceBusFQDN)",
+              "slotSetting": false
+            },
+            {
+              "name": "StorageTableOptions:FullyQualifiedDomainName",
+              "value": "$(databaseFQDN)",
+              "slotSetting": false
+            },
+            {
+              "name": "StorageBlobOptions:FullyQualifiedDomainName",
+              "value": "$(blobFQDN)",
+              "slotSetting": false
+            },
+            {
+                "name": "NotificationOptions:From",
+                "value": "noreply@niobium.co.nz",
+                "slotSetting": false
+            },
+            {
+                "name": "NotificationOptions:Subject",
+                "value": "New customer message",
+                "slotSetting": false
+            },
+            {
+                "name": "NotificationOptions:Template",
+                "value": "From {{NAME}} ({{CONTACT}}): {{MESSAGE}}",
+                "slotSetting": false
+            },
+            {
+                "name": "NotificationOptions:Recipients:www.edennoodleshamilton.co.nz",
+                "value": "marketing@edennoodleshamilton.co.nz",
+                "slotSetting": false
+            },
+            {
+                "name": "NotificationOptions:Recipients:www.edennoodlesbar.co.nz",
+                "value": "market@edennoodlesbar.co.nz",
+                "slotSetting": false
+            },
+            {
+                "name": "NotificationOptions:Recipients:www.joychicbar.co.nz",
+                "value": "marketing@joychicbar.co.nz",
+                "slotSetting": false
             }
           ]
 
