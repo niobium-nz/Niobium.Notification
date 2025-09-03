@@ -27,12 +27,16 @@ namespace Niobium.Notification.Functions
             [FromBody] NotificationRequest request,
             CancellationToken cancellationToken)
         {
-            var tenant = req.GetTenant();
-            if (String.IsNullOrWhiteSpace(tenant))
+            var origin = req.GetSourceHostname();
+            if (String.IsNullOrWhiteSpace(origin))
+            {
+                origin = request.Tenant;
+            }
+
+            if (String.IsNullOrWhiteSpace(origin))
             {
                 return new BadRequestObjectResult(new { Error = "Tenant is required." });
             }
-            request.Tenant = tenant;
 
             _ = request.TryValidate(out var validationState);
             if (!validationState.IsValid)
@@ -40,8 +44,8 @@ namespace Niobium.Notification.Functions
                 return validationState.MakeResponse();
             }
 
-            var recipient = options.Value.Recipients[request.Tenant]
-                ?? throw new ApplicationException(InternalError.InternalServerError, $"Missing tenant recipient: {request.Tenant}");
+            var recipient = options.Value.Recipients[origin]
+                ?? throw new ApplicationException(InternalError.InternalServerError, $"Missing tenant recipient: {origin}");
 
             _ = await assessor.AssessAsync(request.Token, requestID: request.ID.ToString(), cancellationToken: cancellationToken);
 

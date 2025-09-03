@@ -1,9 +1,10 @@
-using Niobium;
-using Niobium.Platform;
-using Niobium.Platform.Captcha.ReCaptcha;
+using Azure.Core;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
+using Niobium;
+using Niobium.Platform;
+using Niobium.Platform.Captcha.ReCaptcha;
 using FromBodyAttribute = Microsoft.Azure.Functions.Worker.Http.FromBodyAttribute;
 
 namespace Niobium.Notification.Functions
@@ -18,12 +19,16 @@ namespace Niobium.Notification.Functions
             [FromBody] SubscribeCommand command,
             CancellationToken cancellationToken)
         {
-            var tenant = req.GetTenant();
-            if (string.IsNullOrWhiteSpace(tenant))
+            var origin = req.GetSourceHostname();
+            if (String.IsNullOrWhiteSpace(origin))
+            {
+                origin = command.Tenant;
+            }
+
+            if (String.IsNullOrWhiteSpace(origin))
             {
                 return new BadRequestObjectResult(new { Error = "Tenant is required." });
             }
-            command.Tenant = tenant;
 
             if (command.Captcha == null)
             {
@@ -36,9 +41,9 @@ namespace Niobium.Notification.Functions
                 return validationState.MakeResponse();
             }
 
-            await assessor.AssessAsync(command.Captcha, requestID: command.ID, tenant: command.Tenant, cancellationToken: cancellationToken);
+            await assessor.AssessAsync(command.Captcha, requestID: command.ID, hostname: origin, cancellationToken: cancellationToken);
 
-            await domainFactory().SubscribeAsync(command.Tenant, command.Campaign, command.Email, command.FirstName, command.LastName, command.Track, req.GetRemoteIP(), cancellationToken: cancellationToken);
+            await domainFactory().SubscribeAsync(origin, command.Campaign, command.Email, command.FirstName, command.LastName, command.Track, req.GetRemoteIP(), cancellationToken: cancellationToken);
             return new OkResult();
         }
     }
