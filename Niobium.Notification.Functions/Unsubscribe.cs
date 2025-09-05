@@ -4,32 +4,32 @@ using Microsoft.Azure.Functions.Worker;
 
 namespace Niobium.Notification.Functions
 {
-    public class Unsubscribe(IRepository<Subscription> repo)
+    public class Unsubscribe(IDomainRepository<SubscriptionDomain, Subscription> repo)
     {
         [Function(nameof(Unsubscribe))]
         public async Task<IActionResult> Run(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequest req,
             [FromQuery(Name = "email")] string email,
-            [FromQuery(Name = "tenant")] string tenant,
-            [FromQuery(Name = "campaign")] string campaign,
+            [FromQuery(Name = "tenant")] Guid tenant,
+            [FromQuery(Name = "channel")] string? channel,
             CancellationToken cancellationToken)
         {
-            if (String.IsNullOrWhiteSpace(email) || String.IsNullOrWhiteSpace(tenant) || String.IsNullOrWhiteSpace(campaign))
+            if (String.IsNullOrWhiteSpace(email) || tenant == Guid.Empty)
             {
                 return new BadRequestResult();
             }
 
-            var subscription = await repo.RetrieveAsync(
-                Subscription.BuildPartitionKey(tenant, campaign),
+            if (String.IsNullOrWhiteSpace(channel))
+            {
+                channel = Constants.DefaultChannel;
+            }
+
+            var domain = await repo.GetAsync(
+                Subscription.BuildPartitionKey(tenant, channel),
                 Subscription.BuildRowKey(email),
                 cancellationToken: cancellationToken);
 
-            if (subscription != null)
-            {
-                subscription.Unsubscribed = DateTimeOffset.UtcNow;
-                _ = await repo.UpdateAsync(subscription, cancellationToken: cancellationToken);
-            }
-
+            await domain.UnsubscribeAsync(cancellationToken);
             return new OkObjectResult("You've been successfully unsubscribed from this mailing list.");
         }
     }

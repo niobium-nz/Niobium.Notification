@@ -2,15 +2,6 @@ name: '1.0$(Rev:.r)'
 trigger:
 - master
 
-parameters:
-- name: updateInfrastructure
-  type: boolean
-  default: false
-  displayName: Update Infrastructure
-  values:
-    - true
-    - false
-
 variables:
   buildAgentVmImage: 'windows-latest'
   serviceConnection: 'niobium-emailnotification'
@@ -43,7 +34,6 @@ stages:
 
   - template: pipelines/jobs/FunctionAppInfrastructure.yml@devops
     parameters:
-      enabled: ${{ parameters.updateInfrastructure }}
       azureServiceConnection: $(serviceConnection)
       resourceGroupName: $(resourceGroupName)
       appName: $(appName)
@@ -198,33 +188,13 @@ stages:
               "slotSetting": false
             },
             {
-                "name": "NotificationOptions:From",
-                "value": "noreply@niobium.co.nz",
+                "name": "NotificationOptions:SelfHostName",
+                "value": "niobiumnotifyfunc.azurewebsites.net",
                 "slotSetting": false
             },
             {
-                "name": "NotificationOptions:Subject",
-                "value": "New customer message",
-                "slotSetting": false
-            },
-            {
-                "name": "NotificationOptions:Template",
-                "value": "From {{NAME}} ({{CONTACT}}): {{MESSAGE}}",
-                "slotSetting": false
-            },
-            {
-                "name": "NotificationOptions:Recipients:www.edennoodleshamilton.co.nz",
-                "value": "marketing@edennoodleshamilton.co.nz",
-                "slotSetting": false
-            },
-            {
-                "name": "NotificationOptions:Recipients:www.edennoodlesbar.co.nz",
-                "value": "market@edennoodlesbar.co.nz",
-                "slotSetting": false
-            },
-            {
-                "name": "NotificationOptions:Recipients:www.joychicbar.co.nz",
-                "value": "marketing@joychicbar.co.nz",
+                "name": "NotificationOptions:TemplateFolder",
+                "value": "templates",
                 "slotSetting": false
             }
           ]

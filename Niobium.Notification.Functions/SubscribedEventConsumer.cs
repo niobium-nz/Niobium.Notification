@@ -1,8 +1,8 @@
 using Azure.Messaging.ServiceBus;
-using Niobium.Messaging;
-using Niobium.Messaging.ServiceBus;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
+using Niobium.Messaging;
+using Niobium.Messaging.ServiceBus;
 using Niobium.Platform.ServiceBus;
 
 namespace Niobium.Notification.Functions

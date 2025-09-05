@@ -8,6 +8,7 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{5212B739-6CB8-4991-BE4F-EF03FDE3F54E}"
 	ProjectSection(SolutionItems) = preProject
 		azure-pipelines.yml = azure-pipelines.yml
+		static\contactus.js = static\contactus.js
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Niobium.Notification.Contracts", "Niobium.Notification.Contracts\Niobium.Notification.Contracts.csproj", "{3F6C670F-876D-4A17-8E5D-88CEED65AC2E}"

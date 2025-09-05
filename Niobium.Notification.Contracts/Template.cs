@@ -1,14 +1,14 @@
-using Niobium;
+using System.Runtime.InteropServices;
 
 namespace Niobium.Notification
 {
     public class Template
     {
         [EntityKey(EntityKeyKind.PartitionKey)]
-        public required string Tenant { get; set; }
+        public required Guid Tenant { get; set; }
 
         [EntityKey(EntityKeyKind.RowKey)]
-        public required string Campaign { get; set; }
+        public required string Channel { get; set; }
 
         [EntityKey(EntityKeyKind.Timestamp)]
         public DateTimeOffset? Timestamp { get; set; }
@@ -16,22 +16,18 @@ namespace Niobium.Notification
         [EntityKey(EntityKeyKind.ETag)]
         public string? ETag { get; set; }
 
-        public string? FromDisplayName { get; set; }
+        public string? FromName { get; set; }
 
-        public required string FromAddress { get; set; }
+        public required string From { get; set; }
 
         public required string Subject { get; set; }
 
+        public string? FallbackTo { get; set; }
+
         public required string Blob { get; set; }
 
-        public static string BuildParitionKey(string tenant)
-        {
-            return tenant.Trim().ToLowerInvariant();
-        }
+        public static string BuildParitionKey(Guid tenant) => tenant.ToString();
 
-        public static string BuildRowKey(string campaign)
-        {
-            return campaign.Trim();
-        }
+        public static string BuildRowKey(string channel) => channel.Trim();
     }
 }

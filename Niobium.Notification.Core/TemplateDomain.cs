@@ -1,0 +1,47 @@
+using System.Net;
+using System.Text.Encodings.Web;
+using Microsoft.Extensions.Options;
+using Niobium.File;
+
+namespace Niobium.Notification
+{
+    public partial class TemplateDomain(
+        Lazy<IRepository<Template>> repository,
+        IEnumerable<IDomainEventHandler<IDomain<Template>>> eventHandlers,
+        IFileService fileService,
+        HtmlEncoder encoder,
+        IOptions<NotificationOptions> options)
+            : GenericDomain<Template>(repository, eventHandlers)
+    {
+        public async Task<Deliverable> BuildAsync(string? destination, IReadOnlyDictionary<string, string> parameters, CancellationToken cancellationToken = default)
+        {
+            var entity = await this.GetEntityAsync(cancellationToken);
+            destination ??= entity.FallbackTo;
+            _ = destination ?? throw new ApplicationException(InternalError.BadRequest, "Destination is required for email notification.");
+
+            var templatePath = $"{entity.Tenant}/{entity.Blob}";
+            using var stream = await fileService.GetAsync(options.Value.TemplateFolder, templatePath, cancellationToken: cancellationToken)
+                ?? throw new ApplicationException(InternalError.InternalServerError, $"Missing template: {templatePath}");
+            using var streamReader = new StreamReader(stream);
+            var body = await streamReader.ReadToEndAsync(cancellationToken: cancellationToken);
+            var unsubscribeLink = this.BuildUnsubscribeLink(destination, entity.Tenant, entity.Channel);
+            body = body.Replace("{{UNSUBSCRIBE_LINK}}", unsubscribeLink);
+            foreach (var (key, value) in parameters)
+            {
+                body = body.Replace($"{{{{{key.ToUpperInvariant()}}}}}", encoder.Encode(value));
+            }
+
+            return new Deliverable
+            {
+                Body = body,
+                From = entity.From,
+                FromName = entity.FromName,
+                Subject = entity.Subject,
+                To = destination,
+            };
+        }
+
+        private string BuildUnsubscribeLink(string email, Guid tenant, string channel)
+            => $"https://{options.Value.SelfHostName}/unsubscribe?email={WebUtility.UrlEncode(email)}&tenant={WebUtility.UrlEncode(tenant.ToString())}&channel={WebUtility.UrlEncode(channel)}";
+    }
+}
