@@ -8,7 +8,6 @@ namespace Niobium.Notification
         public required Guid ID { get; set; }
 
         [Required]
-        [MaxLength(50)]
         public required Guid Tenant { get; set; }
 
         [Required]
