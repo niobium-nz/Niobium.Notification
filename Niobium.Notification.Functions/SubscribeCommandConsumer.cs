@@ -22,7 +22,7 @@ namespace Niobium.Notification.Functions
                 return;
             }
 
-            if (String.IsNullOrWhiteSpace(evt.Tenant))
+            if (evt.Tenant == Guid.Empty)
             {
                 logger.LogError($"Failed to process message {message.MessageId} due to invalid tenant: {rawBody}");
                 return;

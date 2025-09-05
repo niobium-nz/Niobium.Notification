@@ -1,5 +1,3 @@
-using Niobium;
-
 namespace Niobium.Notification
 {
     public class Subscription
@@ -30,27 +28,15 @@ namespace Niobium.Notification
 
         public string? IP { get; set; }
 
-        public string GetTenant()
-        {
-            return Belonging.Split(SPLITOR, 2, StringSplitOptions.RemoveEmptyEntries)[0];
-        }
+        public Guid GetTenant() => Guid.Parse(this.Belonging.Split(SPLITOR, 2, StringSplitOptions.RemoveEmptyEntries)[0]);
 
-        public string GetCampaign()
-        {
-            return Belonging.Split(SPLITOR, 2, StringSplitOptions.RemoveEmptyEntries)[1];
-        }
+        public string GetChannel() => this.Belonging.Split(SPLITOR, 2, StringSplitOptions.RemoveEmptyEntries)[1];
 
-        public string GetFullID()
-        {
-            return $"{Belonging}{SPLITOR}{Email}";
-        }
+        public string GetFullID() => $"{this.Belonging}{SPLITOR}{this.Email}";
 
-        public static string BuildPartitionKey(string tenant, string campaign) => BuildBelonging(tenant, campaign);
+        public static string BuildPartitionKey(Guid tenant, string channel) => BuildBelonging(tenant, channel);
         public static string BuildRowKey(string email) => email.Trim().ToLowerInvariant();
 
-        public static string BuildBelonging(string tenant, string campaign)
-        {
-            return $"{tenant.Trim().ToLowerInvariant()}{SPLITOR}{campaign.Trim()}";
-        }
+        public static string BuildBelonging(Guid tenant, string channel) => $"{tenant}{SPLITOR}{channel.Trim()}";
     }
 }

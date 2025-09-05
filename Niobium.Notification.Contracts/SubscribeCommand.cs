@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using Niobium;
 using Niobium.Messaging;
 
 namespace Niobium.Notification
@@ -7,7 +6,7 @@ namespace Niobium.Notification
     public class SubscribeCommand : DomainEvent, IUserInput
     {
         [MaxLength(50)]
-        public string? Tenant { get; set; }
+        public Guid Tenant { get; set; }
 
         [MaxLength(30)]
         public required string Campaign { get; set; }
@@ -31,27 +30,22 @@ namespace Niobium.Notification
 
         public void Sanitize()
         {
-            if (Track != null)
+            if (this.Track != null)
             {
-                Track = Track.Trim();
+                this.Track = this.Track.Trim();
             }
-            FirstName = FirstName.Trim();
+            this.FirstName = this.FirstName.Trim();
 
-            if (LastName != null)
+            if (this.LastName != null)
             {
-                LastName = LastName.Trim();
-            }
-
-            if (Tenant != null)
-            {
-                Tenant = Tenant.Trim().ToLowerInvariant();
+                this.LastName = this.LastName.Trim();
             }
 
-            Email = Email.Trim().ToLowerInvariant();
+            this.Email = this.Email.Trim().ToLowerInvariant();
 
-            if (Captcha != null)
+            if (this.Captcha != null)
             {
-                Captcha = Captcha.Trim();
+                this.Captcha = this.Captcha.Trim();
             }
         }
     }

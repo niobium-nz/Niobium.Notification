@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Niobium.Notification
 {
-    public class NotificationRequest
+    public class ContactUsRequest
     {
         [Required]
         public required Guid ID { get; set; }
@@ -12,16 +12,17 @@ namespace Niobium.Notification
         public required Guid Tenant { get; set; }
 
         [Required]
-        [MaxLength(50)]
-        public required string Channel { get; set; }
+        [MaxLength(3000)]
+        public required string Message { get; set; }
 
         [MaxLength(50)]
-        public string? Destination { get; set; }
+        public string? Name { get; set; }
+
+        [MaxLength(50)]
+        public string? Contact { get; set; }
 
         [Required]
-        public required Dictionary<string, string> Parameters { get; set; }
-
         [MaxLength(5000)]
-        public string? Token { get; set; }
+        public required string Token { get; set; }
     }
 }

@@ -1,11 +1,10 @@
-using Niobium;
 using Niobium.Messaging;
 
 namespace Niobium.Notification
 {
     internal class SubscribedEventAdaptor(IMessagingBroker<SubscribedEvent> queue) : DomainEventHandler<IDomain<Subscription>, EntityChangedEventArgs<Subscription>>
     {
-        public async override Task HandleCoreAsync(EntityChangedEventArgs<Subscription> e, CancellationToken cancellationToken)
+        public override async Task HandleCoreAsync(EntityChangedEventArgs<Subscription> e, CancellationToken cancellationToken)
         {
             if (e.ChangeType.HasFlag(EntityChangeType.Created))
             {
@@ -15,7 +14,7 @@ namespace Niobium.Notification
                     Value = new SubscribedEvent { Subscription = e.Entity },
                 }, cancellationToken: cancellationToken);
             }
-            
+
         }
     }
 }

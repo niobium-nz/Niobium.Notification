@@ -3,71 +3,44 @@ using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
-using Microsoft.Extensions.Options;
 using Niobium.Platform;
 using Niobium.Platform.Captcha.ReCaptcha;
-using Niobium.Platform.Notification.Email;
 using FromBodyAttribute = Microsoft.Azure.Functions.Worker.Http.FromBodyAttribute;
 
 namespace Niobium.Notification.Functions
 {
     public class DeliverContactUs(
-        IOptions<NotificationOptions> options,
         HtmlEncoder encoder,
-        IEmailNotificationClient sender,
+        NotificationFlow flow,
         IVisitorRiskAssessor assessor)
     {
-        private const string TEMPLATE_NAME = "{{NAME}}";
-        private const string TEMPLATE_CONTACT = "{{CONTACT}}";
-        private const string TEMPLATE_MESSAGE = "{{MESSAGE}}";
-
         [Function(nameof(Notification))]
         public async Task<IActionResult> Notification(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequest req,
-            [FromBody] NotificationRequest request,
+            [FromBody] ContactUsRequest request,
             CancellationToken cancellationToken)
         {
-            var origin = req.GetSourceHostname();
-            if (String.IsNullOrWhiteSpace(origin))
-            {
-                origin = request.Tenant;
-            }
-
-            if (String.IsNullOrWhiteSpace(origin))
-            {
-                return new BadRequestObjectResult(new { Error = "Tenant is required." });
-            }
-
             _ = request.TryValidate(out var validationState);
             if (!validationState.IsValid)
             {
                 return validationState.MakeResponse();
             }
 
-            var recipient = options.Value.Recipients[origin]
-                ?? throw new ApplicationException(InternalError.InternalServerError, $"Missing tenant recipient: {origin}");
-
             _ = await assessor.AssessAsync(request.Token, requestID: request.ID.ToString(), cancellationToken: cancellationToken);
+            await flow.RunAsync(new NotificationRequest
+            {
+                ID = request.ID,
+                Channel = Constants.ContactUsChannel,
+                Tenant = request.Tenant,
+                Parameters = new Dictionary<string, string>
+                 {
+                     { nameof(request.Name), !String.IsNullOrWhiteSpace(request.Name) ? encoder.Encode(request.Name) : "unspecified" },
+                     { nameof(request.Contact),!String.IsNullOrWhiteSpace(request.Contact) ? encoder.Encode(request.Contact) : "unspecified"  },
+                     { nameof(request.Message), encoder.Encode(request.Message) }
+                 },
+            }, cancellationToken);
 
-            var message = encoder.Encode(request.Message);
-            var name = request.Name ?? "unspecified";
-            name = encoder.Encode(name);
-            var contact = request.Contact ?? "unspecified";
-            contact = encoder.Encode(contact);
-            var template = options.Value.Template;
-
-            var notification = template.Replace(TEMPLATE_NAME, name)
-                .Replace(TEMPLATE_CONTACT, contact)
-                .Replace(TEMPLATE_MESSAGE, message);
-
-            var success = await sender.SendAsync(
-                new EmailAddress { Address = options.Value.From },
-                [recipient],
-                options.Value.Subject,
-                notification,
-                cancellationToken);
-            var statuscode = success ? HttpStatusCode.Created : HttpStatusCode.InternalServerError;
-            return new StatusCodeResult((int)statuscode);
+            return new StatusCodeResult((int)HttpStatusCode.Created);
         }
     }
 }

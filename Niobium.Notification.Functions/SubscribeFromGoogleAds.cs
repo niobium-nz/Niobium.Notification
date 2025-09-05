@@ -8,8 +8,8 @@ namespace Niobium.Notification.Functions
 {
     public class SubscribeFromGoogleAds(Func<SubscriptionDomain> domainFactory, ILogger<SubscribeFromGoogleAds> logger)
     {
+        private static readonly Guid Tenant = Guid.Empty; //"www.edennoodleshamilton.co.nz";
         private const string Source = "Google";
-        private const string Tenant = "www.edennoodleshamilton.co.nz";
         private const string Campaign = "OneDollarVoucher";
         private const string CampaignKey = "CA1CECEC-016D-42D0-B7C2-69AC3805A359";
         private const string FullNameColumnID = "FULL_NAME";
@@ -22,7 +22,7 @@ namespace Niobium.Notification.Functions
             [HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequest req,
             CancellationToken cancellationToken)
         {
-            var request = await System.Text.Json.JsonSerializer.DeserializeAsync<GoogleAdsLeadForm>(req.Body, options: snakeCaseSerializationOptions, cancellationToken: cancellationToken);
+            var request = await JsonMarshaller.UnmarshallAsync<GoogleAdsLeadForm>(req.Body, JsonMarshallingFormat.SnakeCase, cancellationToken);
             if (request == null)
             {
                 return new BadRequestResult();
@@ -32,7 +32,7 @@ namespace Niobium.Notification.Functions
 
             if (!request.GoogleKey.Equals(CampaignKey, StringComparison.OrdinalIgnoreCase))
             {
-                logger.LogError($"Invalid key received form from Google: {System.Text.Json.JsonSerializer.Serialize(request)}");
+                logger.LogError($"Invalid key received form from Google: {JsonMarshaller.Marshall(request)}");
                 return new BadRequestResult();
             }
 
@@ -41,7 +41,7 @@ namespace Niobium.Notification.Functions
             if (fullName == null || email == null
                 || String.IsNullOrWhiteSpace(fullName.StringValue) || String.IsNullOrWhiteSpace(email.StringValue))
             {
-                logger.LogError($"Invalid lead received form from Google: {System.Text.Json.JsonSerializer.Serialize(request)}");
+                logger.LogError($"Invalid lead received form from Google: {JsonMarshaller.Marshall(request)}");
                 return new BadRequestResult();
             }
 
