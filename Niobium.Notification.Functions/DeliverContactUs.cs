@@ -14,8 +14,8 @@ namespace Niobium.Notification.Functions
         NotificationFlow flow,
         IVisitorRiskAssessor assessor)
     {
-        [Function(nameof(Notification))]
-        public async Task<IActionResult> Notification(
+        [Function(nameof(ContactUs))]
+        public async Task<IActionResult> ContactUs(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequest req,
             [FromBody] ContactUsRequest request,
             CancellationToken cancellationToken)
