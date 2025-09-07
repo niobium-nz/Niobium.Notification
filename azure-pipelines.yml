@@ -10,6 +10,7 @@ variables:
   tableDB: 'niobiumemaildb'
   serviceBusNamespace: 'niobiumemailsb'
   subscribeCommandQueueName: 'subscribecommand'
+  notifyCommandQueueName: 'notifycommand'
   subscribedEventQueueName: 'subscribedevent'
   enableStagingSlot: true
   
@@ -75,7 +76,7 @@ stages:
         azureServiceConnection: $(serviceConnection)
         resourceGroupName: $(resourceGroupName)
         serviceBusNamespaceName: $(serviceBusNamespace)
-        serviceBusQueueNames: [$(subscribeCommandQueueName), $(subscribedEventQueueName)]
+        serviceBusQueueNames: [$(subscribeCommandQueueName), $(subscribedEventQueueName), $(notifyCommandQueueName)]
         dataOwnerPrincipalId: $(functionAppPrincipalId)
 
   - job: Configuration
@@ -159,6 +160,11 @@ stages:
             },
             {
               "name": "AzureWebJobs.SubscribeCommandConsumer.Disabled",
+              "value": "true",
+              "slotSetting": true
+            },
+            {
+              "name": "AzureWebJobs.NotifyCommandConsumer.Disabled",
               "value": "true",
               "slotSetting": true
             },

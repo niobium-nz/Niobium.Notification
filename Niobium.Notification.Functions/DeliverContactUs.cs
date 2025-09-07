@@ -27,7 +27,7 @@ namespace Niobium.Notification.Functions
             }
 
             _ = await assessor.AssessAsync(request.Token, requestID: request.ID.ToString(), cancellationToken: cancellationToken);
-            await flow.RunAsync(new NotificationRequest
+            await flow.RunAsync(new NotifyCommand
             {
                 ID = request.ID,
                 Channel = Constants.ContactUsChannel,
