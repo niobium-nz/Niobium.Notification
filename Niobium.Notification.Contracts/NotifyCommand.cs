@@ -1,12 +1,10 @@
 using System.ComponentModel.DataAnnotations;
+using Niobium.Messaging;
 
 namespace Niobium.Notification
 {
-    public class NotifyCommand
+    public class NotifyCommand : DomainEvent, IUserInput
     {
-        [Required]
-        public required string ID { get; set; }
-
         [Required]
         [MaxLength(50)]
         public required Guid Tenant { get; set; }
@@ -26,5 +24,18 @@ namespace Niobium.Notification
 
         [MaxLength(5000)]
         public string? Token { get; set; }
+
+        public void Sanitize()
+        {
+            if (Destination != null)
+            {
+                Destination = Destination.Trim();
+            }
+
+            if (DestinationDisplayName != null)
+            {
+                DestinationDisplayName = DestinationDisplayName.Trim();
+            }
+        }
     }
 }
