@@ -23,7 +23,7 @@ namespace Niobium.Notification
 
             var success = await sender.SendAsync(
                 new EmailAddress { Address = deliverable.From, DisplayName = deliverable.FromName },
-                [deliverable.To],
+                [new EmailAddress { Address = deliverable.To, DisplayName = deliverable.ToName }],
                 deliverable.Subject,
                 deliverable.Body,
                 cancellationToken);

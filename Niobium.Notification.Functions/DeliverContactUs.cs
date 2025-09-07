@@ -29,7 +29,7 @@ namespace Niobium.Notification.Functions
             _ = await assessor.AssessAsync(request.Token, requestID: request.ID.ToString(), cancellationToken: cancellationToken);
             await flow.RunAsync(new NotifyCommand
             {
-                ID = request.ID,
+                ID = request.ID.ToString(),
                 Channel = Constants.ContactUsChannel,
                 Tenant = request.Tenant,
                 Parameters = new Dictionary<string, string>

@@ -7,7 +7,7 @@ namespace Niobium.Notification
             public required string From { get; set; }
 
             public string? FromName { get; set; }
-
+            
             public required string To { get; set; }
 
             public string? ToName { get; set; }
