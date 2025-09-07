@@ -7,10 +7,13 @@ namespace Niobium.Notification
 
         public override async Task HandleCoreAsync(SubscribedEvent e, CancellationToken cancellationToken) => await flow.RunAsync(new NotifyCommand
         {
-            ID = Guid.NewGuid(),
+            ID = e.Subscription.GetFullID(),
             Tenant = e.Subscription.GetTenant(),
             Channel = e.Subscription.GetChannel(),
             Destination = e.Subscription.Email,
+            DestinationDisplayName = String.IsNullOrWhiteSpace(e.Subscription.LastName) ?
+                e.Subscription.FirstName :
+                $"{e.Subscription.FirstName} {e.Subscription.LastName}",
             Parameters = new Dictionary<string, string>
                 {
                     { "FIRST_NAME", e.Subscription.FirstName.ToUpperInvariant() },

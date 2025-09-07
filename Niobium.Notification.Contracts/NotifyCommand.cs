@@ -5,7 +5,7 @@ namespace Niobium.Notification
     public class NotifyCommand
     {
         [Required]
-        public required Guid ID { get; set; }
+        public required string ID { get; set; }
 
         [Required]
         [MaxLength(50)]
@@ -17,6 +17,9 @@ namespace Niobium.Notification
 
         [MaxLength(50)]
         public string? Destination { get; set; }
+
+        [MaxLength(50)]
+        public string? DestinationDisplayName { get; set; }
 
         [Required]
         public required Dictionary<string, string> Parameters { get; set; }
