@@ -8,7 +8,7 @@ namespace Niobium.Notification
         IEmailNotificationClient sender,
         ILogger<NotificationFlow> logger) : IFlow
     {
-        public async Task RunAsync(NotificationRequest request, CancellationToken cancellationToken = default)
+        public async Task RunAsync(NotifyCommand request, CancellationToken cancellationToken = default)
         {
             var domain = await repo.GetAsync(
                 Template.BuildParitionKey(request.Tenant),

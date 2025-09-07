@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Niobium.Notification
 {
-    public class NotificationRequest
+    public class NotifyCommand
     {
         [Required]
         public required Guid ID { get; set; }

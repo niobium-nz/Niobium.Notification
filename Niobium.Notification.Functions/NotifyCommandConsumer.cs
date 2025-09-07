@@ -6,25 +6,19 @@ using Niobium.Platform.ServiceBus;
 
 namespace Niobium.Notification.Functions
 {
-    public class SubscribeCommandConsumer(
-        Func<SubscriptionDomain> domainFactory,
-        ILogger<SubscribeCommandConsumer> logger)
+    public class NotifyCommandConsumer(
+        NotificationFlow flow,
+        ILogger<NotifyCommandConsumer> logger)
     {
-        [Function(nameof(SubscribeCommandConsumer))]
+        [Function(nameof(NotifyCommandConsumer))]
         public async Task Run(
-            [ServiceBusTrigger("subscribecommand", AutoCompleteMessages = true, Connection = nameof(ServiceBusTriggerOptions))]
+            [ServiceBusTrigger("nofifycommand", AutoCompleteMessages = true, Connection = nameof(ServiceBusTriggerOptions))]
             ServiceBusReceivedMessage message,
             CancellationToken cancellationToken)
         {
-            if (!message.TryParse(out SubscribeCommand? evt, out var rawBody))
+            if (!message.TryParse(out NotifyCommand? evt, out var rawBody))
             {
                 logger.LogError($"Failed to parse message {message.MessageId}: {rawBody}");
-                return;
-            }
-
-            if (evt.Tenant == Guid.Empty)
-            {
-                logger.LogError($"Failed to process message {message.MessageId} due to invalid tenant: {rawBody}");
                 return;
             }
 
@@ -35,7 +29,7 @@ namespace Niobium.Notification.Functions
                 return;
             }
 
-            await domainFactory().SubscribeAsync(evt.Tenant!, evt.Campaign, evt.Email, evt.FirstName, evt.LastName, evt.Track, cancellationToken: cancellationToken);
+            await flow.RunAsync(evt, cancellationToken);
         }
     }
 }

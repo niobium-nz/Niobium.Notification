@@ -5,7 +5,7 @@ namespace Niobium.Notification
     {
         protected override DomainEventAudience EventSource => DomainEventAudience.External;
 
-        public override async Task HandleCoreAsync(SubscribedEvent e, CancellationToken cancellationToken) => await flow.RunAsync(new NotificationRequest
+        public override async Task HandleCoreAsync(SubscribedEvent e, CancellationToken cancellationToken) => await flow.RunAsync(new NotifyCommand
         {
             ID = Guid.NewGuid(),
             Tenant = e.Subscription.GetTenant(),
