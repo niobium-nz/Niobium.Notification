@@ -12,7 +12,7 @@ namespace Niobium.Notification.Functions
     {
         [Function(nameof(NotifyCommandConsumer))]
         public async Task Run(
-            [ServiceBusTrigger("nofifycommand", AutoCompleteMessages = true, Connection = nameof(ServiceBusTriggerOptions))]
+            [ServiceBusTrigger("notifycommand", AutoCompleteMessages = true, Connection = nameof(ServiceBusTriggerOptions))]
             ServiceBusReceivedMessage message,
             CancellationToken cancellationToken)
         {
