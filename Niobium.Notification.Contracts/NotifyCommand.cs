@@ -6,7 +6,6 @@ namespace Niobium.Notification
     public class NotifyCommand : DomainEvent, IUserInput
     {
         [Required]
-        [MaxLength(50)]
         public required Guid Tenant { get; set; }
 
         [Required]

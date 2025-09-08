@@ -5,8 +5,8 @@ namespace Niobium.Notification
 {
     public class SubscribeCommand : DomainEvent, IUserInput
     {
-        [MaxLength(50)]
-        public Guid Tenant { get; set; }
+        [Required]
+        public required Guid Tenant { get; set; }
 
         [MaxLength(30)]
         public required string Campaign { get; set; }
