@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Encodings.Web;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Niobium.File;
 
@@ -10,12 +11,19 @@ namespace Niobium.Notification
         IEnumerable<IDomainEventHandler<IDomain<Template>>> eventHandlers,
         IFileService fileService,
         HtmlEncoder encoder,
-        IOptions<NotificationOptions> options)
+        IOptions<NotificationOptions> options,
+        ILogger<TemplateDomain> logger)
             : GenericDomain<Template>(repository, eventHandlers)
     {
-        public async Task<Deliverable> BuildAsync(string? destination, IReadOnlyDictionary<string, string> parameters, CancellationToken cancellationToken = default)
+        public async Task<Deliverable?> BuildAsync(string? destination, IReadOnlyDictionary<string, string> parameters, CancellationToken cancellationToken = default)
         {
-            var entity = await this.GetEntityAsync(cancellationToken);
+            var entity = await this.TryGetEntityAsync(cancellationToken);
+            if (entity == null)
+            {
+                logger.LogWarning($"Missing email template for {new StorageKey(this.PartitionKey ?? String.Empty, this.RowKey ?? String.Empty)}");
+                return null;
+            }
+
             destination ??= entity.FallbackTo;
             _ = destination ?? throw new ApplicationException(InternalError.BadRequest, "Destination is required for email notification.");
 
