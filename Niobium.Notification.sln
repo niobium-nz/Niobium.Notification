@@ -15,6 +15,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Niobium.Notification.Contra
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Niobium.Notification.Core", "Niobium.Notification.Core\Niobium.Notification.Core.csproj", "{77B4FA47-ECBF-4537-9874-9C81CC34F862}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Niobium.Notification.Core.Tests", "Niobium.Notification.Core.Tests\Niobium.Notification.Core.Tests.csproj", "{6C9E997B-3F0F-46C5-8D71-9BEAD63B68CD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -33,6 +35,10 @@ Global
 		{77B4FA47-ECBF-4537-9874-9C81CC34F862}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{77B4FA47-ECBF-4537-9874-9C81CC34F862}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{77B4FA47-ECBF-4537-9874-9C81CC34F862}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6C9E997B-3F0F-46C5-8D71-9BEAD63B68CD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6C9E997B-3F0F-46C5-8D71-9BEAD63B68CD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6C9E997B-3F0F-46C5-8D71-9BEAD63B68CD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6C9E997B-3F0F-46C5-8D71-9BEAD63B68CD}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
