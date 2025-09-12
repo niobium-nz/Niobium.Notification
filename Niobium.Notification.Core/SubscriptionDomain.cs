@@ -3,7 +3,7 @@ namespace Niobium.Notification
     public class SubscriptionDomain(Lazy<IRepository<Subscription>> repository, IEnumerable<IDomainEventHandler<IDomain<Subscription>>> eventHandlers)
         : GenericDomain<Subscription>(repository, eventHandlers)
     {
-        public async Task SubscribeAsync(Guid tenant, string campaign, string email, string firstName, string? lastName, string? source, string? ip = null, CancellationToken cancellationToken = default)
+        public async Task SubscribeAsync(Guid tenant, string campaign, string email, string? firstName, string? lastName, string? source, string? ip = null, CancellationToken cancellationToken = default)
         {
             _ = this.Initialize(new Subscription
             {

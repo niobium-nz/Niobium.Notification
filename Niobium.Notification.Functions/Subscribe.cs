@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
@@ -25,7 +26,7 @@ namespace Niobium.Notification.Functions
 
             if (command.Captcha == null)
             {
-                return new ForbidResult();
+                return new StatusCodeResult((int)HttpStatusCode.Forbidden);
             }
 
             _ = command.TryValidate(out var validationState);
