@@ -14,9 +14,8 @@ namespace Niobium.Notification
         [MaxLength(30)]
         public string? Track { get; set; }
 
-        [Required]
         [MaxLength(50)]
-        public required string FirstName { get; set; }
+        public string? FirstName { get; set; }
 
         [MaxLength(50)]
         public string? LastName { get; set; }
@@ -34,7 +33,11 @@ namespace Niobium.Notification
             {
                 this.Track = this.Track.Trim();
             }
-            this.FirstName = this.FirstName.Trim();
+
+            if (this.FirstName != null)
+            {
+                this.FirstName = this.FirstName.Trim();
+            }
 
             if (this.LastName != null)
             {

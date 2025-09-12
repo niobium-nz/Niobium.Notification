@@ -16,7 +16,7 @@ namespace Niobium.Notification
                 $"{e.Subscription.FirstName} {e.Subscription.LastName}",
             Parameters = new Dictionary<string, string>
                 {
-                    { "FIRST_NAME", e.Subscription.FirstName.ToUpperInvariant() },
+                    { "FIRST_NAME", String.IsNullOrWhiteSpace(e.Subscription.FirstName) ? String.Empty : e.Subscription.FirstName.ToUpperInvariant() },
                     { "LAST_NAME", String.IsNullOrWhiteSpace(e.Subscription.LastName) ? String.Empty : e.Subscription.LastName.ToUpperInvariant() },
                 }
         }, cancellationToken);

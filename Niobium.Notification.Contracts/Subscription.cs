@@ -16,7 +16,7 @@ namespace Niobium.Notification
         [EntityKey(EntityKeyKind.ETag)]
         public string? ETag { get; set; }
 
-        public required string FirstName { get; set; }
+        public string? FirstName { get; set; }
 
         public string? LastName { get; set; }
 
