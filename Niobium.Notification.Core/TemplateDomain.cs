@@ -25,7 +25,12 @@ namespace Niobium.Notification
             }
 
             destination ??= entity.FallbackTo;
-            _ = destination ?? throw new ApplicationException(InternalError.BadRequest, "Destination is required for email notification.");
+            _ = destination ?? throw new ApplicationException(InternalError.InternalServerError, $"Destination is required for email notification {entity.Tenant}#{entity.Channel}.");
+
+            if (String.IsNullOrWhiteSpace(entity.Subject))
+            {
+                throw new ApplicationException(InternalError.InternalServerError, $"Subject is required for email notification {entity.Tenant}#{entity.Channel}.");
+            }
 
             var templatePath = $"{entity.Tenant}/{entity.Blob}";
             using var stream = await fileService.GetAsync(options.Value.TemplateFolder, templatePath, cancellationToken: cancellationToken)
