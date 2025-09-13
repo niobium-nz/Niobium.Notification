@@ -4,11 +4,13 @@ trigger:
 
 variables:
   buildAgentVmImage: 'windows-latest'
-  serviceConnection: 'niobium-emailnotification'
-  resourceGroupName: 'niobium-emailnotification'
-  appName: 'NiobiumNotifyFunc'
-  tableDB: 'niobiumemaildb'
-  serviceBusNamespace: 'niobiumemailsb'
+  serviceConnection: 'niobium-ntfy'
+  resourceGroupName: 'niobium-ntfy'
+  appName: 'niobiumntfyFunc'
+  tableDB: 'niobiumntfydb'
+  tableDBStaging: 'niobiumntfydbstaging'
+  serviceBusNamespace: 'niobiumntfysb'
+  serviceBusNamespaceStaging: 'niobiumntfysbstaging'
   subscribeCommandQueueName: 'subscribecommand'
   notifyCommandQueueName: 'notifycommand'
   subscribedEventQueueName: 'subscribedevent'
@@ -52,15 +54,23 @@ stages:
       vmImage: $(buildAgentVmImage)
     variables:
       functionAppPrincipalId: $[dependencies.Infrastructure.outputs['infrastructureOutputs.functionAppPrincipalId']]
+      functionAppPrincipalIdStaging: $[dependencies.Infrastructure.outputs['infrastructureOutputs.functionAppPrincipalIdStaging']]
     steps:
-    - checkout: devops
+    - checkout: devops  
     - template: pipelines/steps/newStorageAccount.yml@devops
       parameters:
         azureServiceConnection: $(serviceConnection)
         resourceGroupName: $(serviceConnection)
         storageAccountName: $(tableDB)
         contributorPrincipalId: $(functionAppPrincipalId)
-
+    - template: pipelines/steps/newStorageAccount.yml@devops
+      condition: and(succeeded(), eq('${{ variables.enableStagingSlot }}', true))
+      parameters:
+        azureServiceConnection: $(serviceConnection)
+        resourceGroupName: $(serviceConnection)
+        storageAccountName: $(tableDBStaging)
+        contributorPrincipalId: $(functionAppPrincipalIdStaging)
+        
   - job: Messaging
     dependsOn: 
       - Infrastructure
@@ -69,6 +79,7 @@ stages:
       vmImage: $(buildAgentVmImage)
     variables:
       functionAppPrincipalId: $[dependencies.Infrastructure.outputs['infrastructureOutputs.functionAppPrincipalId']]
+      functionAppPrincipalIdStaging: $[dependencies.Infrastructure.outputs['infrastructureOutputs.functionAppPrincipalIdStaging']]
     steps:
     - checkout: devops
     - template: pipelines/steps/newServiceBus.yml@devops
@@ -78,6 +89,13 @@ stages:
         serviceBusNamespaceName: $(serviceBusNamespace)
         serviceBusQueueNames: [$(subscribeCommandQueueName), $(subscribedEventQueueName), $(notifyCommandQueueName)]
         dataOwnerPrincipalId: $(functionAppPrincipalId)
+    - template: pipelines/steps/newServiceBus.yml@devops
+      parameters:
+        azureServiceConnection: $(serviceConnection)
+        resourceGroupName: $(resourceGroupName)
+        serviceBusNamespaceName: $(serviceBusNamespaceStaging)
+        serviceBusQueueNames: [$(subscribeCommandQueueName), $(subscribedEventQueueName), $(notifyCommandQueueName)]
+        dataOwnerPrincipalId: $(functionAppPrincipalIdStaging)
 
   - job: Configuration
     dependsOn:
@@ -108,6 +126,41 @@ stages:
         resourceGroupName: $(resourceGroupName)
         appSettings: |
           [
+            {
+              "name": "WEBSITE_USE_PLACEHOLDER_DOTNETISOLATED",
+              "value": "1",
+              "slotSetting": false
+            },
+            {
+              "name": "ServiceBusOptions:FullyQualifiedNamespace",
+              "value": "$(serviceBusFQDN)",
+              "slotSetting": false
+            },
+            {
+              "name": "ServiceBusTriggerOptions:FullyQualifiedNamespace",
+              "value": "$(serviceBusFQDN)",
+              "slotSetting": false
+            },
+            {
+              "name": "StorageTableOptions:FullyQualifiedDomainName",
+              "value": "$(databaseFQDN)",
+              "slotSetting": false
+            },
+            {
+              "name": "StorageBlobOptions:FullyQualifiedDomainName",
+              "value": "$(blobFQDN)",
+              "slotSetting": false
+            },
+            {
+                "name": "NotificationOptions:SelfHostName",
+                "value": "niobiumntfyfunc.azurewebsites.net",
+                "slotSetting": false
+            },
+            {
+                "name": "NotificationOptions:TemplateFolder",
+                "value": "templates",
+                "slotSetting": false
+            },
             {
                 "name": "CaptchaOptions:Secrets:www.edennoodleshamilton.co.nz",
                 "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/RECAPTCHA-WWW-EDENNOODLESHAMILTON-CO-NZ/)",
@@ -144,31 +197,6 @@ stages:
         appSettings: |
           [
             {
-              "name": "ResendServiceOptions:GlobalAPIKey",
-              "value": "012345678901234567890123456789AB",
-              "slotSetting": true
-            },
-            {
-              "name": "CaptchaOptions:IsDisabled",
-              "value": "true",
-              "slotSetting": true
-            },
-            {
-              "name": "AzureWebJobs.SubscribedEventConsumer.Disabled",
-              "value": "true",
-              "slotSetting": true
-            },
-            {
-              "name": "AzureWebJobs.SubscribeCommandConsumer.Disabled",
-              "value": "true",
-              "slotSetting": true
-            },
-            {
-              "name": "AzureWebJobs.NotifyCommandConsumer.Disabled",
-              "value": "true",
-              "slotSetting": true
-            },
-            {
               "name": "WEBSITE_USE_PLACEHOLDER_DOTNETISOLATED",
               "value": "1",
               "slotSetting": false
@@ -195,13 +223,38 @@ stages:
             },
             {
                 "name": "NotificationOptions:SelfHostName",
-                "value": "niobiumnotifyfunc.azurewebsites.net",
+                "value": "niobiumntfyfunc.azurewebsites.net",
                 "slotSetting": false
             },
             {
                 "name": "NotificationOptions:TemplateFolder",
                 "value": "templates",
                 "slotSetting": false
+            },
+            {
+              "name": "ResendServiceOptions:GlobalAPIKey",
+              "value": "012345678901234567890123456789AB",
+              "slotSetting": true
+            },
+            {
+              "name": "CaptchaOptions:IsDisabled",
+              "value": "true",
+              "slotSetting": true
+            },
+            {
+              "name": "AzureWebJobs.SubscribedEventConsumer.Disabled",
+              "value": "true",
+              "slotSetting": true
+            },
+            {
+              "name": "AzureWebJobs.SubscribeCommandConsumer.Disabled",
+              "value": "true",
+              "slotSetting": true
+            },
+            {
+              "name": "AzureWebJobs.NotifyCommandConsumer.Disabled",
+              "value": "true",
+              "slotSetting": true
             }
           ]
 

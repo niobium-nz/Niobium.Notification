@@ -25,7 +25,7 @@ namespace Niobium.Notification
         public required string Email { get; set; }
 
         [MaxLength(5000)]
-        public string? Captcha { get; set; }
+        public string? Token { get; set; }
 
         public void Sanitize()
         {
@@ -46,9 +46,9 @@ namespace Niobium.Notification
 
             this.Email = this.Email.Trim().ToLowerInvariant();
 
-            if (this.Captcha != null)
+            if (this.Token != null)
             {
-                this.Captcha = this.Captcha.Trim();
+                this.Token = this.Token.Trim();
             }
         }
     }
