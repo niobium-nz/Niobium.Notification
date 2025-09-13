@@ -24,7 +24,7 @@ namespace Niobium.Notification.Functions
                 return new BadRequestObjectResult(new { Error = "Cannot source to origin." });
             }
 
-            if (command.Captcha == null)
+            if (command.Token == null)
             {
                 return new StatusCodeResult((int)HttpStatusCode.Forbidden);
             }
@@ -35,7 +35,7 @@ namespace Niobium.Notification.Functions
                 return validationState.MakeResponse();
             }
 
-            _ = await assessor.AssessAsync(command.Captcha, requestID: command.ID, hostname: origin, cancellationToken: cancellationToken);
+            _ = await assessor.AssessAsync(command.Token, requestID: command.ID, hostname: origin, cancellationToken: cancellationToken);
 
             await domainFactory().SubscribeAsync(command.Tenant, command.Campaign, command.Email, command.FirstName, command.LastName, command.Track, req.GetRemoteIP(), cancellationToken: cancellationToken);
             return new OkResult();
