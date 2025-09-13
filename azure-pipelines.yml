@@ -64,8 +64,8 @@ stages:
         storageAccountName: $(tableDB)
         contributorPrincipalId: $(functionAppPrincipalId)
     - template: pipelines/steps/newStorageAccount.yml@devops
-      condition: and(succeeded(), eq('${{ variables.enableStagingSlot }}', true))
       parameters:
+        switch: ${{ variables.enableStagingSlot }}
         azureServiceConnection: $(serviceConnection)
         resourceGroupName: $(serviceConnection)
         storageAccountName: $(tableDBStaging)
@@ -91,6 +91,7 @@ stages:
         dataOwnerPrincipalId: $(functionAppPrincipalId)
     - template: pipelines/steps/newServiceBus.yml@devops
       parameters:
+        switch: ${{ variables.enableStagingSlot }}
         azureServiceConnection: $(serviceConnection)
         resourceGroupName: $(resourceGroupName)
         serviceBusNamespaceName: $(serviceBusNamespaceStaging)
