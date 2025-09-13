@@ -63,6 +63,7 @@ stages:
         resourceGroupName: $(serviceConnection)
         storageAccountName: $(tableDB)
         contributorPrincipalId: $(functionAppPrincipalId)
+        outputVariableName: 'newStorageAccountProperties'
     - template: pipelines/steps/newStorageAccount.yml@devops
       parameters:
         switch: ${{ variables.enableStagingSlot }}
@@ -70,6 +71,7 @@ stages:
         resourceGroupName: $(serviceConnection)
         storageAccountName: $(tableDBStaging)
         contributorPrincipalId: $(functionAppPrincipalIdStaging)
+        outputVariableName: 'newStorageAccountPropertiesStaging'
         
   - job: Messaging
     dependsOn: 
@@ -89,6 +91,7 @@ stages:
         serviceBusNamespaceName: $(serviceBusNamespace)
         serviceBusQueueNames: [$(subscribeCommandQueueName), $(subscribedEventQueueName), $(notifyCommandQueueName)]
         dataOwnerPrincipalId: $(functionAppPrincipalId)
+        outputVariableName: 'newServiceBusProperties'
     - template: pipelines/steps/newServiceBus.yml@devops
       parameters:
         switch: ${{ variables.enableStagingSlot }}
@@ -97,6 +100,7 @@ stages:
         serviceBusNamespaceName: $(serviceBusNamespaceStaging)
         serviceBusQueueNames: [$(subscribeCommandQueueName), $(subscribedEventQueueName), $(notifyCommandQueueName)]
         dataOwnerPrincipalId: $(functionAppPrincipalIdStaging)
+        outputVariableName: 'newServiceBusPropertiesStaging'
 
   - job: Configuration
     dependsOn:
@@ -107,10 +111,13 @@ stages:
     pool:
       vmImage: $(buildAgentVmImage)
     variables:
+      keyVaultUrl: $[dependencies.Infrastructure.outputs['infrastructureOutputs.keyVaultUrl']]
       databaseFQDN: $[dependencies.StorageAccount.outputs['newStorageAccountProperties.tableFQDN']]
       blobFQDN: $[dependencies.StorageAccount.outputs['newStorageAccountProperties.blobFQDN']]
-      keyVaultUrl: $[dependencies.Infrastructure.outputs['infrastructureOutputs.keyVaultUrl']]
       serviceBusFQDN: $[dependencies.Messaging.outputs['newServiceBusProperties.fullyQualifiedNamespace']]
+      databaseFQDNStaging: $[dependencies.StorageAccount.outputs['newStorageAccountPropertiesStaging.tableFQDN']]
+      blobFQDNStaging: $[dependencies.StorageAccount.outputs['newStorageAccountPropertiesStaging.blobFQDN']]
+      serviceBusFQDNStaging: $[dependencies.Messaging.outputs['newServiceBusPropertiesStaging.fullyQualifiedNamespace']]
     steps:
     - checkout: none
     - pwsh: Write-Output "##vso[task.setvariable variable=slotName;]production"
@@ -133,34 +140,34 @@ stages:
               "slotSetting": false
             },
             {
+                "name": "NotificationOptions:TemplateFolder",
+                "value": "templates",
+                "slotSetting": false
+            },
+            {
               "name": "ServiceBusOptions:FullyQualifiedNamespace",
               "value": "$(serviceBusFQDN)",
-              "slotSetting": false
+              "slotSetting": true
             },
             {
               "name": "ServiceBusTriggerOptions:FullyQualifiedNamespace",
               "value": "$(serviceBusFQDN)",
-              "slotSetting": false
+              "slotSetting": true
             },
             {
               "name": "StorageTableOptions:FullyQualifiedDomainName",
               "value": "$(databaseFQDN)",
-              "slotSetting": false
+              "slotSetting": true
             },
             {
               "name": "StorageBlobOptions:FullyQualifiedDomainName",
               "value": "$(blobFQDN)",
-              "slotSetting": false
+              "slotSetting": true
             },
             {
                 "name": "NotificationOptions:SelfHostName",
                 "value": "niobiumntfyfunc.azurewebsites.net",
-                "slotSetting": false
-            },
-            {
-                "name": "NotificationOptions:TemplateFolder",
-                "value": "templates",
-                "slotSetting": false
+                "slotSetting": true
             },
             {
                 "name": "CaptchaOptions:Secrets:www.edennoodleshamilton.co.nz",
@@ -203,34 +210,34 @@ stages:
               "slotSetting": false
             },
             {
-              "name": "ServiceBusOptions:FullyQualifiedNamespace",
-              "value": "$(serviceBusFQDN)",
-              "slotSetting": false
-            },
-            {
-              "name": "ServiceBusTriggerOptions:FullyQualifiedNamespace",
-              "value": "$(serviceBusFQDN)",
-              "slotSetting": false
-            },
-            {
-              "name": "StorageTableOptions:FullyQualifiedDomainName",
-              "value": "$(databaseFQDN)",
-              "slotSetting": false
-            },
-            {
-              "name": "StorageBlobOptions:FullyQualifiedDomainName",
-              "value": "$(blobFQDN)",
-              "slotSetting": false
-            },
-            {
-                "name": "NotificationOptions:SelfHostName",
-                "value": "niobiumntfyfunc.azurewebsites.net",
-                "slotSetting": false
-            },
-            {
                 "name": "NotificationOptions:TemplateFolder",
                 "value": "templates",
                 "slotSetting": false
+            },
+            {
+              "name": "ServiceBusOptions:FullyQualifiedNamespace",
+              "value": "$(serviceBusFQDNStaging)",
+              "slotSetting": true
+            },
+            {
+              "name": "ServiceBusTriggerOptions:FullyQualifiedNamespace",
+              "value": "$(serviceBusFQDNStaging)",
+              "slotSetting": true
+            },
+            {
+              "name": "StorageTableOptions:FullyQualifiedDomainName",
+              "value": "$(databaseFQDNStaging)",
+              "slotSetting": true
+            },
+            {
+              "name": "StorageBlobOptions:FullyQualifiedDomainName",
+              "value": "$(blobFQDNStaging)",
+              "slotSetting": true
+            },
+            {
+                "name": "NotificationOptions:SelfHostName",
+                "value": "niobiumntfyfunc-staging.azurewebsites.net",
+                "slotSetting": true
             },
             {
               "name": "ResendServiceOptions:GlobalAPIKey",
