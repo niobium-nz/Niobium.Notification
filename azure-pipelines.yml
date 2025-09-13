@@ -4,7 +4,7 @@ trigger:
 
 variables:
   buildAgentVmImage: 'windows-latest'
-  serviceConnection: 'niobium-ntfy'
+  serviceConnection: 'niobium-emailnotification'
   resourceGroupName: 'niobium-ntfy'
   appName: 'niobiumntfyFunc'
   tableDB: 'niobiumntfydb'
@@ -60,7 +60,7 @@ stages:
     - template: pipelines/steps/newStorageAccount.yml@devops
       parameters:
         azureServiceConnection: $(serviceConnection)
-        resourceGroupName: $(serviceConnection)
+        resourceGroupName: $(resourceGroupName)
         storageAccountName: $(tableDB)
         contributorPrincipalId: $(functionAppPrincipalId)
         outputVariableName: 'newStorageAccountProperties'
@@ -68,7 +68,7 @@ stages:
       parameters:
         switch: ${{ variables.enableStagingSlot }}
         azureServiceConnection: $(serviceConnection)
-        resourceGroupName: $(serviceConnection)
+        resourceGroupName: $(resourceGroupName)
         storageAccountName: $(tableDBStaging)
         contributorPrincipalId: $(functionAppPrincipalIdStaging)
         outputVariableName: 'newStorageAccountPropertiesStaging'
