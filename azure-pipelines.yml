@@ -300,11 +300,11 @@ stages:
       - Testing
     condition: and(succeeded(), eq('${{ variables.enableStagingSlot }}', true))
     - task: AzureAppServiceManage@0
-        displayName: 'Swap Production'
-        inputs:
-          azureSubscription: $(serviceConnection)
-          ResourceGroupName: $(resourceGroupName)
-          Action: 'Swap Slots'
-          WebAppName: $(appName)
-          SourceSlot: 'staging'
-          SwapWithProduction: true
+      displayName: 'Swap Production'
+      inputs:
+        azureSubscription: $(serviceConnection)
+        ResourceGroupName: $(resourceGroupName)
+        Action: 'Swap Slots'
+        WebAppName: $(appName)
+        SourceSlot: 'staging'
+        SwapWithProduction: true
