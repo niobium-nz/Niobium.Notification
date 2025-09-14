@@ -17,7 +17,7 @@ describe('contact-us.js E2E (vitest)', () => {
     }
 
     const recaptchaKey = process.env.RECAPTCHA_KEY || 'test-recaptcha-key';
-    const tenant = process.env.TENANT || 'test-tenant';
+      const tenant = process.env.TENANT || 'de8b3e50-abf6-4cdd-9269-f2472a1020ad';
     const name = process.env.NAME || 'E2E Tester';
     const contact = process.env.CONTACT || 'tester@example.com';
     const message = process.env.MESSAGE || 'This is an automated E2E test.';
