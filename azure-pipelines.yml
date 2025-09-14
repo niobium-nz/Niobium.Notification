@@ -180,11 +180,6 @@ stages:
                 "slotSetting": true
             },
             {
-                "name": "CaptchaOptions:Secrets:www.joychicbar.co.nz",
-                "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/RECAPTCHA-WWW-JOYCHICBAR-CO-NZ/)",
-                "slotSetting": true
-            },
-            {
                 "name": "ResendServiceOptions:DomainScopedAPIKeys:xxx.co.nz",
                 "value": "test123)",
                 "slotSetting": true
