@@ -299,6 +299,7 @@ stages:
     dependsOn: 
       - Testing
     condition: and(succeeded(), eq('${{ variables.enableStagingSlot }}', true))
+    steps:
     - task: AzureAppServiceManage@0
       displayName: 'Swap Production'
       inputs:
