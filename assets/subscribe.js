@@ -91,7 +91,7 @@
    * @param {string} firstName Optionally the first name.
    * @param {string} lastName Optionally the last name.
    * @param {string} track Optionally the internal track identifier.
-   * @param {string} baseUrl The WebAPI base URL.
+   * @param {string} baseUrl The WebAPI URL.
    */
     function subscribe(reCapthchaPublicKey, tenant, campaign, email, firstName, lastName, track, baseUrl) {
     if (!global.grecaptcha || !global.grecaptcha.ready) {
