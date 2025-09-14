@@ -58,10 +58,10 @@
     try {
       const response = await fetch(url, options);
 
-        // If the response is not OK and there are retries left, wait and retry.
+      // If the response is not OK and there are retries left, wait and retry.
       if (!response.ok && retries > 0) {
         console.warn(`Fetch failed with status ${response.status}. Retrying...`);
-            // Exponential back-off delay.
+        // Exponential back-off delay.
         const delay = 1000 * (4 - retries);
         await new Promise((resolve) => setTimeout(resolve, delay));
         return await fetchWithRetry(url, options, retries - 1);
@@ -85,38 +85,41 @@
    * @param {string} name The contact's name.
    * @param {string} contact The contact information (e.g., email or phone).
    * @param {string} message The message content.
-   * @param {string} baseUrl The WebAPI base URL.
+   * @param {string} baseUrl The WebAPI URL.
+   * @returns {Promise<Response>} The fetch response promise.
    */
   function contactUs(reCapthchaPublicKey, tenant, name, contact, message, baseUrl) {
     if (!global.grecaptcha || !global.grecaptcha.ready) {
-      console.error("reCAPTCHA is not loaded.");
-      return;
+      return Promise.reject(new Error("reCAPTCHA is not loaded."));
     }
 
     const url = baseUrl || "/api/notification/ContactUs";
+      
+    return new Promise((resolve, reject) => {
+      global.grecaptcha.ready(function () {
+        global.grecaptcha
+          .execute(reCapthchaPublicKey, { action: "submit" })
+          .then(function (token) {
+            /** @type {ContactData} */
+            const data = {
+              id: generateGUID(),
+              tenant: tenant,
+              name: name,
+              contact: contact,
+              message: message,
+              token: token,
+            };
 
-    global.grecaptcha.ready(function () {
-      global.grecaptcha
-        .execute(reCapthchaPublicKey, { action: "submit" })
-        .then(function (token) {
-          /** @type {ContactData} */
-          const data = {
-            id: generateGUID(),
-            tenant: tenant,
-            name: name,
-            contact: contact,
-            message: message,
-            token: token,
-          };
+            const options = {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(data),
+            };
 
-          const options = {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(data),
-          };
-
-          fetchWithRetry(url, options);
-        });
+            fetchWithRetry(url, options).then(resolve).catch(reject);
+          })
+          .catch(reject);
+      });
     });
   }
 
