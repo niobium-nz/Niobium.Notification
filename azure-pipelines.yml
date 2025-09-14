@@ -272,4 +272,39 @@ stages:
       serviceConnection: $(serviceConnection)
       resourceGroupName: $(resourceGroupName)
       enableStagingSlot: ${{ variables.enableStagingSlot }}
-      autoSwapSlots: true
+      autoSwapSlots: false
+
+  - job: Testing
+    dependsOn: 
+      - Deploy
+    condition: succeeded()
+    pool:
+      vmImage: $(buildAgentVmImage)
+    variables:
+      API_URL: 'https://niobiumntfyfunc-staging.azurewebsites.net'
+    steps:
+    - task: Npm@1
+      inputs:
+        command: 'install'
+        workingDir: '$(System.DefaultWorkingDirectory)/Niobium.Notification.IntegrationTests'
+      displayName: 'npm install'
+    - task: Npm@1
+      inputs:
+        command: 'custom'
+        customCommand: 'test'
+        workingDir: '$(System.DefaultWorkingDirectory)/Niobium.Notification.IntegrationTests'
+      displayName: 'npm test'
+
+  - job: Swap
+    dependsOn: 
+      - Testing
+    condition: and(succeeded(), eq('${{ variables.enableStagingSlot }}', true))
+    - task: AzureAppServiceManage@0
+        displayName: 'Swap Production'
+        inputs:
+          azureSubscription: $(serviceConnection)
+          ResourceGroupName: $(resourceGroupName)
+          Action: 'Swap Slots'
+          WebAppName: $(appName)
+          SourceSlot: 'staging'
+          SwapWithProduction: true

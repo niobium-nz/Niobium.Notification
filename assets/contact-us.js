@@ -93,7 +93,7 @@
       return Promise.reject(new Error("reCAPTCHA is not loaded."));
     }
 
-    const url = baseUrl || "/api/notification/ContactUs";
+    const url = (baseUrl || "/api/notification/") + "ContactUs";
       
     return new Promise((resolve, reject) => {
       global.grecaptcha.ready(function () {
