@@ -166,7 +166,7 @@ stages:
             },
             {
                 "name": "NotificationOptions:SelfHostName",
-                "value": "niobiumntfyfunc.azurewebsites.net",
+                "value": "api.notification.niobium.co.nz",
                 "slotSetting": true
             },
             {
@@ -231,7 +231,7 @@ stages:
             },
             {
                 "name": "NotificationOptions:SelfHostName",
-                "value": "niobiumntfyfunc-staging.azurewebsites.net",
+                "value": "staging.api.notification.niobium.co.nz",
                 "slotSetting": true
             },
             {
@@ -241,21 +241,6 @@ stages:
             },
             {
               "name": "CaptchaOptions:IsDisabled",
-              "value": "true",
-              "slotSetting": true
-            },
-            {
-              "name": "AzureWebJobs.SubscribedEventConsumer.Disabled",
-              "value": "true",
-              "slotSetting": true
-            },
-            {
-              "name": "AzureWebJobs.SubscribeCommandConsumer.Disabled",
-              "value": "true",
-              "slotSetting": true
-            },
-            {
-              "name": "AzureWebJobs.NotifyCommandConsumer.Disabled",
               "value": "true",
               "slotSetting": true
             }
@@ -276,7 +261,7 @@ stages:
     pool:
       vmImage: $(buildAgentVmImage)
     variables:
-      API_URL: 'https://niobiumntfyfunc-staging.azurewebsites.net'
+      API_URL: 'https://staging.api.notification.niobium.co.nz'
     steps:
     - task: Npm@1
       inputs:
