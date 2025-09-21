@@ -7,6 +7,7 @@ variables:
   serviceConnection: 'niobium-emailnotification'
   resourceGroupName: 'niobium-ntfy'
   appName: 'niobiumntfyFunc'
+  assetsPageName: 'assets-notification-niobium-co-nz'
   tableDB: 'niobiumntfydb'
   tableDBStaging: 'niobiumntfydbstaging'
   serviceBusNamespace: 'niobiumntfysb'
@@ -59,6 +60,7 @@ stages:
     - checkout: devops  
     - template: pipelines/steps/newStorageAccount.yml@devops
       parameters:
+        sku: 'Standard_LRS'
         azureServiceConnection: $(serviceConnection)
         resourceGroupName: $(resourceGroupName)
         storageAccountName: $(tableDB)
@@ -67,6 +69,7 @@ stages:
     - template: pipelines/steps/newStorageAccount.yml@devops
       parameters:
         switch: ${{ variables.enableStagingSlot }}
+        sku: 'Standard_LRS'
         azureServiceConnection: $(serviceConnection)
         resourceGroupName: $(resourceGroupName)
         storageAccountName: $(tableDBStaging)
@@ -289,3 +292,9 @@ stages:
         WebAppName: $(appName)
         SourceSlot: 'staging'
         SwapWithProduction: true
+
+  - template: pipelines/jobs/AssetsDeploy.yml@devops
+    parameters:
+      cloudflarePagesProjectName: $(assetsPageName)
+      cloudflareAccountID: $(cloudflareAccountID)
+      cloudflareAPIToken: $(cloudflareAPIToken)
