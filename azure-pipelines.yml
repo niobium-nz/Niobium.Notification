@@ -188,6 +188,11 @@ stages:
                 "slotSetting": true
             },
             {
+                "name": "CaptchaOptions:Secrets:www.zaps.co.nz",
+                "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/RECAPTCHA-WWW-ZAPS-CO-NZ/)",
+                "slotSetting": true
+            },
+            {
                 "name": "ResendServiceOptions:DomainScopedAPIKeys:xxx.co.nz",
                 "value": "test123)",
                 "slotSetting": true
