@@ -1,10 +1,8 @@
 using System.Net;
 using System.Text.Encodings.Web;
-using Azure.Core;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
-using Microsoft.Extensions.Logging;
 using Niobium.Platform;
 using Niobium.Platform.Captcha.ReCaptcha;
 using FromBodyAttribute = Microsoft.Azure.Functions.Worker.Http.FromBodyAttribute;
@@ -14,8 +12,7 @@ namespace Niobium.Notification.Functions
     public class DeliverContactUs(
         HtmlEncoder encoder,
         NotificationFlow flow,
-        IVisitorRiskAssessor assessor,
-        ILogger<DeliverContactUs> logger)
+        IVisitorRiskAssessor assessor)
     {
         [Function(nameof(ContactUs))]
         public async Task<IActionResult> ContactUs(
@@ -28,11 +25,6 @@ namespace Niobium.Notification.Functions
             {
                 return validationState.MakeResponse();
             }
-
-            string? origin = req.Headers.Origin.SingleOrDefault();
-            var referer = req.Headers.Referer.SingleOrDefault();
-            var hostname = req.GetSourceHostname();
-            logger.LogError("ContactUs request from {origin} with referer {referer} and hostname {hostname}", origin, referer, hostname);
 
             _ = await assessor.AssessAsync(request.Token, requestID: request.ID.ToString(), cancellationToken: cancellationToken);
             await flow.RunAsync(new NotifyCommand

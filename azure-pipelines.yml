@@ -183,6 +183,11 @@ stages:
                 "slotSetting": true
             },
             {
+                "name": "CaptchaOptions:Secrets:www.niobium.co.nz",
+                "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/RECAPTCHA-WWW-NIOBIUM-CO-NZ/)",
+                "slotSetting": true
+            },
+            {
                 "name": "ResendServiceOptions:DomainScopedAPIKeys:xxx.co.nz",
                 "value": "test123)",
                 "slotSetting": true
