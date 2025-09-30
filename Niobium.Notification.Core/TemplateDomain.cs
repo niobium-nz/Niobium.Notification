@@ -39,8 +39,10 @@ namespace Niobium.Notification
             var body = await streamReader.ReadToEndAsync(cancellationToken: cancellationToken);
             var unsubscribeLink = this.BuildUnsubscribeLink(destination, entity.Tenant, entity.Channel);
             body = body.Replace("{{UNSUBSCRIBE_LINK}}", unsubscribeLink);
+            var subject = entity.Subject.Replace("{{UNSUBSCRIBE_LINK}}", unsubscribeLink);
             foreach (var (key, value) in parameters)
             {
+                subject = subject.Replace($"{{{{{key.ToUpperInvariant()}}}}}", encoder.Encode(value));
                 body = body.Replace($"{{{{{key.ToUpperInvariant()}}}}}", encoder.Encode(value));
             }
 
