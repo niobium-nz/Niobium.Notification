@@ -51,7 +51,7 @@ namespace Niobium.Notification
                 Body = body,
                 From = entity.From,
                 FromName = entity.FromName,
-                Subject = entity.Subject,
+                Subject = subject,
                 To = destination,
             };
         }
