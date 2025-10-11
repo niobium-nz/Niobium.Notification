@@ -61,6 +61,7 @@ namespace Niobium.Notification.Functions
                                     list.Add(dict);
                                 }
                             }
+                            evt.Parameters[key] = list;
                             break;
                         default:
                             evt.Parameters[key] = jsonElement.ToString() ?? String.Empty;
