@@ -193,6 +193,11 @@ stages:
                 "slotSetting": true
             },
             {
+                "name": "CaptchaOptions:Secrets:www.tapss.care",
+                "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/RECAPTCHA-WWW-TAPSS-CARE/)",
+                "slotSetting": true
+            },
+            {
                 "name": "ResendServiceOptions:DomainScopedAPIKeys:xxx.co.nz",
                 "value": "test123)",
                 "slotSetting": true

@@ -32,7 +32,7 @@ namespace Niobium.Notification.Functions
                 ID = request.ID.ToString(),
                 Channel = Constants.ContactUsChannel,
                 Tenant = request.Tenant,
-                Parameters = new Dictionary<string, string>
+                Parameters = new Dictionary<string, object>
                  {
                      { nameof(request.Name), !String.IsNullOrWhiteSpace(request.Name) ? encoder.Encode(request.Name) : "unspecified" },
                      { nameof(request.Contact),!String.IsNullOrWhiteSpace(request.Contact) ? encoder.Encode(request.Contact) : "unspecified"  },
