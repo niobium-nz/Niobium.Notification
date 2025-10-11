@@ -42,15 +42,24 @@ namespace Niobium.Notification
             var subject = entity.Subject.Replace("{{UNSUBSCRIBE_LINK}}", unsubscribeLink);
             foreach (var (key, value) in parameters)
             {
-                if (value is IEnumerable<string> values)
+                if (value is IEnumerable<Dictionary<string, string>> values)
                 {
                     var section = ExtractRepeatableSection(body, key, out var startIndex, out var endIndex);
+                    List<string> repeatedSections = [];
                     if (section != null)
                     {
-                        //repeatable section
-                        var repeatedSections = values.Select(v => section.Replace($"{{{{{key.ToUpperInvariant()}}}}}", encoder.Encode(v)));
-                        body = $"{body[..startIndex]}{String.Join(Environment.NewLine, repeatedSections)}{body[endIndex..]}";
+                        foreach (var dic in values)
+                        { 
+                            var newSection = section;
+                            foreach (var (subKey, subValue) in dic)
+                            {
+                                newSection = newSection.Replace($"{{{{{subKey.ToUpperInvariant()}}}}}", encoder.Encode(subValue));
+                            }
+                            repeatedSections.Add(newSection);
+                        }
                     }
+
+                    body = $"{body[..startIndex]}{String.Join(Environment.NewLine, repeatedSections)}{body[endIndex..]}";
                 }
                 else
                 {
