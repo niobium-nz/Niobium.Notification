@@ -37,7 +37,7 @@ namespace Niobium.Notification.Functions
         private static void Transform(NotifyCommand evt)
         {
             // NotifyCommand.Parameters is a Dictionary<string, object>, there could be JsonElement values because of deserialization
-            // Transform them to string or IEnumerable<string> for easier usage in templates
+            // Transform them to string or IEnumerable<Dictionary<string, string>> for easier usage in templates
             foreach (var key in evt.Parameters.Keys.ToList())
             {
                 if (evt.Parameters[key] is JsonElement jsonElement)
@@ -48,19 +48,19 @@ namespace Niobium.Notification.Functions
                             evt.Parameters[key] = jsonElement.GetString() ?? String.Empty;
                             break;
                         case JsonValueKind.Array:
-                            var list = new List<string>();
+                            var list = new List<Dictionary<string, string>>();
                             foreach (var item in jsonElement.EnumerateArray())
                             {
-                                if (item.ValueKind == JsonValueKind.String)
+                                if (item.ValueKind == JsonValueKind.Object)
                                 {
-                                    list.Add(item.GetString() ?? String.Empty);
-                                }
-                                else
-                                {
-                                    list.Add(item.ToString() ?? String.Empty);
+                                    var dict = new Dictionary<string, string>();
+                                    foreach (var prop in item.EnumerateObject())
+                                    {
+                                        dict[prop.Name] = prop.Value.GetString() ?? String.Empty;
+                                    }
+                                    list.Add(dict);
                                 }
                             }
-                            evt.Parameters[key] = list;
                             break;
                         default:
                             evt.Parameters[key] = jsonElement.ToString() ?? String.Empty;

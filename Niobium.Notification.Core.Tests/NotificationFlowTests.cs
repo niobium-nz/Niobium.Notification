@@ -531,10 +531,10 @@ public sealed class NotificationFlowTests
     }
 
     /// <summary>
-    /// Renders a repeatable section for each value and encodes content.
-    /// Given: a template with a repeatable ITEMS section and two values.
+    /// Renders a repeatable section for each value and encodes content using sub-keys in dictionaries.
+    /// Given: a template with a repeatable ITEMS section and two dictionary values (NAME, URL, DESC).
     /// When: a notification is requested.
-    /// Then: the body contains two <li> entries with encoded text and no raw {{ITEMS}} placeholder remains.
+    /// Then: the body contains two <li> entries with encoded link, name and desc, markers remain, and no raw placeholders remain.
     /// </summary>
     [TestMethod]
     public async Task SendNotification_RepeatableSection_RendersMultipleItems_Encoded()
@@ -543,12 +543,16 @@ public sealed class NotificationFlowTests
         var tenant = Guid.NewGuid();
         var channel = "repeat";
         var template = BuildTemplate(tenant, channel);
-        var body = "<html><body><ul><!-- ITEMS BEGIN --><li>{{ITEMS}}</li><!-- ITEMS END --></ul></body></html>";
+        var body = "<html><body><ul><!-- ITEMS BEGIN --><li><a href=\"{{URL}}\">{{NAME}}</a> - {{DESC}}</li><!-- ITEMS END --></ul></body></html>";
         var domain = CreateDomain(template, body, DefaultOptions);
         var (sut, _, emailMock, _) = CreateSut(domain);
         var request = BuildCommand(tenant, channel, "list@example.com", new Dictionary<string, object>
         {
-            ["items"] = new[] { "One <1>", "Two & 2" }
+            ["items"] = new[]
+            {
+                new Dictionary<string, string> { ["name"] = "One <1>", ["url"] = "https://x.com?q=1&k=2", ["desc"] = "A & B" },
+                new Dictionary<string, string> { ["name"] = "Two", ["url"] = "https://y.com?a=3&b=4", ["desc"] = "<X>" }
+            }
         });
 
         // When
@@ -559,18 +563,15 @@ public sealed class NotificationFlowTests
             It.IsAny<EmailAddress>(),
             It.IsAny<IEnumerable<EmailAddress>>(),
             It.IsAny<string>(),
-            It.Is<string>(b =>
-                b.Contains("<li>One &lt;1&gt;</li>") &&
-                b.Contains("<li>Two &amp; 2</li>") &&
-                !b.Contains("{{ITEMS}}")),
+            It.Is<string>(b => BodyHasTwoEncodedItems(b)),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
     /// <summary>
     /// Removes the repeatable section content when the collection is empty (no list items rendered).
-    /// Given: a template with a repeatable ITEMS section and an empty values collection.
+    /// Given: a template with a repeatable ITEMS section and an empty dictionary collection.
     /// When: a notification is requested.
-    /// Then: the body contains no <li> items for the section and the placeholder is not present.
+    /// Then: the body contains no <li> items for the section, the section markers remain, and the placeholder is not present.
     /// </summary>
     [TestMethod]
     public async Task SendNotification_RepeatableSection_EmptyCollection_RendersNothing()
@@ -579,12 +580,12 @@ public sealed class NotificationFlowTests
         var tenant = Guid.NewGuid();
         var channel = "repeat-empty";
         var template = BuildTemplate(tenant, channel);
-        var body = "<html><body><ul><!-- ITEMS BEGIN --><li>{{ITEMS}}</li><!-- ITEMS END --></ul></body></html>";
+        var body = "<html><body><ul><!-- ITEMS BEGIN --><li><a href=\"{{URL}}\">{{NAME}}</a> - {{DESC}}</li><!-- ITEMS END --></ul></body></html>";
         var domain = CreateDomain(template, body, DefaultOptions);
         var (sut, _, emailMock, _) = CreateSut(domain);
         var request = BuildCommand(tenant, channel, "list@example.com", new Dictionary<string, object>
         {
-            ["ITEMS"] = Array.Empty<string>()
+            ["ITEMS"] = Array.Empty<Dictionary<string, string>>()
         });
 
         // When
@@ -595,7 +596,47 @@ public sealed class NotificationFlowTests
             It.IsAny<EmailAddress>(),
             It.IsAny<IEnumerable<EmailAddress>>(),
             It.IsAny<string>(),
-            It.Is<string>(b => !b.Contains("<li>") && !b.Contains("{{ITEMS}}")),
+            It.Is<string>(b => BodyHasNoItemsButMarkers(b)),
             It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    private static bool BodyHasTwoEncodedItems(string b)
+    {
+        // Expect two encoded li rows based on dictionaries supplied in test
+        bool first = b.Contains("<li><a href=\"https://x.com?q=1&amp;k=2\">One &lt;1&gt;</a> - A &amp; B</li>");
+        bool second = b.Contains("<li><a href=\"https://y.com?a=3&amp;b=4\">Two</a> - &lt;X&gt;</li>");
+        bool hasMarkers = b.Contains("<!-- ITEMS BEGIN -->") && b.Contains("<!-- ITEMS END -->");
+        bool noPlaceholders = !b.Contains("{{ITEMS}}") && !b.Contains("{{URL}}") && !b.Contains("{{NAME}}") && !b.Contains("{{DESC}}");
+        int Count(string s, string needle)
+        {
+            int count = 0, idx = 0;
+            while ((idx = s.IndexOf(needle, idx, StringComparison.Ordinal)) >= 0)
+            {
+                count++;
+                idx += needle.Length;
+            }
+            return count;
+        }
+        bool exactItemCount = Count(b, "<li>") == 2 && Count(b, "</li>") == 2;
+        return first && second && hasMarkers && noPlaceholders && exactItemCount;
+    }
+
+    private static bool BodyHasNoItemsButMarkers(string b)
+    {
+        bool noItems = !b.Contains("<li>");
+        bool hasMarkers = b.Contains("<!-- ITEMS BEGIN -->") && b.Contains("<!-- ITEMS END -->");
+        bool noPlaceholders = !b.Contains("{{ITEMS}}") && !b.Contains("{{URL}}") && !b.Contains("{{NAME}}") && !b.Contains("{{DESC}}");
+        var startTag = "<!-- ITEMS BEGIN -->";
+        var endTag = "<!-- ITEMS END -->";
+        var start = b.IndexOf(startTag, StringComparison.Ordinal);
+        var end = b.IndexOf(endTag, StringComparison.Ordinal);
+        bool sectionCleared = true;
+        if (start >= 0 && end >= 0 && end > start)
+        {
+            start += startTag.Length;
+            var between = b.Substring(start, end - start);
+            sectionCleared = String.IsNullOrWhiteSpace(between) || between.Trim() == string.Empty;
+        }
+        return noItems && hasMarkers && noPlaceholders && sectionCleared;
     }
 }
