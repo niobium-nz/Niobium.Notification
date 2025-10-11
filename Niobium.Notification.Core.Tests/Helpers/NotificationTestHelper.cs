@@ -28,7 +28,7 @@ internal static class NotificationTestHelper
             FallbackTo = fallbackTo
         };
 
-    public static NotifyCommand BuildCommand(Guid tenant, string channel, string? destination, Dictionary<string, string> parameters)
+    public static NotifyCommand BuildCommand(Guid tenant, string channel, string? destination, Dictionary<string, object> parameters)
         => new()
         {
             Tenant = tenant,

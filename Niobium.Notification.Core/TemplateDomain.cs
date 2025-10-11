@@ -15,7 +15,7 @@ namespace Niobium.Notification
         ILogger<TemplateDomain> logger)
             : GenericDomain<Template>(repository, eventHandlers)
     {
-        public async Task<Deliverable?> BuildAsync(string? destination, IReadOnlyDictionary<string, string> parameters, CancellationToken cancellationToken = default)
+        public async Task<Deliverable?> BuildAsync(string? destination, IReadOnlyDictionary<string, object> parameters, CancellationToken cancellationToken = default)
         {
             var entity = await this.TryGetEntityAsync(cancellationToken);
             if (entity == null)
@@ -42,8 +42,22 @@ namespace Niobium.Notification
             var subject = entity.Subject.Replace("{{UNSUBSCRIBE_LINK}}", unsubscribeLink);
             foreach (var (key, value) in parameters)
             {
-                subject = subject.Replace($"{{{{{key.ToUpperInvariant()}}}}}", encoder.Encode(value));
-                body = body.Replace($"{{{{{key.ToUpperInvariant()}}}}}", encoder.Encode(value));
+                if (value is IEnumerable<string> values)
+                {
+                    var section = ExtractRepeatableSection(body, key, out var startIndex, out var endIndex);
+                    if (section != null)
+                    {
+                        //repeatable section
+                        var repeatedSections = values.Select(v => section.Replace($"{{{{{key.ToUpperInvariant()}}}}}", encoder.Encode(v)));
+                        body = $"{body[..startIndex]}{String.Join(Environment.NewLine, repeatedSections)}{body[endIndex..]}";
+                    }
+                }
+                else
+                {
+                    var strValue = value?.ToString() ?? String.Empty;
+                    subject = subject.Replace($"{{{{{key.ToUpperInvariant()}}}}}", encoder.Encode(strValue));
+                    body = body.Replace($"{{{{{key.ToUpperInvariant()}}}}}", encoder.Encode(strValue));
+                }
             }
 
             return new Deliverable
@@ -54,6 +68,21 @@ namespace Niobium.Notification
                 Subject = subject,
                 To = destination,
             };
+        }
+
+        private static string? ExtractRepeatableSection(string body, string sectionName, out int startIndex, out int endIndex)
+        {
+            sectionName = sectionName.ToUpperInvariant();
+            var startTag = $"<!-- {sectionName} BEGIN -->";
+            var endTag = $"<!-- {sectionName} END -->";
+            startIndex = body.IndexOf(startTag);
+            endIndex = body.IndexOf(endTag);
+            if (startIndex == -1 || endIndex == -1 || endIndex <= startIndex)
+            {
+                return null;
+            }
+            startIndex += startTag.Length;
+            return body[startIndex..endIndex].Trim();
         }
 
         private string BuildUnsubscribeLink(string email, Guid tenant, string channel)

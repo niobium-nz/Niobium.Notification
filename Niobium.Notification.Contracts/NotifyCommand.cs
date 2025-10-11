@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json;
 using Niobium.Messaging;
 
 namespace Niobium.Notification
@@ -19,7 +20,7 @@ namespace Niobium.Notification
         public string? DestinationDisplayName { get; set; }
 
         [Required]
-        public required Dictionary<string, string> Parameters { get; set; }
+        public required Dictionary<string, object> Parameters { get; set; }
 
         [MaxLength(5000)]
         public string? Token { get; set; }

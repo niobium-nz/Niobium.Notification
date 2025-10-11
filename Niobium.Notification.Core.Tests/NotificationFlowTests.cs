@@ -35,7 +35,7 @@ public sealed class NotificationFlowTests
         var options = DefaultOptions;
         var domain = CreateDomain(template, body, options);
         var (sut, repoMock, emailMock, flowLoggerMock) = CreateSut(domain);
-        var request = BuildCommand(tenant, channel, "alice@example.com", new Dictionary<string, string>
+        var request = BuildCommand(tenant, channel, "alice@example.com", new Dictionary<string, object>
         {
             ["name"] = "Alice <Admin>",
             ["order_id"] = "#123 & 456"
@@ -74,7 +74,7 @@ public sealed class NotificationFlowTests
         var domain = CreateDomain(template, body, DefaultOptions);
         var (sut, _, emailMock, _) = CreateSut(domain);
         var value = "Alice <Admin>";
-        var request = BuildCommand(tenant, channel, "alice@example.com", new Dictionary<string, string>
+        var request = BuildCommand(tenant, channel, "alice@example.com", new Dictionary<string, object>
         {
             [keyVariant] = value
         });
@@ -106,7 +106,7 @@ public sealed class NotificationFlowTests
         var template = BuildTemplate(tenant, channel, fallbackTo: "fallback@example.com");
         var domain = CreateDomain(template, BuildTemplateBody(), DefaultOptions);
         var (sut, repoMock, emailMock, _) = CreateSut(domain);
-        var request = BuildCommand(tenant, channel, null, new Dictionary<string, string> { ["name"] = "Bob" });
+        var request = BuildCommand(tenant, channel, null, new Dictionary<string, object> { ["name"] = "Bob" });
 
         // When
         await sut.RunAsync(request, CancellationToken.None);
@@ -308,7 +308,7 @@ public sealed class NotificationFlowTests
 
         var flowLoggerMock = new Mock<ILogger<NotificationFlow>>();
         var sut = new NotificationFlow(repoMock.Object, emailMock.Object, flowLoggerMock.Object);
-        var request = BuildCommand(tenant, channel, "erin@example.com", new Dictionary<string, string> { ["name"] = "Erin" });
+        var request = BuildCommand(tenant, channel, "erin@example.com", new Dictionary<string, object> { ["name"] = "Erin" });
 
         // When
         await sut.RunAsync(request, CancellationToken.None);
@@ -485,7 +485,7 @@ public sealed class NotificationFlowTests
 
         var domain = CreateDomain(template, null, options, fsMock);
         var (sut, repoMock, emailMock, _) = CreateSut(domain);
-        var request = BuildCommand(tenant, channel, "user@example.com", new Dictionary<string, string> { ["name"] = "U" });
+        var request = BuildCommand(tenant, channel, "user@example.com", new Dictionary<string, object> { ["name"] = "U" });
 
         // When
         Func<Task> act = async () => await sut.RunAsync(request, CancellationToken.None);
@@ -528,5 +528,74 @@ public sealed class NotificationFlowTests
             It.Is<It.IsAnyType>((v, t) => true),
             It.IsAny<Exception?>(),
             It.Is<Func<It.IsAnyType, Exception?, string>>((v, t) => true)), Times.Never);
+    }
+
+    /// <summary>
+    /// Renders a repeatable section for each value and encodes content.
+    /// Given: a template with a repeatable ITEMS section and two values.
+    /// When: a notification is requested.
+    /// Then: the body contains two <li> entries with encoded text and no raw {{ITEMS}} placeholder remains.
+    /// </summary>
+    [TestMethod]
+    public async Task SendNotification_RepeatableSection_RendersMultipleItems_Encoded()
+    {
+        // Given
+        var tenant = Guid.NewGuid();
+        var channel = "repeat";
+        var template = BuildTemplate(tenant, channel);
+        var body = "<html><body><ul><!-- ITEMS BEGIN --><li>{{ITEMS}}</li><!-- ITEMS END --></ul></body></html>";
+        var domain = CreateDomain(template, body, DefaultOptions);
+        var (sut, _, emailMock, _) = CreateSut(domain);
+        var request = BuildCommand(tenant, channel, "list@example.com", new Dictionary<string, object>
+        {
+            ["items"] = new[] { "One <1>", "Two & 2" }
+        });
+
+        // When
+        await sut.RunAsync(request, CancellationToken.None);
+
+        // Then
+        emailMock.Verify(x => x.SendAsync(
+            It.IsAny<EmailAddress>(),
+            It.IsAny<IEnumerable<EmailAddress>>(),
+            It.IsAny<string>(),
+            It.Is<string>(b =>
+                b.Contains("<li>One &lt;1&gt;</li>") &&
+                b.Contains("<li>Two &amp; 2</li>") &&
+                !b.Contains("{{ITEMS}}")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>
+    /// Removes the repeatable section content when the collection is empty (no list items rendered).
+    /// Given: a template with a repeatable ITEMS section and an empty values collection.
+    /// When: a notification is requested.
+    /// Then: the body contains no <li> items for the section and the placeholder is not present.
+    /// </summary>
+    [TestMethod]
+    public async Task SendNotification_RepeatableSection_EmptyCollection_RendersNothing()
+    {
+        // Given
+        var tenant = Guid.NewGuid();
+        var channel = "repeat-empty";
+        var template = BuildTemplate(tenant, channel);
+        var body = "<html><body><ul><!-- ITEMS BEGIN --><li>{{ITEMS}}</li><!-- ITEMS END --></ul></body></html>";
+        var domain = CreateDomain(template, body, DefaultOptions);
+        var (sut, _, emailMock, _) = CreateSut(domain);
+        var request = BuildCommand(tenant, channel, "list@example.com", new Dictionary<string, object>
+        {
+            ["ITEMS"] = Array.Empty<string>()
+        });
+
+        // When
+        await sut.RunAsync(request, CancellationToken.None);
+
+        // Then
+        emailMock.Verify(x => x.SendAsync(
+            It.IsAny<EmailAddress>(),
+            It.IsAny<IEnumerable<EmailAddress>>(),
+            It.IsAny<string>(),
+            It.Is<string>(b => !b.Contains("<li>") && !b.Contains("{{ITEMS}}")),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 }
