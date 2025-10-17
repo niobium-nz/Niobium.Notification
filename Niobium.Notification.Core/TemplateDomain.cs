@@ -59,7 +59,10 @@ namespace Niobium.Notification
                         }
                     }
 
-                    body = $"{body[..startIndex]}{String.Join(Environment.NewLine, repeatedSections)}{body[endIndex..]}";
+                    if (startIndex > 0)
+                    {
+                        body = $"{body[..startIndex]}{String.Join(Environment.NewLine, repeatedSections)}{body[endIndex..]}";
+                    }
                 }
                 else
                 {
