@@ -49,19 +49,22 @@
 
     /**
      * Executes a fetch request with a retry mechanism.
+     * Allows passing a function that will be invoked on each attempt to produce fresh options (e.g., for reCAPTCHA tokens).
      * @param {string} url The URL to send the request to.
-     * @param {RequestInit} options The fetch options.
+     * @param {RequestInit|(() => Promise<RequestInit>|RequestInit)} options The fetch options or a factory returning options per attempt.
      * @param {number} retries The maximum number of retry attempts.
      * @returns {Promise<Response>} The fetch response.
      */
     async function fetchWithRetry(url, options, retries = 3) {
+        const resolveOptions = async () => (typeof options === "function" ? await /** @type {any} */ (options)() : options);
         try {
-            const response = await fetch(url, options);
+            const currentOptions = await resolveOptions();
+            const response = await fetch(url, currentOptions);
 
             // If the response is not OK and there are retries left, wait and retry.
             if (!response.ok && retries > 0) {
                 console.warn(`Fetch failed with status ${response.status}. Retrying...`);
-                // Exponential back-off delay.
+                // Back-off delay.
                 const delay = 1000 * (4 - retries);
                 await new Promise((resolve) => setTimeout(resolve, delay));
                 return await fetchWithRetry(url, options, retries - 1);
@@ -115,6 +118,7 @@
 
     /**
      * Submits a contact us request after executing reCAPTCHA.
+     * Ensures a fresh reCAPTCHA token is generated for every retry attempt.
      * @param {string} reCapthchaPublicKey The reCAPTCHA public key.
      * @param {string} tenant The tenant identifier.
      * @param {string} name The contact's name.
@@ -125,22 +129,8 @@
      * @returns {Promise<Response>} The fetch response promise.
      */
     async function contactUs(reCapthchaPublicKey, tenant, name, contact, message, baseUrl, localTest = false) {
-        let token;
-        try {
-            token = await getRecaptchaToken(reCapthchaPublicKey, "contactUs");
-        } catch (error) {
-            return Promise.reject(new Error("reCAPTCHA execution failed."));
-        }
-
-        /** @type {ContactData} */
-        const data = {
-            id: generateGUID(),
-            tenant: tenant,
-            name: name,
-            contact: contact,
-            message: message,
-            token: token,
-        };
+        // Keep request identity and payload stable across retries except for token
+        const stableId = generateGUID();
 
         const headers = { "Content-Type": "application/json" };
         if (localTest) {
@@ -148,14 +138,37 @@
             headers["Referer"] = "http://127.0.0.1:3000/";
         }
 
-        const options = {
-            method: "POST",
-            headers: headers,
-            body: JSON.stringify(data),
+        /**
+         * Build fresh RequestInit with a new reCAPTCHA token on every attempt
+         * @returns {Promise<RequestInit>}
+         */
+        const buildOptions = async () => {
+            let token;
+            try {
+                token = await getRecaptchaToken(reCapthchaPublicKey, "contactUs");
+            } catch (error) {
+                return Promise.reject(new Error("reCAPTCHA execution failed."));
+            }
+
+            /** @type {ContactData} */
+            const data = {
+                id: stableId,
+                tenant: tenant,
+                name: name,
+                contact: contact,
+                message: message,
+                token: token,
+            };
+
+            return {
+                method: "POST",
+                headers: headers,
+                body: JSON.stringify(data),
+            };
         };
 
         const url = (baseUrl || "/api/notification") + "/ContactUs";
-        return await fetchWithRetry(url, options);
+        return await fetchWithRetry(url, buildOptions);
     }
 
     // Public API
