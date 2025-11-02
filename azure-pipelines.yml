@@ -198,8 +198,8 @@ stages:
                 "slotSetting": true
             },
             {
-                "name": "ResendServiceOptions:DomainScopedAPIKeys:xxx.co.nz",
-                "value": "test123)",
+                "name": "ResendServiceOptions:DomainScopedAPIKeys:tapss.care",
+                "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/RESEND-API-KEY-TAPSS-CARE/)",
                 "slotSetting": true
             },
             {
