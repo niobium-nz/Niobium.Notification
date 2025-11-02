@@ -148,6 +148,16 @@ stages:
                 "slotSetting": false
             },
             {
+                "name": "ResendServiceOptions:DomainScopedAPIKeys:tapss.care",
+                "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/RESEND-API-KEY-TAPSS-CARE/)",
+                "slotSetting": false
+            },
+            {
+                "name": "ResendServiceOptions:GlobalAPIKey",
+                "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/RESEND-API-KEY/)",
+                "slotSetting": false
+            },
+            {
               "name": "ServiceBusOptions:FullyQualifiedNamespace",
               "value": "$(serviceBusFQDN)",
               "slotSetting": true
@@ -196,16 +206,6 @@ stages:
                 "name": "CaptchaOptions:Secrets:www.tapss.care",
                 "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/RECAPTCHA-WWW-TAPSS-CARE/)",
                 "slotSetting": true
-            },
-            {
-                "name": "ResendServiceOptions:DomainScopedAPIKeys:tapss.care",
-                "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/RESEND-API-KEY-TAPSS-CARE/)",
-                "slotSetting": true
-            },
-            {
-                "name": "ResendServiceOptions:GlobalAPIKey",
-                "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/RESEND-API-KEY/)",
-                "slotSetting": true
             }
           ]
     - task: AzureAppServiceSettings@1
@@ -251,11 +251,6 @@ stages:
                 "name": "NotificationOptions:SelfHostName",
                 "value": "staging.api.notification.niobium.co.nz",
                 "slotSetting": true
-            },
-            {
-              "name": "ResendServiceOptions:GlobalAPIKey",
-              "value": "012345678901234567890123456789AB",
-              "slotSetting": true
             },
             {
               "name": "CaptchaOptions:IsDisabled",
@@ -306,7 +301,7 @@ stages:
         Action: 'Swap Slots'
         WebAppName: $(appName)
         SourceSlot: 'staging'
-        SwapWithProduction: true
+        SwapWithProduction: false
 
   - template: pipelines/jobs/AssetsDeploy.yml@devops
     parameters:
