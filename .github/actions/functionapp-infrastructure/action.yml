@@ -1,0 +1,210 @@
+name: Function App Infrastructure
+description: Provision Azure Function App infrastructure using Bicep via az cli, then expose outputs and configure app settings.
+
+inputs:
+  azure_credentials:
+    description: JSON credentials for azure/login (ARM_* or federated)
+    required: true
+  resource_group:
+    description: Resource group name
+    required: true
+  location:
+    description: Azure location for deployment
+    required: true
+  app_name:
+    description: Function App name
+    required: true
+  enable_key_vault:
+    description: Enable Key Vault
+    required: false
+    default: 'false'
+  enable_staging_slot:
+    description: Enable Staging slot
+    required: false
+    default: 'false'
+  custom_domain_names:
+    description: JSON array of custom domains
+    required: false
+    default: '[]'
+  custom_domain_managed_cert:
+    description: Use managed certificate for custom domains
+    required: false
+    default: 'false'
+  allowed_origins:
+    description: Allowed origins for CORS
+    required: false
+    default: ''
+  dotnet_version:
+    description: .NET version (major)
+    required: false
+    default: '8'
+  cors_support_credentials:
+    description: CORS support credentials
+    required: false
+    default: 'false'
+  bicep_file:
+    description: Path to FunctionApp.bicep
+    required: false
+    default: 'bicep/FunctionApp.bicep'
+  function_runtime:
+    description: FUNCTIONS_WORKER_RUNTIME value (e.g., dotnet-isolated)
+    required: false
+    default: 'dotnet-isolated'
+  configure_app_settings:
+    description: After provisioning, configure application settings on the function app (and staging if enabled)
+    required: false
+    default: 'true'
+  trigger_file_path:
+    description: Path of a file that, when changed in the last commit, should trigger infra deployment
+    required: false
+    default: 'azure-pipelines.yml'
+
+outputs:
+  function_app_name:
+    description: Deployed function app name
+    value: ${{ steps.outputs-step.outputs.function_app_name }}
+  function_app_content_share_name:
+    description: Content share name
+    value: ${{ steps.outputs-step.outputs.function_app_content_share_name }}
+  storage_account_connection_string:
+    description: Storage connection string
+    value: ${{ steps.outputs-step.outputs.storage_account_connection_string }}
+  application_insights_connection_string:
+    description: App Insights connection string
+    value: ${{ steps.outputs-step.outputs.application_insights_connection_string }}
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 2
+
+    - id: switch
+      name: Detect infra trigger change
+      shell: bash
+      env:
+        TRIGGER: ${{ inputs.trigger_file_path }}
+      run: |
+        set -euo pipefail
+        current_commit=$(git rev-parse HEAD)
+        parent_commit=$(git show --format=%P --no-patch "$current_commit" || true)
+        if [[ -z "$parent_commit" ]]; then
+          echo "is_dirty=false" >> "$GITHUB_OUTPUT"
+          echo "No parent commit found; skipping infra by default."
+        else
+          if git diff --name-only "$parent_commit" "$current_commit" -- "$TRIGGER" | grep -q .; then
+            echo "is_dirty=true" >> "$GITHUB_OUTPUT"
+            echo "$TRIGGER has changed. Will run infra."
+          else
+            echo "is_dirty=false" >> "$GITHUB_OUTPUT"
+            echo "$TRIGGER has NOT changed. Skipping infra."
+          fi
+        fi
+
+    - name: Azure Login
+      uses: azure/login@v2
+      with:
+        creds: ${{ inputs.azure_credentials }}
+
+    - name: Deploy Bicep
+      if: ${{ steps.switch.outputs.is_dirty == 'true' }}
+      id: deploy
+      shell: bash
+      env:
+        RG: ${{ inputs.resource_group }}
+        LOC: ${{ inputs.location }}
+        BICEP: ${{ inputs.bicep_file }}
+        APP_NAME: ${{ inputs.app_name }}
+        ENABLE_KV: ${{ inputs.enable_key_vault }}
+        ENABLE_SLOT: ${{ inputs.enable_staging_slot }}
+        CUSTOM_DOMAINS: ${{ inputs.custom_domain_names }}
+        CUSTOM_DOMAINS_CERT: ${{ inputs.custom_domain_managed_cert }}
+        ALLOWED_ORIGINS: ${{ inputs.allowed_origins }}
+        DOTNET_VER: ${{ inputs.dotnet_version }}
+        CORS_SUPPORT_CRED: ${{ inputs.cors_support_credentials }}
+      run: |
+        set -euo pipefail
+        az group create -n "$RG" -l "$LOC"
+        # Convert strings to booleans
+        toBool(){ case "${1,,}" in true|1|yes|y) echo true;; *) echo false;; esac }
+        ENABLE_KV_BOOL=$(toBool "$ENABLE_KV")
+        ENABLE_SLOT_BOOL=$(toBool "$ENABLE_SLOT")
+        CUSTOM_DOMAINS_CERT_BOOL=$(toBool "$CUSTOM_DOMAINS_CERT")
+        CORS_SUPPORT_CRED_BOOL=$(toBool "$CORS_SUPPORT_CRED")
+        # Deploy
+        az deployment group create \
+          -g "$RG" \
+          -f "$BICEP" \
+          -n DeployPipelineTemplate \
+          -p appName="$APP_NAME" \
+             enableKeyVault=$ENABLE_KV_BOOL \
+             enableStagingSlot=$ENABLE_SLOT_BOOL \
+             customDomainNames="$CUSTOM_DOMAINS" \
+             customDomainNameManagedCertificate=$CUSTOM_DOMAINS_CERT_BOOL \
+             allowedOrigins="$ALLOWED_ORIGINS" \
+             dotnetVersion="$DOTNET_VER" \
+             corsSupportCredentials=$CORS_SUPPORT_CRED_BOOL 
+
+    - id: outputs-step
+      if: ${{ steps.switch.outputs.is_dirty == 'true' }}
+      name: Extract deployment outputs
+      shell: bash
+      env:
+        RG: ${{ inputs.resource_group }}
+      run: |
+        set -euo pipefail
+        get_out(){ az deployment group show -g "$RG" -n DeployPipelineTemplate --query "$1" -o tsv || true; }
+        function_app_name=$(get_out 'properties.outputs.functionAppName.value')
+        function_app_content_share_name=$(get_out 'properties.outputs.functionAppContentShareName.value')
+        storage_account_connection_string=$(get_out 'properties.outputs.storageAccountConnectionString.value')
+        application_insights_connection_string=$(get_out 'properties.outputs.applicationInsightsConnectionString.value')
+        echo "function_app_name=$function_app_name" >> "$GITHUB_OUTPUT"
+        echo "function_app_content_share_name=$function_app_content_share_name" >> "$GITHUB_OUTPUT"
+        echo "storage_account_connection_string=$storage_account_connection_string" >> "$GITHUB_OUTPUT"
+        echo "application_insights_connection_string=$application_insights_connection_string" >> "$GITHUB_OUTPUT"
+
+    - name: Configure production app settings
+      if: ${{ steps.switch.outputs.is_dirty == 'true' && inputs.configure_app_settings == 'true' }}
+      shell: bash
+      env:
+        RG: ${{ inputs.resource_group }}
+        APP: ${{ steps.outputs-step.outputs.function_app_name }}
+        STORAGE: ${{ steps.outputs-step.outputs.storage_account_connection_string }}
+        SHARE: ${{ steps.outputs-step.outputs.function_app_content_share_name }}
+        AI: ${{ steps.outputs-step.outputs.application_insights_connection_string }}
+        RUNTIME: ${{ inputs.function_runtime }}
+      run: |
+        set -euo pipefail
+        az webapp config appsettings set -g "$RG" -n "$APP" --settings \
+          AzureWebJobsStorage="$STORAGE" \
+          WEBSITE_CONTENTAZUREFILECONNECTIONSTRING="$STORAGE" \
+          WEBSITE_CONTENTSHARE="$SHARE" \
+          FUNCTIONS_EXTENSION_VERSION="~4" \
+          WEBSITE_NODE_DEFAULT_VERSION="~14" \
+          APPLICATIONINSIGHTS_CONNECTION_STRING="$AI" \
+          FUNCTIONS_WORKER_RUNTIME="$RUNTIME" \
+          AZURE_FUNCTIONS_ENVIRONMENT="Production"
+
+    - name: Configure staging app settings
+      if: ${{ steps.switch.outputs.is_dirty == 'true' && inputs.configure_app_settings == 'true' && inputs.enable_staging_slot == 'true' }}
+      shell: bash
+      env:
+        RG: ${{ inputs.resource_group }}
+        APP: ${{ steps.outputs-step.outputs.function_app_name }}
+        STORAGE: ${{ steps.outputs-step.outputs.storage_account_connection_string }}
+        SHARE: ${{ steps.outputs-step.outputs.function_app_content_share_name }}
+        AI: ${{ steps.outputs-step.outputs.application_insights_connection_string }}
+        RUNTIME: ${{ inputs.function_runtime }}
+      run: |
+        set -euo pipefail
+        az webapp config appsettings set -g "$RG" -n "$APP" --slot staging --settings \
+          AzureWebJobsStorage="$STORAGE" \
+          WEBSITE_CONTENTAZUREFILECONNECTIONSTRING="$STORAGE" \
+          WEBSITE_CONTENTSHARE="$SHARE" \
+          FUNCTIONS_EXTENSION_VERSION="~4" \
+          WEBSITE_NODE_DEFAULT_VERSION="~14" \
+          APPLICATIONINSIGHTS_CONNECTION_STRING="$AI" \
+          FUNCTIONS_WORKER_RUNTIME="$RUNTIME" \
+          AZURE_FUNCTIONS_ENVIRONMENT="Staging"

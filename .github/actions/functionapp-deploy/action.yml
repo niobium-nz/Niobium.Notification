@@ -1,0 +1,94 @@
+name: Function App Deploy
+description: Deploy Azure Functions package and optionally swap slots.
+
+inputs:
+  azure_credentials:
+    description: JSON credentials for azure/login
+    required: true
+  resource_group:
+    description: Resource group name
+    required: true
+  app_name:
+    description: Function app name
+    required: true
+  package_path:
+    description: Path to the package (zip or folder)
+    required: true
+  enable_staging_slot:
+    description: Deploy to staging slot
+    required: false
+    default: 'false'
+  auto_swap_slots:
+    description: Automatically swap staging to production after deploy
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Azure Login
+      uses: azure/login@v2
+      with:
+        creds: ${{ inputs.azure_credentials }}
+
+    - name: Determine slot
+      id: slot
+      shell: bash
+      run: |
+        SLOT_NAME=production
+        if [[ "${{ inputs.enable_staging_slot }}" == 'true' ]]; then
+          SLOT_NAME=staging
+        fi
+        echo "slot_name=$SLOT_NAME" >> "$GITHUB_OUTPUT"
+
+    - name: Ensure zip package
+      id: pkg
+      shell: bash
+      env:
+        PKG: ${{ inputs.package_path }}
+      run: |
+        set -euo pipefail
+        if [ -d "$PKG" ]; then
+          echo "Package is a directory. Zipping..."
+          mkdir -p "$GITHUB_WORKSPACE/artifact"
+          ZIP_PATH="$GITHUB_WORKSPACE/artifact/deploy-${GITHUB_RUN_NUMBER}.zip"
+          (cd "$PKG" && zip -r "$ZIP_PATH" .)
+          echo "path=$ZIP_PATH" >> "$GITHUB_OUTPUT"
+        else
+          echo "path=$PKG" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Deploy with Azure CLI
+      shell: bash
+      env:
+        RG: ${{ inputs.resource_group }}
+        APP: ${{ inputs.app_name }}
+        SLOT: ${{ steps.slot.outputs.slot_name }}
+        PKG: ${{ steps.pkg.outputs.path }}
+      run: |
+        set -euo pipefail
+        if [[ "$SLOT" == "production" ]]; then
+          az functionapp deployment source config-zip \
+            --resource-group "$RG" \
+            --name "$APP" \
+            --src "$PKG"
+        else
+          az functionapp deployment source config-zip \
+            --resource-group "$RG" \
+            --name "$APP" \
+            --slot "$SLOT" \
+            --src "$PKG"
+        fi
+
+    - name: Swap Slots
+      if: ${{ inputs.auto_swap_slots == 'true' && inputs.enable_staging_slot == 'true' }}
+      shell: bash
+      env:
+        RG: ${{ inputs.resource_group }}
+        APP: ${{ inputs.app_name }}
+      run: |
+        az webapp deployment slot swap \
+          --resource-group "$RG" \
+          --name "$APP" \
+          --slot staging \
+          --target-slot production

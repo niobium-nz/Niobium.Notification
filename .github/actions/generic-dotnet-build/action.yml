@@ -1,0 +1,143 @@
+name: Generic .NET Build
+description: Restore, build, test, publish, and archive .NET projects, producing a deployable artifact.
+
+inputs:
+  dotnet_version:
+    description: .NET SDK version to use (e.g., 8.x)
+    required: false
+    default: '8.x'
+  project_to_publish:
+    description: Project(s) to publish
+    required: false
+    default: '**/*.csproj'
+  zip_artifact:
+    description: Whether to zip the published output
+    required: false
+    default: 'true'
+  nuget_feed_url:
+    description: Optional NuGet feed URL to push packages to
+    required: false
+    default: ''
+  nuget_api_key:
+    description: Optional NuGet API key (use a secret)
+    required: false
+    default: ''
+  artifact_name:
+    description: Artifact name for upload
+    required: false
+    default: 'drop'
+
+outputs:
+  artifact_path:
+    description: Path of produced artifact (zip or directory)
+    value: ${{ steps.set-outputs.outputs.artifact_path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ inputs.dotnet_version }}
+
+    - name: Dotnet Restore
+      shell: bash
+      run: |
+        if [[ -f "nuget.config" || -f "NuGet.config" ]]; then
+          dotnet restore --configfile nuget.config || dotnet restore --configfile NuGet.config
+        else
+          dotnet restore
+        fi
+
+    - name: Dotnet Build
+      shell: bash
+      run: dotnet build --configuration Release --no-restore
+
+    - name: Dotnet Test
+      shell: bash
+      run: |
+        set -e
+        # Run tests only if test projects exist
+        shopt -s nullglob
+        tests=(**/*Tests/*.csproj)
+        if (( ${#tests[@]} )); then
+          dotnet test --configuration Release --no-build --logger trx --collect "XPlat Code Coverage"
+        else
+          echo "No *Tests projects found. Skipping tests."
+        fi
+
+    - name: Publish
+      shell: bash
+      run: |
+        outdir="$GITHUB_WORKSPACE/publish"
+        rm -rf "$outdir"
+        dotnet publish "${{ inputs.project_to_publish }}" --configuration Release --output "$outdir" --no-build
+
+    - name: Optionally push NuGet packages
+      if: ${{ inputs.nuget_feed_url != '' && inputs.nuget_api_key != '' }}
+      shell: bash
+      env:
+        FEED_URL: ${{ inputs.nuget_feed_url }}
+        NUGET_API_KEY: ${{ inputs.nuget_api_key }}
+      run: |
+        shopt -s nullglob
+        pkgs=(**/*.nupkg)
+        if (( ${#pkgs[@]} )); then
+          for p in "${pkgs[@]}"; do
+            echo "Pushing $p to $FEED_URL"
+            dotnet nuget push "$p" --api-key "$NUGET_API_KEY" --source "$FEED_URL" --skip-duplicate
+          done
+        else
+          echo "No .nupkg found to push."
+        fi
+
+    - name: Zip Artifact
+      if: ${{ inputs.zip_artifact == 'true' }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p "$GITHUB_WORKSPACE/artifact"
+        zip_path="$GITHUB_WORKSPACE/artifact/build-${GITHUB_RUN_NUMBER}.zip"
+        if command -v zip >/dev/null 2>&1; then
+          (cd "$GITHUB_WORKSPACE/publish" && zip -r "$zip_path" .)
+        else
+          echo "zip not found; using Python's zipfile module"
+          python - <<'PY'
+import os, sys
+from zipfile import ZipFile, ZIP_DEFLATED
+base=os.environ.get('GITHUB_WORKSPACE')
+out=os.path.join(base,'artifact',f"build-{os.environ.get('GITHUB_RUN_NUMBER')}.zip")
+root=os.path.join(base,'publish')
+with ZipFile(out,'w',ZIP_DEFLATED) as z:
+    for r,_,files in os.walk(root):
+        for f in files:
+            p=os.path.join(r,f)
+            z.write(p, os.path.relpath(p, root))
+print(out)
+PY
+        fi
+        echo "ARTIFACT_PATH=$zip_path" >> $GITHUB_ENV
+
+    - name: Prepare Artifact
+      if: ${{ inputs.zip_artifact != 'true' }}
+      shell: bash
+      run: |
+        echo "ARTIFACT_PATH=$GITHUB_WORKSPACE/publish" >> $GITHUB_ENV
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact_name }}
+        path: ${{ env.ARTIFACT_PATH }}
+        if-no-files-found: error
+
+    - id: set-outputs
+      name: Set outputs
+      shell: bash
+      run: |
+        echo "artifact_path=${ARTIFACT_PATH}" >> "$GITHUB_OUTPUT"
