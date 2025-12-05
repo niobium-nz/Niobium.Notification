@@ -193,6 +193,16 @@ stages:
                 "slotSetting": true
             },
             {
+                "name": "CaptchaOptions:Secrets:www.edennoodlesbarmissionbay.co.nz",
+                "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/RECAPTCHA-WWW-EDENNOODLESBARMISSIONBAY-CO-NZ/)",
+                "slotSetting": true
+            },
+            {
+                "name": "CaptchaOptions:Secrets:www.edennoodlesbarmorningside.co.nz",
+                "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/RECAPTCHA-WWW-EDENNOODLESBARMORNINGSIDE-CO-NZ/)",
+                "slotSetting": true
+            },
+            {
                 "name": "CaptchaOptions:Secrets:www.niobium.co.nz",
                 "value": "@Microsoft.KeyVault(SecretUri=$(keyVaultUrl)/secrets/RECAPTCHA-WWW-NIOBIUM-CO-NZ/)",
                 "slotSetting": true
