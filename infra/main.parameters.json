@@ -4,6 +4,9 @@
   "parameters": {
     "environmentName": {
       "value": "${AZURE_ENV_NAME}"
+    },
+    "serviceBusQueueNames": {
+      "value": "${SERVICE_BUS_QUEUE_NAMES}"
     }
   }
 }
