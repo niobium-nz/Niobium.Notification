@@ -20,7 +20,7 @@ param appSettings array = []
 
 @description('Automatically set by azd. True if the container app already exists.')
 param appExists bool = false
-
+ 
 @description('Name of the Queues, seperated by comma.')
 param serviceBusQueueNames string = ''
 
