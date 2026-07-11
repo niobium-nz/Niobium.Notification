@@ -4,9 +4,6 @@
   "parameters": {
     "environmentName": {
       "value": "${AZURE_ENV_NAME}"
-    },
-    "AZURE_RESOURCE_GROUP": {
-      "value": "rg-niobium-notify-${AZURE_ENV_NAME}"
     }
   }
 }
