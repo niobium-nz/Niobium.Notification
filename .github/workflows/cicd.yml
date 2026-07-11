@@ -1,0 +1,303 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [ main ]
+
+env:
+  BUILD_AGENT_VM_IMAGE: ubuntu-latest
+  RESOURCE_GROUP_NAME: niobium-ntfy
+  APP_NAME: niobiumntfyFunc
+  ASSETS_PAGES_PROJECT: assets-notification-niobium-co-nz
+  TABLE_DB: niobiumntfydb
+  TABLE_DB_STAGING: niobiumntfydbstaging
+  SERVICEBUS_NAMESPACE: niobiumntfysb
+  SERVICEBUS_NAMESPACE_STAGING: niobiumntfysbstaging
+  SUBSCRIBE_COMMAND_QUEUE: subscribecommand
+  NOTIFY_COMMAND_QUEUE: notifycommand
+  SUBSCRIBED_EVENT_QUEUE: subscribedevent
+  ENABLE_STAGING_SLOT: 'true'
+
+jobs:
+  build:
+    name: Build .NET Functions
+    runs-on: ${{ env.BUILD_AGENT_VM_IMAGE }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build and Publish
+        id: build
+        uses: ./.github/actions/generic-dotnet-build
+        with:
+          projectToPublish: '**/Niobium.Notification.Functions.csproj'
+
+      - name: Pack NuGet packages
+        run: dotnet pack -c Release --no-restore
+
+      - name: Publish Packages
+        shell: pwsh
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not $env:NUGET_API_KEY) { Write-Host 'NUGET_API_KEY is not set. Skipping push.'; exit 0 }
+          $packages = Get-ChildItem -Recurse -Filter *.nupkg | Where-Object { $_.FullName -notlike '*symbols.nupkg' }
+          if (-not $packages) { Write-Host 'No packages found to push. Skipping.'; exit 0 }
+          foreach ($pkg in $packages) {
+          Write-Host "Pushing $($pkg.FullName) to NuGet.org"
+          dotnet nuget push $pkg.FullName --api-key "$env:NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+
+  infrastructure:
+    name: Provision Function App Infrastructure
+    runs-on: ${{ env.BUILD_AGENT_VM_IMAGE }}
+    needs: build
+    outputs:
+      functionAppPrincipalId: ${{ steps.infra.outputs.functionAppPrincipalId }}
+      functionAppPrincipalIdStaging: ${{ steps.infra.outputs.functionAppPrincipalIdStaging }}
+      keyVaultUrl: ${{ steps.infra.outputs.keyVaultUrl }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Azure Login
+      uses: azure/login@v2
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Run infrastructure action
+      id: infra
+      uses: ./.github/actions/functionapp-infrastructure
+      with:
+        resourceGroupName: ${{ env.RESOURCE_GROUP_NAME }}
+        appName: ${{ env.APP_NAME }}
+        enableKeyVault: 'true'
+        enableStagingSlot: ${{ env.ENABLE_STAGING_SLOT }}
+        allowedOrigins: '*'
+
+  storage:
+    name: Storage Accounts
+    runs-on: ${{ env.BUILD_AGENT_VM_IMAGE }}
+    needs: infrastructure
+    outputs:
+      tableFQDN: ${{ steps.prod.outputs.tableFQDN }}
+      blobFQDN: ${{ steps.prod.outputs.blobFQDN }}
+      tableFQDNStaging: ${{ steps.staging.outputs.tableFQDN }}
+      blobFQDNStaging: ${{ steps.staging.outputs.blobFQDN }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Azure Login
+      uses: azure/login@v2
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Create prod storage account
+      id: prod
+      uses: ./.github/actions/new-storageaccount
+      with:
+        resourceGroupName: ${{ env.RESOURCE_GROUP_NAME }}
+        storageAccountName: ${{ env.TABLE_DB }}
+        sku: Standard_LRS
+        contributorPrincipalId: ${{ needs.infrastructure.outputs.functionAppPrincipalId }}
+
+    - name: Create staging storage account
+      if: ${{ env.ENABLE_STAGING_SLOT == 'true' }}
+      id: staging
+      uses: ./.github/actions/new-storageaccount
+      with:
+        resourceGroupName: ${{ env.RESOURCE_GROUP_NAME }}
+        storageAccountName: ${{ env.TABLE_DB_STAGING }}
+        sku: Standard_LRS
+        contributorPrincipalId: ${{ needs.infrastructure.outputs.functionAppPrincipalIdStaging }}
+
+  messaging:
+    name: Service Bus
+    runs-on: ${{ env.BUILD_AGENT_VM_IMAGE }}
+    needs: infrastructure
+    outputs:
+      serviceBusFQDN: ${{ steps.sbprod.outputs.fullyQualifiedNamespace }}
+      serviceBusFQDNStaging: ${{ steps.sbstaging.outputs.fullyQualifiedNamespace }}
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Azure Login
+      uses: azure/login@v2
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Create prod service bus
+      id: sbprod
+      uses: ./.github/actions/new-servicebus
+      with:
+        resourceGroupName: ${{ env.RESOURCE_GROUP_NAME }}
+        serviceBusNamespaceName: ${{ env.SERVICEBUS_NAMESPACE }}
+        serviceBusQueueNames: ${{ env.SUBSCRIBE_COMMAND_QUEUE }},${{ env.SUBSCRIBED_EVENT_QUEUE }},${{ env.NOTIFY_COMMAND_QUEUE }}
+        dataOwnerPrincipalId: ${{ needs.infrastructure.outputs.functionAppPrincipalId }}
+
+    - name: Create staging service bus
+      if: ${{ env.ENABLE_STAGING_SLOT == 'true' }}
+      id: sbstaging
+      uses: ./.github/actions/new-servicebus
+      with:
+        resourceGroupName: ${{ env.RESOURCE_GROUP_NAME }}
+        serviceBusNamespaceName: ${{ env.SERVICEBUS_NAMESPACE_STAGING }}
+        serviceBusQueueNames: ${{ env.SUBSCRIBE_COMMAND_QUEUE }},${{ env.SUBSCRIBED_EVENT_QUEUE }},${{ env.NOTIFY_COMMAND_QUEUE }}
+        dataOwnerPrincipalId: ${{ needs.infrastructure.outputs.functionAppPrincipalIdStaging }}
+
+  configuration:
+    name: Configure App Settings
+    runs-on: ${{ env.BUILD_AGENT_VM_IMAGE }}
+    needs: [infrastructure, storage, messaging]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Azure Login
+      uses: azure/login@v2
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Set production app settings
+      shell: pwsh
+      run: |
+        $rg='${{ env.RESOURCE_GROUP_NAME }}'
+        $app='${{ env.APP_NAME }}'
+        $kv='${{ needs.infrastructure.outputs.keyVaultUrl }}'
+        $sb='${{ needs.messaging.outputs.serviceBusFQDN }}'
+        $table='${{ needs.storage.outputs.tableFQDN }}'
+        $blob='${{ needs.storage.outputs.blobFQDN }}'
+        az webapp config appsettings set --resource-group $rg --name $app --settings `
+        WEBSITE_USE_PLACEHOLDER_DOTNETISOLATED=1 `
+        "NotificationOptions:TemplateFolder=templates" `
+        "ResendServiceOptions:DomainScopedAPIKeys:tapss.care=@Microsoft.KeyVault(SecretUri=$kv/secrets/RESEND-API-KEY-TAPSS-CARE/)" `
+        "ResendServiceOptions:GlobalAPIKey=@Microsoft.KeyVault(SecretUri=$kv/secrets/RESEND-API-KEY/)" `
+        "ServiceBusOptions:FullyQualifiedNamespace=$sb" `
+        "ServiceBusTriggerOptions:FullyQualifiedNamespace=$sb" `
+        "StorageTableOptions:FullyQualifiedDomainName=$table" `
+        "StorageBlobOptions:FullyQualifiedDomainName=$blob" `
+        "NotificationOptions:SelfHostName=api.notification.niobium.co.nz" `
+        "CaptchaOptions:Secrets:www.edennoodleshamilton.co.nz=@Microsoft.KeyVault(SecretUri=$kv/secrets/RECAPTCHA-WWW-EDENNOODLESHAMILTON-CO-NZ/)" `
+        "CaptchaOptions:Secrets:www.edennoodlesbar.co.nz=@Microsoft.KeyVault(SecretUri=$kv/secrets/RECAPTCHA-WWW-EDENNOODLESBAR-CO-NZ/)" `
+        "CaptchaOptions:Secrets:www.niobium.co.nz=@Microsoft.KeyVault(SecretUri=$kv/secrets/RECAPTCHA-WWW-NIOBIUM-CO-NZ/)" `
+        "CaptchaOptions:Secrets:www.zaps.co.nz=@Microsoft.KeyVault(SecretUri=$kv/secrets/RECAPTCHA-WWW-ZAPS-CO-NZ/)" `
+        "CaptchaOptions:Secrets:www.tapss.care=@Microsoft.KeyVault(SecretUri=$kv/secrets/RECAPTCHA-WWW-TAPSS-CARE/)"
+
+    - name: Set staging app settings
+      if: ${{ env.ENABLE_STAGING_SLOT == 'true' }}
+      shell: pwsh
+      run: |
+        $rg='${{ env.RESOURCE_GROUP_NAME }}'
+        $app='${{ env.APP_NAME }}'
+        $kv='${{ needs.infrastructure.outputs.keyVaultUrl }}'
+        $sb='${{ needs.messaging.outputs.serviceBusFQDNStaging }}'
+        $table='${{ needs.storage.outputs.tableFQDNStaging }}'
+        $blob='${{ needs.storage.outputs.blobFQDNStaging }}'
+        az webapp config appsettings set --resource-group $rg --name $app --slot staging --settings `
+        WEBSITE_USE_PLACEHOLDER_DOTNETISOLATED=1 `
+        "NotificationOptions:TemplateFolder=templates" `
+        "ServiceBusOptions:FullyQualifiedNamespace=$sb" `
+        "ServiceBusTriggerOptions:FullyQualifiedNamespace=$sb" `
+        "StorageTableOptions:FullyQualifiedDomainName=$table" `
+        "StorageBlobOptions:FullyQualifiedDomainName=$blob" `
+        "NotificationOptions:SelfHostName=staging.api.notification.niobium.co.nz" `
+        "CaptchaOptions:IsDisabled=true"
+
+  deploy:
+    name: Deploy Function App (to staging if enabled)
+    runs-on: ${{ env.BUILD_AGENT_VM_IMAGE }}
+    needs: [build, configuration]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Azure Login
+      uses: azure/login@v2
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Deploy
+      uses: ./.github/actions/functionapp-deploy
+      with:
+        resourceGroupName: ${{ env.RESOURCE_GROUP_NAME }}
+        appName: ${{ env.APP_NAME }}
+        enableStagingSlot: ${{ env.ENABLE_STAGING_SLOT }}
+        autoSwapSlots: 'false'
+
+  tests:
+    name: Integration Tests (staging)
+    runs-on: ${{ env.BUILD_AGENT_VM_IMAGE }}
+    needs: deploy
+    env:
+      API_URL: https://staging.api.notification.niobium.co.nz
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: npm install
+      working-directory: ./Niobium.Notification.IntegrationTests
+      run: npm install
+
+    - name: npm test
+      working-directory: ./Niobium.Notification.IntegrationTests
+      run: npm test
+
+  swap:
+    name: Swap Staging -> Production
+    runs-on: ubuntu-latest
+    if: ${{ success() && env.ENABLE_STAGING_SLOT == 'true' }}
+    needs: tests
+  
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Azure Login
+      uses: azure/login@v2
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Swap Slots
+      uses: azure/cli@v2
+      with:
+        azcliversion: latest
+        inlineScript: |
+          az webapp deployment slot swap \
+          --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+          --name ${{ env.APP_NAME }} \
+          --slot staging \
+          --target-slot production
+
+  assets:
+    name: Deploy Assets to Cloudflare Pages
+    runs-on: ubuntu-latest
+    needs: [swap]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build assets
+      run: |
+        if [ -f "assets/package.json" ]; then \
+        cd assets && npm ci && npm run build; \
+        fi
+
+    - name: Publish to Cloudflare Pages
+      uses: cloudflare/pages-action@v1
+      with:
+        apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        projectName: ${{ env.ASSETS_PAGES_PROJECT }}
+        directory: ./assets
+        gitHubToken: ${{ secrets.GITHUB_TOKEN }}

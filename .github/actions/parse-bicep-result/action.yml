@@ -1,0 +1,44 @@
+name: Parse Bicep Result
+description: Parse ARM/Bicep deployment outputs JSON and expose common outputs.
+
+inputs:
+  input_json_value:
+    description: JSON string of deployment outputs (e.g., properties.outputs)
+    required: true
+  enabled:
+    description: Whether to run parsing step
+    required: false
+    default: 'true'
+
+outputs:
+  function_app_name:
+    description: functionAppName output value
+    value: ${{ steps.parse.outputs.function_app_name }}
+  function_app_content_share_name:
+    description: functionAppContentShareName output value
+    value: ${{ steps.parse.outputs.function_app_content_share_name }}
+  storage_account_connection_string:
+    description: storageAccountConnectionString output value
+    value: ${{ steps.parse.outputs.storage_account_connection_string }}
+  application_insights_connection_string:
+    description: applicationInsightsConnectionString output value
+    value: ${{ steps.parse.outputs.application_insights_connection_string }}
+
+runs:
+  using: composite
+  steps:
+    - id: parse
+      name: Parse JSON
+      if: ${{ inputs.enabled == 'true' }}
+      shell: pwsh
+      run: |
+        $json = '${{ inputs.input_json_value }}'
+        try { $obj = $json | ConvertFrom-Json } catch { Write-Error "Invalid JSON provided."; exit 1 }
+        $functionAppName = $obj.functionAppName.value
+        $functionAppContentShareName = $obj.functionAppContentShareName.value
+        $storageAccountConnectionString = $obj.storageAccountConnectionString.value
+        $applicationInsightsConnectionString = $obj.applicationInsightsConnectionString.value
+        "function_app_name=$functionAppName" >> $env:GITHUB_OUTPUT
+        "function_app_content_share_name=$functionAppContentShareName" >> $env:GITHUB_OUTPUT
+        "storage_account_connection_string=$storageAccountConnectionString" >> $env:GITHUB_OUTPUT
+        "application_insights_connection_string=$applicationInsightsConnectionString" >> $env:GITHUB_OUTPUT

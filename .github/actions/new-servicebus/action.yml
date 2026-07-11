@@ -1,0 +1,97 @@
+name: New Service Bus
+description: Provision an Azure Service Bus namespace (and queues) using a Bicep module and return the raw deployment outputs JSON.
+
+inputs:
+ azure_credentials:
+ description: JSON credentials for azure/login (ARM_* or federated)
+ required: true
+ resource_group:
+ description: Resource group name
+ required: true
+ location:
+ description: Azure location for deployment
+ required: true
+ service_bus_namespace_name:
+ description: Service Bus namespace name
+ required: true
+ service_bus_queue_names:
+ description: JSON array of queue names
+ required: false
+ default: '[]'
+ service_bus_sku:
+ description: Service Bus SKU (Basic, Standard, Premium)
+ required: false
+ default: 'Basic'
+ data_owner_principal_id:
+ description: Optional AAD principal id to grant Data Owner
+ required: false
+ default: ''
+ bicep_file:
+ description: Path to ServiceBus.bicep
+ required: false
+ default: 'bicep/modules/ServiceBus.bicep'
+ enabled:
+ description: Whether to run this step
+ required: false
+ default: 'true'
+
+outputs:
+ deployment_outputs_json:
+ description: Raw JSON of properties.outputs from the deployment
+ value: ${{ steps.outputs_json.outputs.deployment_outputs_json }}
+
+runs:
+ using: composite
+ steps:
+ - name: Checkout
+ uses: actions/checkout@v4
+
+ - name: Azure Login
+ if: ${{ inputs.enabled == 'true' }}
+ uses: azure/login@v2
+ with:
+ creds: ${{ inputs.azure_credentials }}
+
+ - id: deploy
+ if: ${{ inputs.enabled == 'true' }}
+ name: Deploy Service Bus via Bicep
+ shell: bash
+ env:
+ RG: ${{ inputs.resource_group }}
+ LOC: ${{ inputs.location }}
+ BICEP: ${{ inputs.bicep_file }}
+ NS: ${{ inputs.service_bus_namespace_name }}
+ QUEUES: ${{ inputs.service_bus_queue_names }}
+ SKU: ${{ inputs.service_bus_sku }}
+ OWNER: ${{ inputs.data_owner_principal_id }}
+ run: |
+ set -euo pipefail
+ az group create -n "$RG" -l "$LOC"
+ PARAMS=(
+ "serviceBusNamespaceName=$NS"
+ "serviceBusQueueNames=$QUEUES"
+ "serviceBusSku=$SKU"
+ )
+ if [[ -n "$OWNER" ]]; then
+ PARAMS+=("dataOwnerPrincipalId=$OWNER")
+ fi
+ az deployment group create \
+ -g "$RG" \
+ -n DeployPipelineTemplate \
+ -f "$BICEP" \
+ -p "${PARAMS[@]}"
+
+ - id: outputs_json
+ if: ${{ inputs.enabled == 'true' }}
+ name: Fetch deployment outputs
+ shell: bash
+ env:
+ RG: ${{ inputs.resource_group }}
+ run: |
+ set -euo pipefail
+ JSON=$(az deployment group show -g "$RG" -n DeployPipelineTemplate --query properties.outputs -o json || echo '{}')
+ {
+ echo "deployment_outputs_json<<EOF"
+ echo "$JSON"
+ echo EOF
+ } >> "$GITHUB_OUTPUT"
