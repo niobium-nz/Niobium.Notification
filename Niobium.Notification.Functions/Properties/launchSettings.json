@@ -1,9 +1,0 @@
-{
-  "profiles": {
-    "Niobium.EmailNotification": {
-      "commandName": "Project",
-      "commandLineArgs": "--port 7212",
-      "launchBrowser": false
-    }
-  }
-}
