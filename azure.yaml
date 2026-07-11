@@ -1,0 +1,24 @@
+name: niobiumnotify
+hooks:
+  preprovision:
+    shell: pwsh
+    run: ./infra/scripts/SetAppSettings.ps1
+  postprovision:
+    shell: pwsh
+    run: ./infra/scripts/ClearAppSettings.ps1
+services:
+  host:
+    project: ./src/Niobium.Notification.Host
+    language: csharp
+    host: containerapp
+    docker:
+      context: ../..
+      path: ./Dockerfile
+      registry: docker.io
+      image: niobiumnz/niobiumnotify
+      tag: ${APPSETTING_SERVICE_VERSION:-1.0.0-prerelease}
+infra:
+  provider: bicep
+  layers:
+    - name: niobiumnotify-host
+      path: ./infra

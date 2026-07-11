@@ -1,0 +1,24 @@
+services:
+  niobium.notify.host:
+    image: ${DOCKER_REGISTRY-}niobiumnotify
+    build:
+      context: .
+      dockerfile: src/Niobium.Notification.Host/Dockerfile
+    env_file:
+      - .azure/dev/.env
+    ports:
+      - "8080:8080"
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://aspire-dashboard:18889
+    depends_on:
+      aspire-dashboard:
+        condition: service_started
+
+  aspire-dashboard:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:latest
+    container_name: aspire-dashboard
+    ports:
+      - "18888:18888" # Dashboard Web UI
+      - "4317:18889"  # OTLP gRPC port
+      - "4318:18890"  # OTLP HTTP port
+    restart: unless-stopped

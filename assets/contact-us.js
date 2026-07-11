@@ -31,6 +31,12 @@
 (function (global) {
     "use strict";
 
+    const RECAPTCHA_SCRIPT_BASE_URL = "https://www.google.com/recaptcha/api.js";
+    const RECAPTCHA_LOAD_TIMEOUT_MS = 10000;
+    const RECAPTCHA_READY_TIMEOUT_MS = 10000;
+    let reCaptchaScriptLoadPromise = null;
+    let reCaptchaScriptLoadSiteKey = null;
+
     // Create/resolve namespace: niobium.notification
     const niobium = (global.niobium = global.niobium || {});
     const notificationNS = (niobium.notification = niobium.notification || {});
@@ -44,6 +50,49 @@
             const r = (Math.random() * 16) | 0;
             const v = c === "x" ? r : (r & 0x3) | 0x8;
             return v.toString(16);
+        });
+    }
+
+    /**
+     * Reads the reCAPTCHA site key from the contact-us.js query string.
+     * @returns {string}
+     */
+    function getConfiguredSiteKey() {
+        if (typeof document === "undefined" || !document.currentScript || !document.currentScript.src) {
+            return "";
+        }
+
+        try {
+            const scriptUrl = document.currentScript.src;
+            const urlParams = new URLSearchParams(new URL(scriptUrl).search);
+            return (urlParams.get("siteKey") || "").trim();
+        } catch (error) {
+            return "";
+        }
+    }
+
+    /**
+     * Wraps a promise with a timeout.
+     * @template T
+     * @param {Promise<T>} promise The promise to wrap.
+     * @param {number} timeoutMs The timeout in milliseconds.
+     * @param {string} message The timeout error message.
+     * @returns {Promise<T>}
+     */
+    function withTimeout(promise, timeoutMs, message) {
+        return new Promise((resolve, reject) => {
+            const timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
+
+            promise.then(
+                (value) => {
+                    clearTimeout(timeoutId);
+                    resolve(value);
+                },
+                (error) => {
+                    clearTimeout(timeoutId);
+                    reject(error);
+                }
+            );
         });
     }
 
@@ -82,11 +131,71 @@
     }
 
     /**
+     * Ensures the Google reCAPTCHA v3 script is loaded.
+     * @param {string} siteKey Your reCAPTCHA site key.
+     * @returns {Promise<void>}
+     */
+    function ensureRecaptchaScript(siteKey) {
+        if (typeof global.grecaptcha !== "undefined" && global.grecaptcha.ready) {
+            return Promise.resolve();
+        }
+
+        if (!siteKey) {
+            return Promise.reject(new Error("A reCAPTCHA site key is required to load the reCAPTCHA script."));
+        }
+
+        if (reCaptchaScriptLoadPromise) {
+            if (reCaptchaScriptLoadSiteKey && reCaptchaScriptLoadSiteKey !== siteKey) {
+                return Promise.reject(new Error("A different reCAPTCHA site key is already being used on this page."));
+            }
+
+            return reCaptchaScriptLoadPromise;
+        }
+
+        reCaptchaScriptLoadSiteKey = siteKey;
+
+        reCaptchaScriptLoadPromise = withTimeout(new Promise((resolve, reject) => {
+            if (typeof document === "undefined") {
+                reject(new Error("Document is unavailable to load the reCAPTCHA script."));
+                return;
+            }
+
+            const scriptUrl = `${RECAPTCHA_SCRIPT_BASE_URL}?render=${encodeURIComponent(siteKey)}`;
+            const existingScript = document.querySelector(`script[src="${scriptUrl}"]`);
+
+            if (existingScript) {
+                if (typeof global.grecaptcha !== "undefined" && global.grecaptcha.ready) {
+                    resolve();
+                    return;
+                }
+
+                existingScript.addEventListener("load", () => resolve(), { once: true });
+                existingScript.addEventListener("error", () => reject(new Error("Failed to load the reCAPTCHA script.")), { once: true });
+                return;
+            }
+
+            const script = document.createElement("script");
+            script.src = scriptUrl;
+            script.async = true;
+            script.defer = true;
+            script.onload = () => resolve();
+            script.onerror = () => reject(new Error("Failed to load the reCAPTCHA script."));
+            document.head.appendChild(script);
+        }), RECAPTCHA_LOAD_TIMEOUT_MS, "Timed out while loading the reCAPTCHA script.").catch((error) => {
+            reCaptchaScriptLoadPromise = null;
+            reCaptchaScriptLoadSiteKey = null;
+            throw error;
+        });
+
+        return reCaptchaScriptLoadPromise;
+    }
+
+    /**
      * Wraps grecaptcha.ready() in a Promise.
      * @returns {Promise<void>}
      */
     function reCaptchaReady() {
-        return new Promise(resolve => {
+        return withTimeout(new Promise((resolve) => {
             // Check if grecaptcha is already defined to handle cases where
             // the library loads before this function is called.
             if (typeof global.grecaptcha !== 'undefined' && global.grecaptcha.ready) {
@@ -101,7 +210,7 @@
                     }
                 }, 50); // Check every 50ms
             }
-        });
+        }), RECAPTCHA_READY_TIMEOUT_MS, "Timed out while waiting for reCAPTCHA to become ready.");
     }
 
     /**
@@ -111,6 +220,9 @@
      * @returns {Promise<string>} The reCAPTCHA token.
      */
     async function getRecaptchaToken(siteKey, action) {
+        if (siteKey) {
+            await ensureRecaptchaScript(siteKey);
+        }
         await reCaptchaReady();
         const token = await global.grecaptcha.execute(siteKey, { action: action });
         return token;
@@ -131,6 +243,7 @@
     async function contactUs(reCapthchaPublicKey, tenant, name, contact, message, baseUrl, localTest = false) {
         // Keep request identity and payload stable across retries except for token
         const stableId = generateGUID();
+        const resolvedSiteKey = (reCapthchaPublicKey || "").trim() || configuredSiteKey;
 
         const headers = { "Content-Type": "application/json" };
         if (localTest) {
@@ -145,7 +258,11 @@
         const buildOptions = async () => {
             let token;
             try {
-                token = await getRecaptchaToken(reCapthchaPublicKey, "contactUs");
+                if (localTest) {
+                    token = "local-test";
+                } else {
+                    token = await getRecaptchaToken(resolvedSiteKey, "contactUs");
+                }
             } catch (error) {
                 return Promise.reject(new Error("reCAPTCHA execution failed."));
             }
@@ -169,6 +286,13 @@
 
         const url = (baseUrl || "/api/notification") + "/ContactUs";
         return await fetchWithRetry(url, buildOptions);
+    }
+
+    const configuredSiteKey = getConfiguredSiteKey();
+    if (configuredSiteKey) {
+        ensureRecaptchaScript(configuredSiteKey).catch(() => {
+            reCaptchaScriptLoadPromise = null;
+        });
     }
 
     // Public API
