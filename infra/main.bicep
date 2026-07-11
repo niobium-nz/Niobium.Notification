@@ -27,7 +27,7 @@ param serviceBusQueueNames string = ''
 var logAnalyticsName = '${appName}-law'
 var appInsightsName = '${appName}-ai'
 var storageAccountName = replace('${appName}-sa', '-', '')
-var serviceBusName = '${appName}-sb'
+var serviceBusName = '${appName}-sbns'
 var containerAppResourceId = resourceId('Microsoft.App/containerApps', containerAppName)
 var serviceBusQueueNamesArray = empty(serviceBusQueueNames) || serviceBusQueueNames == '' ? [] : split(serviceBusQueueNames, ',')
 
