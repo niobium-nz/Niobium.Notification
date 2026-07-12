@@ -167,7 +167,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.21.0' = {
     dapr: {
       enabled: true
       appId: serviceBusPubSubDapr.outputs.serviceBusPubSubDaprAppId
-      appPort: 8080
+      appPort: 5050
       appProtocol: 'http'
     }
     scaleSettings: {
