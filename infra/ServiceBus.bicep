@@ -15,7 +15,7 @@ param location string = resourceGroup().location
 ])
 param serviceBusSku string = 'Basic'
 
-resource serviceBusNamespace 'Microsoft.ServiceBus/namespaces@2024-01-01' = {
+resource serviceBusNamespace 'Microsoft.ServiceBus/namespaces@2026-01-01' = {
   name: serviceBusNamespaceName
   location: location
   sku: {
@@ -25,7 +25,7 @@ resource serviceBusNamespace 'Microsoft.ServiceBus/namespaces@2024-01-01' = {
   properties: {}
 }
 
-resource serviceBusQueues 'Microsoft.ServiceBus/namespaces/queues@2024-01-01' = [for serviceBusQueueName in serviceBusQueueNames: {
+resource serviceBusQueues 'Microsoft.ServiceBus/namespaces/queues@2026-01-01' = [for serviceBusQueueName in serviceBusQueueNames: {
   parent: serviceBusNamespace
   name: serviceBusQueueName
   properties: {
@@ -42,7 +42,7 @@ resource serviceBusQueues 'Microsoft.ServiceBus/namespaces/queues@2024-01-01' = 
   }
 }]
 
-resource sendAuthorizationRules 'Microsoft.ServiceBus/namespaces/queues/authorizationRules@2024-01-01' = [for (serviceBusQueueName, i) in serviceBusQueueNames: {
+resource sendAuthorizationRules 'Microsoft.ServiceBus/namespaces/queues/authorizationRules@2026-01-01' = [for (serviceBusQueueName, i) in serviceBusQueueNames: {
   name: '${serviceBusQueueName}-2'
   parent: serviceBusQueues[i]
   properties: {
@@ -52,7 +52,7 @@ resource sendAuthorizationRules 'Microsoft.ServiceBus/namespaces/queues/authoriz
   }
 }]
 
-resource listenAuthorizationRules 'Microsoft.ServiceBus/namespaces/queues/authorizationRules@2024-01-01' = [for (serviceBusQueueName, i) in serviceBusQueueNames: {
+resource listenAuthorizationRules 'Microsoft.ServiceBus/namespaces/queues/authorizationRules@2026-01-01' = [for (serviceBusQueueName, i) in serviceBusQueueNames: {
   name: '${serviceBusQueueName}-8'
   parent: serviceBusQueues[i]
   properties: {
@@ -62,4 +62,5 @@ resource listenAuthorizationRules 'Microsoft.ServiceBus/namespaces/queues/author
   }
 }]
 
+output name string = serviceBusNamespace.name
 output fullyQualifiedNamespace string = replace(replace(serviceBusNamespace.properties.serviceBusEndpoint, 'https://', ''), '/', '')

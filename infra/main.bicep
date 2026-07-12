@@ -24,6 +24,7 @@ param appExists bool = true
 @description('Name of the Queues, seperated by comma.')
 param serviceBusQueueNames string = ''
 
+var pubSubDaprAppId = 'servicebus-dapr-worker'
 var logAnalyticsName = '${appName}-law'
 var appInsightsName = '${appName}-ai'
 var storageAccountName = replace('${appName}-sa', '-', '')
@@ -108,6 +109,14 @@ module managedEnvironment 'br/public:avm/res/app/managed-environment:0.13.3' = {
   }
 }
 
+module serviceBusPubSubDapr 'ServiceBusPubSub.bicep' = {
+  params: {
+    serviceBusNamespaceName: serviceBus.name
+    containerAppsEnvironmentName: managedEnvironment.outputs.name
+    pubSubDaprAppId: pubSubDaprAppId
+  }
+}
+
 var currentImage = appExists ? reference(containerAppResourceId, '2026-01-01').template.containers[0].image : 'mcr.microsoft.com/dotnet/samples:dotnetapp'
 module containerApp 'br/public:avm/res/app/container-app:0.21.0' = {
   params: {
@@ -131,6 +140,12 @@ module containerApp 'br/public:avm/res/app/container-app:0.21.0' = {
         }
       }
     ]
+    dapr: {
+      enabled: true
+      appId: serviceBusPubSubDapr.outputs.serviceBusPubSubDaprAppId
+      appPort: 8080
+      appProtocol: 'http'
+    }
     scaleSettings: {
         minReplicas: 0
         maxReplicas: 1

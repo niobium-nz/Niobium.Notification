@@ -9,6 +9,7 @@
     <File Path="infra/main.parameters.json" />
     <File Path="infra/ServiceBus.bicep" />
     <File Path="infra/ServiceBusAuth.bicep" />
+    <File Path="infra/ServiceBusPubSub.bicep" />
   </Folder>
   <Folder Name="/Pipelines/">
     <File Path=".github/workflows/azure-prod.yml" />
