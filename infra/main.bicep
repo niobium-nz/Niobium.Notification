@@ -117,6 +117,29 @@ module serviceBusPubSubDapr 'ServiceBusPubSub.bicep' = {
   }
 }
 
+var serviceBusQueueScaleRules = [for queueName in serviceBusQueueNamesArray: {
+  name: 'servicebus-${queueName}'
+  custom: {
+    type: 'azure-servicebus'
+    metadata: {
+      queueName: queueName
+      namespace: serviceBus.name
+      messageCount: '10'
+      activationMessageCount: '0'
+    }
+    identity: 'system'
+  }
+}]
+var containerAppScaleRules = concat([
+  {
+    name: 'http-requests'
+    http: {
+      metadata: {
+        concurrentRequests: '20'
+      }
+    }
+  }
+], serviceBusQueueScaleRules)
 var currentImage = appExists ? reference(containerAppResourceId, '2026-01-01').template.containers[0].image : 'mcr.microsoft.com/dotnet/samples:dotnetapp'
 module containerApp 'br/public:avm/res/app/container-app:0.21.0' = {
   params: {
@@ -129,6 +152,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.21.0' = {
     managedIdentities: {
       systemAssigned: true
     }
+    activeRevisionsMode: 'Single'
     containers: [
       {
         name: 'app'
@@ -147,8 +171,11 @@ module containerApp 'br/public:avm/res/app/container-app:0.21.0' = {
       appProtocol: 'http'
     }
     scaleSettings: {
-        minReplicas: 0
-        maxReplicas: 1
+      minReplicas: 0
+      maxReplicas: 5
+      pollingInterval: 15
+      cooldownPeriod: 300
+      rules: containerAppScaleRules
     }
     secrets: derivedSecrets
     ingressAllowInsecure: false
@@ -158,7 +185,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.21.0' = {
 
 module serviceBusAuth 'ServiceBusAuth.bicep' = {
   params: {
-    serviceBusNamespaceName: serviceBusName
+    serviceBusNamespaceName: serviceBus.name
     dataOwnerPrincipalId: containerApp.outputs.systemAssignedMIPrincipalId!
   }
 }
