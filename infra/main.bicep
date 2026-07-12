@@ -185,7 +185,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.21.0' = {
 
 module serviceBusAuth 'ServiceBusAuth.bicep' = {
   params: {
-    serviceBusNamespaceName: serviceBus.name
+    serviceBusNamespaceName: serviceBus.outputs.name
     dataOwnerPrincipalId: containerApp.outputs.systemAssignedMIPrincipalId!
   }
 }
