@@ -7,7 +7,7 @@ hooks:
     shell: pwsh
     run: ./infra/scripts/ClearAppSettings.ps1
 services:
-  host:
+  niobium.notification.host:
     project: ./src/Niobium.Notification.Host
     language: csharp
     host: containerapp

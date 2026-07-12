@@ -146,7 +146,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.21.0' = {
     name: containerAppName
     location: location
     tags: {
-        'azd-service-name': 'host'
+        'azd-service-name': 'niobium.notification.host'
     }
     environmentResourceId: managedEnvironment.outputs.resourceId
     managedIdentities: {
