@@ -111,7 +111,7 @@ module managedEnvironment 'br/public:avm/res/app/managed-environment:0.13.3' = {
 
 module serviceBusPubSubDapr 'ServiceBusPubSub.bicep' = {
   params: {
-    serviceBusNamespaceName: serviceBus.name
+    serviceBusNamespaceName: serviceBus.outputs.name
     containerAppsEnvironmentName: managedEnvironment.outputs.name
     pubSubDaprAppId: pubSubDaprAppId
   }
@@ -123,7 +123,7 @@ var serviceBusQueueScaleRules = [for queueName in serviceBusQueueNamesArray: {
     type: 'azure-servicebus'
     metadata: {
       queueName: queueName
-      namespace: serviceBus.name
+      namespace: serviceBusName
       messageCount: '10'
       activationMessageCount: '0'
     }
