@@ -196,9 +196,10 @@ module containerApp 'br/public:avm/res/app/container-app:0.21.0' = {
   }
 }
 
-module serviceBusAuth 'ServiceBusAuth.bicep' = {
+module RBAC 'RBAC.bicep' = {
   params: {
     serviceBusNamespaceName: serviceBus.outputs.name
+    storageAccountName: storageAccount.outputs.name
     dataOwnerPrincipalId: containerApp.outputs.systemAssignedMIPrincipalId!
   }
 }

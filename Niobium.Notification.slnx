@@ -7,8 +7,8 @@
   <Folder Name="/Infrastructures/">
     <File Path="infra/main.bicep" />
     <File Path="infra/main.parameters.json" />
+    <File Path="infra/RBAC.bicep" />
     <File Path="infra/ServiceBus.bicep" />
-    <File Path="infra/ServiceBusAuth.bicep" />
     <File Path="infra/ServiceBusPubSub.bicep" />
   </Folder>
   <Folder Name="/Pipelines/">
