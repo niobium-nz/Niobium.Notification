@@ -106,6 +106,10 @@ module managedEnvironment 'br/public:avm/res/app/managed-environment:0.13.3' = {
     zoneRedundant: false
     publicNetworkAccess: 'Enabled'
     appInsightsConnectionString: appInsights.outputs.connectionString
+    appLogsConfiguration: {
+      destination: 'log-analytics'
+      logAnalyticsWorkspaceResourceId: logAnalytics.outputs.resourceId
+    }
   }
 }
 
@@ -181,6 +185,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.21.0' = {
     secrets: derivedSecrets
     ingressTargetPort: 8080
     ingressTransport: 'auto'
+    ingressAllowInsecure: false
   }
 }
 
