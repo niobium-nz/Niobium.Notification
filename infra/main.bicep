@@ -125,13 +125,13 @@ var serviceBusQueueScaleRules = [for queueName in serviceBusQueueNamesArray: {
   name: 'servicebus-${queueName}'
   custom: {
     type: 'azure-servicebus'
+    identity: 'system'
     metadata: {
       queueName: queueName
       namespace: serviceBusName
       messageCount: '10'
       activationMessageCount: '0'
     }
-    identity: 'system'
   }
 }]
 var containerAppScaleRules = concat([
@@ -169,12 +169,12 @@ module containerApp 'br/public:avm/res/app/container-app:0.21.0' = {
         }
       }
     ]
-    // dapr: {
-    //   enabled: true
-    //   appId: serviceBusPubSubDapr.outputs.serviceBusPubSubDaprAppId
-    //   appPort: 8080
-    //   appProtocol: 'http'
-    // }
+    dapr: {
+      enabled: true
+      appId: serviceBusPubSubDapr.outputs.serviceBusPubSubDaprAppId
+      appPort: 8080
+      appProtocol: 'http'
+    }
     scaleSettings: {
       minReplicas: 0
       maxReplicas: 5
