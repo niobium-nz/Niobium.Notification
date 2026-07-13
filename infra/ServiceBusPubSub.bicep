@@ -51,6 +51,10 @@ resource serviceBusPubSub 'Microsoft.App/managedEnvironments/daprComponents@2025
         name: 'lockRenewalInSec'
         value: '20'
       }
+      {
+        name: 'rawPayload'
+        value: 'true'
+      }
     ]
 
     // This is the Dapr app ID, not the Container App name.
