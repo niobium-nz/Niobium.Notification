@@ -167,7 +167,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.21.0' = {
     dapr: {
       enabled: true
       appId: serviceBusPubSubDapr.outputs.serviceBusPubSubDaprAppId
-      appPort: 5050
+      appPort: 8080
       appProtocol: 'http'
     }
     scaleSettings: {
@@ -175,7 +175,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.21.0' = {
       maxReplicas: 5
       pollingInterval: 15
       cooldownPeriod: 300
-      rules: containerAppScaleRules
+      rules: serviceBusQueueScaleRules
     }
     secrets: derivedSecrets
     ingressAllowInsecure: false
