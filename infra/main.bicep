@@ -9,6 +9,9 @@ param location string = resourceGroup().location
 @description('Short name used as a prefix for Azure resources. Keep it globally unique where required.')
 param appName string = 'niobiumnotify-${environmentName}'
 
+@description('Port for the container app.')
+param appPort int = 8080
+
 @description('Name of the Container Apps managed environment.')
 param containerAppsEnvironmentName string = '${appName}-cae'
 
@@ -77,6 +80,10 @@ var storageTableFqdn string = replace(replace(storageAccount.outputs.serviceEndp
 var storageBlobFqdn string = replace(replace(storageAccount.outputs.serviceEndpoints.blob, 'https://', ''), '/', '')
 
 var containerEnv2 = concat(containerEnv, [
+  { 
+      name: 'ASPNETCORE_HTTP_PORTS'
+      value: string(appPort)
+  }
   { 
       name: 'APPLICATION_INSIGHTS_CONNECTION_STRING'
       value: appInsights.outputs.connectionString
@@ -172,7 +179,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.21.0' = {
     dapr: {
       enabled: true
       appId: serviceBusPubSubDapr.outputs.serviceBusPubSubDaprAppId
-      appPort: 8080
+      appPort: appPort
       appProtocol: 'http'
     }
     scaleSettings: {
@@ -183,7 +190,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.21.0' = {
       rules: containerAppScaleRules
     }
     secrets: derivedSecrets
-    ingressTargetPort: 8080
+    ingressTargetPort: appPort
     ingressTransport: 'auto'
     ingressAllowInsecure: false
   }
