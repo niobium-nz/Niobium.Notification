@@ -63,4 +63,4 @@ resource listenAuthorizationRules 'Microsoft.ServiceBus/namespaces/queues/author
 }]
 
 output name string = serviceBusNamespaceName
-output fullyQualifiedNamespace string = replace(replace(serviceBusNamespace.properties.serviceBusEndpoint, 'https://', ''), '/', '')
+output fullyQualifiedNamespace string = first(split(replace(replace(serviceBusNamespace.properties.serviceBusEndpoint, 'https://', ''), '/', ''), ':'))
