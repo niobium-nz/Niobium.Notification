@@ -178,8 +178,8 @@ module containerApp 'br/public:avm/res/app/container-app:0.21.0' = {
       rules: serviceBusQueueScaleRules
     }
     secrets: derivedSecrets
-    ingressAllowInsecure: false
     ingressTargetPort: 8080
+    ingressTransport: 'auto'
   }
 }
 
