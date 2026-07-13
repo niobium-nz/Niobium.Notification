@@ -85,7 +85,7 @@ var containerEnv2 = concat(containerEnv, [
       value: string(appPort)
   }
   { 
-      name: 'APPLICATION_INSIGHTS_CONNECTION_STRING'
+      name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
       value: appInsights.outputs.connectionString
   }
   { 

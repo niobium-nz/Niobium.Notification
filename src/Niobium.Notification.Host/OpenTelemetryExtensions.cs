@@ -1,3 +1,4 @@
+using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Azure.Monitor.OpenTelemetry.Exporter;
 using OpenTelemetry;
 using OpenTelemetry.Exporter;
@@ -12,7 +13,7 @@ namespace Niobium.Notification.Host
     {
         public static IHostApplicationBuilder ConfigureOpenTelemetry(this IHostApplicationBuilder builder)
         {
-            string? applicationInsightsConnectionString = builder.Configuration.GetValue<string>("APPLICATION_INSIGHTS_CONNECTION_STRING");
+            string? applicationInsightsConnectionString = builder.Configuration.GetValue<string>("APPLICATIONINSIGHTS_CONNECTION_STRING");
             string? otlpEndpoint = builder.Configuration.GetValue<string>("OTEL_EXPORTER_OTLP_ENDPOINT");
             string? environment = builder.Environment.EnvironmentName;
             Dictionary<string, object> resourceAttributes = new()
@@ -23,59 +24,41 @@ namespace Niobium.Notification.Host
                 { "deployment.environment", environment ?? "local" }
             };
 
-            ResourceBuilder resourceBuilder = ResourceBuilder.CreateDefault().AddAttributes(resourceAttributes);
-
-            TracerProviderBuilder tracerBuilder = Sdk.CreateTracerProviderBuilder()
-                .SetResourceBuilder(resourceBuilder)
-                .AddHttpClientInstrumentation()
-                .AddSource("Niobium.*")
-                .AddConsoleExporter();
+            OpenTelemetryBuilder telemetryBuilder = builder.Services.AddOpenTelemetry();
+            telemetryBuilder.ConfigureResource(resourceBuilder => resourceBuilder.AddAttributes(resourceAttributes));
 
             if (!String.IsNullOrWhiteSpace(applicationInsightsConnectionString))
             {
-                tracerBuilder.AddAzureMonitorTraceExporter(options => options.ConnectionString = applicationInsightsConnectionString);
+                telemetryBuilder.UseAzureMonitor(options => options.ConnectionString = applicationInsightsConnectionString);
             }
 
-            if (!String.IsNullOrWhiteSpace(otlpEndpoint))
+            telemetryBuilder.WithTracing(builder =>
             {
-                tracerBuilder.AddOtlpExporter(o =>
+                if (!String.IsNullOrWhiteSpace(otlpEndpoint))
                 {
-                    o.Endpoint = new Uri(otlpEndpoint);
-                    o.Protocol = OtlpExportProtocol.Grpc;
-                });
-            }
-
-            TracerProvider tracerProvider = tracerBuilder.Build();
-            builder.Services.AddSingleton(tracerProvider);
-
-            MeterProviderBuilder meterBuilder = Sdk.CreateMeterProviderBuilder()
-                .SetResourceBuilder(resourceBuilder)
-                .AddHttpClientInstrumentation()
-                .AddRuntimeInstrumentation()
-                .AddMeter("Niobium.*");
-
-            if (!String.IsNullOrWhiteSpace(applicationInsightsConnectionString))
+                    builder.AddOtlpExporter(o =>
+                    {
+                        o.Endpoint = new Uri(otlpEndpoint);
+                        o.Protocol = OtlpExportProtocol.Grpc;
+                    });
+                }
+            });
+            telemetryBuilder.WithMetrics(builder =>
             {
-                meterBuilder.AddAzureMonitorMetricExporter(options => options.ConnectionString = applicationInsightsConnectionString);
-            }
-
-            if (!String.IsNullOrWhiteSpace(otlpEndpoint))
-            {
-                meterBuilder.AddOtlpExporter(o =>
+                if (!String.IsNullOrWhiteSpace(otlpEndpoint))
                 {
-                    o.Endpoint = new Uri(otlpEndpoint);
-                    o.Protocol = OtlpExportProtocol.Grpc;
-                });
-            }
-
-            MeterProvider meterProvider = meterBuilder.Build();
-            builder.Services.AddSingleton(meterProvider);
+                    builder.AddOtlpExporter(o =>
+                    {
+                        o.Endpoint = new Uri(otlpEndpoint);
+                        o.Protocol = OtlpExportProtocol.Grpc;
+                    });
+                }
+            });
 
             builder.Logging.ClearProviders();
             builder.Logging.AddConsole();
-            builder.Logging.AddOpenTelemetry(logging =>
+            ILoggingBuilder logBuilder = builder.Logging.AddOpenTelemetry(logging =>
             {
-                logging.SetResourceBuilder(resourceBuilder);
                 logging.IncludeFormattedMessage = true;
                 logging.IncludeScopes = true;
 
@@ -92,8 +75,11 @@ namespace Niobium.Notification.Host
                         o.Protocol = OtlpExportProtocol.Grpc;
                     });
                 }
-            })
-            .SetMinimumLevel(LogLevel.Debug);
+            });
+
+#if DEBUG
+            logBuilder.SetMinimumLevel(LogLevel.Debug);
+#endif
 
             return builder;
         }
