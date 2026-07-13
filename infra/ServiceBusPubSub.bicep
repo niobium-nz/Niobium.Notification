@@ -27,7 +27,7 @@ resource serviceBusPubSub 'Microsoft.App/managedEnvironments/daprComponents@2025
 
     metadata: [
       {
-        name: serviceBusNamespace.name
+        name: 'namespaceName'
         value: '${serviceBusNamespace.name}.servicebus.windows.net'
       }
       {
