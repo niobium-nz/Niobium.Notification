@@ -49,7 +49,6 @@ namespace Niobium.Notification.Host
         {
             app.UseForwardedHeaders();
             app.UseRouting();
-            app.UseAuthorization();
             app.UseCloudEvents();
             app.UsePlatform();
             app.MapControllers();
