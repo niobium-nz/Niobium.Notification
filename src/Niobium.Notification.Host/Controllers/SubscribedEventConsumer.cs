@@ -6,19 +6,12 @@ namespace Niobium.Notification.Host.Controllers
 {
     [ApiController]
     [Route(DaprComponents.MessageRoute)]
-    public class SubscribedEventConsumer(IExternalEventAdaptor<Subscription, SubscribedEvent> adaptor, ILogger<SubscribedEventConsumer> logger) : ControllerBase
+    public class SubscribedEventConsumer(IExternalEventAdaptor<Subscription, SubscribedEvent> adaptor) : ControllerBase
     {
         [Topic(DaprComponents.ServiceBusPubSub, QueueNames.SubscribedEvent, enableRawPayload: true)]
         [HttpPost(QueueNames.SubscribedEvent)]
-        public async Task<IActionResult> ConsumeAsync(CancellationToken cancellationToken)
+        public async Task<IActionResult> ConsumeAsync(SubscribedEvent message, CancellationToken cancellationToken)
         {
-            SubscribedEvent? message = await this.Request.ReadFromJsonAsync<SubscribedEvent>(cancellationToken: cancellationToken);
-            if (message == null)
-            {
-                logger.LogError("Failed to parse message.");
-                return this.BadRequest();
-            }
-
             await adaptor.OnEvent(message, cancellationToken);
             return this.NoContent();
         }

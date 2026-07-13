@@ -9,15 +9,8 @@ namespace Niobium.Notification.Host.Controllers
     {
         [Topic(DaprComponents.ServiceBusPubSub, QueueNames.SubscribeCommand, enableRawPayload: true)]
         [HttpPost(QueueNames.SubscribeCommand)]
-        public async Task<IActionResult> ConsumeAsync(CancellationToken cancellationToken)
+        public async Task<IActionResult> ConsumeAsync(SubscribeCommand message, CancellationToken cancellationToken)
         {
-            SubscribeCommand? message = await this.Request.ReadFromJsonAsync<SubscribeCommand>(cancellationToken: cancellationToken);
-            if (message == null)
-            {
-                logger.LogError("Failed to parse message.");
-                return this.BadRequest();
-            }
-
             message.TryValidate(out ValidationState? validationState);
             if (!validationState.IsValid)
             {
