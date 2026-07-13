@@ -117,29 +117,29 @@ module serviceBusPubSubDapr 'ServiceBusPubSub.bicep' = {
   }
 }
 
-// var serviceBusQueueScaleRules = [for queueName in serviceBusQueueNamesArray: {
-//   name: 'servicebus-${queueName}'
-//   custom: {
-//     type: 'azure-servicebus'
-//     metadata: {
-//       queueName: queueName
-//       namespace: serviceBusName
-//       messageCount: '10'
-//       activationMessageCount: '0'
-//     }
-//     identity: 'system'
-//   }
-// }]
-// var containerAppScaleRules = concat([
-//   {
-//     name: 'http-requests'
-//     http: {
-//       metadata: {
-//         concurrentRequests: '20'
-//       }
-//     }
-//   }
-// ], serviceBusQueueScaleRules)
+var serviceBusQueueScaleRules = [for queueName in serviceBusQueueNamesArray: {
+  name: 'servicebus-${queueName}'
+  custom: {
+    type: 'azure-servicebus'
+    metadata: {
+      queueName: queueName
+      namespace: serviceBusName
+      messageCount: '10'
+      activationMessageCount: '0'
+    }
+    identity: 'system'
+  }
+}]
+var containerAppScaleRules = concat([
+  {
+    name: 'http-requests'
+    http: {
+      metadata: {
+        concurrentRequests: '20'
+      }
+    }
+  }
+], serviceBusQueueScaleRules)
 
 var currentImage = appExists ? reference(containerAppResourceId, '2026-01-01').template.containers[0].image : 'mcr.microsoft.com/dotnet/samples:dotnetapp'
 module containerApp 'br/public:avm/res/app/container-app:0.21.0' = {
@@ -176,16 +176,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.21.0' = {
       maxReplicas: 5
       pollingInterval: 15
       cooldownPeriod: 300
-      rules: [
-        {
-          name: 'http-requests'
-          http: {
-            metadata: {
-              concurrentRequests: '20'
-            }
-          }
-        }
-      ]
+      rules: containerAppScaleRules
     }
     secrets: derivedSecrets
     ingressTargetPort: 8080
