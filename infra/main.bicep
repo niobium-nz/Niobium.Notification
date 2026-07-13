@@ -109,13 +109,13 @@ module managedEnvironment 'br/public:avm/res/app/managed-environment:0.13.3' = {
   }
 }
 
-// module serviceBusPubSubDapr 'ServiceBusPubSub.bicep' = {
-//   params: {
-//     serviceBusNamespaceName: serviceBus.outputs.name
-//     containerAppsEnvironmentName: managedEnvironment.outputs.name
-//     pubSubDaprAppId: pubSubDaprAppId
-//   }
-// }
+module serviceBusPubSubDapr 'ServiceBusPubSub.bicep' = {
+  params: {
+    serviceBusNamespaceName: serviceBus.outputs.name
+    containerAppsEnvironmentName: managedEnvironment.outputs.name
+    pubSubDaprAppId: pubSubDaprAppId
+  }
+}
 
 // var serviceBusQueueScaleRules = [for queueName in serviceBusQueueNamesArray: {
 //   name: 'servicebus-${queueName}'
@@ -171,13 +171,22 @@ module containerApp 'br/public:avm/res/app/container-app:0.21.0' = {
     //   appPort: 8080
     //   appProtocol: 'http'
     // }
-    // scaleSettings: {
-    //   minReplicas: 0
-    //   maxReplicas: 5
-    //   pollingInterval: 15
-    //   cooldownPeriod: 300
-    //   rules: containerAppScaleRules
-    // }
+    scaleSettings: {
+      minReplicas: 0
+      maxReplicas: 5
+      pollingInterval: 15
+      cooldownPeriod: 300
+      rules: [
+        {
+          name: 'http-requests'
+          http: {
+            metadata: {
+              concurrentRequests: '20'
+            }
+          }
+        }
+      ]
+    }
     secrets: derivedSecrets
     ingressTargetPort: 8080
     ingressTransport: 'auto'
