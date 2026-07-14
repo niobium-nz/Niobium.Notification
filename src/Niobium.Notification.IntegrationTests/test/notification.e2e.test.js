@@ -2,8 +2,8 @@ import path from 'node:path';
 import { describe, it, expect } from 'vitest';
 
 // Load the helper script which attaches to global.niobium.notification
-await import(path.resolve(process.cwd(), '../assets/contact-us.js'));
-await import(path.resolve(process.cwd(), '../assets/subscribe.js'));
+await import(path.resolve(process.cwd(), '../../assets/contact-us.js'));
+await import(path.resolve(process.cwd(), '../../assets/subscribe.js'));
 
 // Ensure Node 18+ provides global fet
 if (typeof fetch !== 'function') {
@@ -80,7 +80,7 @@ describe('Notification end-to-end tests', () => {
 
         // Try to parse JSON response if present
         const text = await response.text();
-        
+
         // Some endpoints might return empty content; that's OK
         if (text) {
             try {

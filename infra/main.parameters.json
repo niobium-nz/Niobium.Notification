@@ -7,6 +7,9 @@
     },
     "serviceBusQueueNames": {
       "value": "${SERVICE_BUS_QUEUE_NAMES}"
+    },
+    "customDomainName": {
+      "value": "${CUSTOM_DOMAIN_NAME}"
     }
   }
 }

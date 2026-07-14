@@ -22,10 +22,13 @@ param containerAppName string = '${appName}-ca'
 param appSettings array = []
 
 @description('Automatically set by azd. True if the container app already exists.')
-param appExists bool = true
+param appExists bool = false
 
 @description('Name of the Queues, seperated by comma.')
 param serviceBusQueueNames string = ''
+
+@description('Custom domain name bind to the container app.')
+param customDomainName string = ''
 
 var pubSubDaprAppId = 'servicebus-dapr-worker'
 var logAnalyticsName = '${appName}-law'
@@ -80,6 +83,10 @@ var storageTableFqdn string = replace(replace(storageAccount.outputs.serviceEndp
 var storageBlobFqdn string = replace(replace(storageAccount.outputs.serviceEndpoints.blob, 'https://', ''), '/', '')
 
 var containerEnv2 = concat(containerEnv, [
+  { 
+      name: 'ASPNETCORE_ENVIRONMENT'
+      value: environmentName
+  }
   { 
       name: 'ASPNETCORE_HTTP_PORTS'
       value: string(appPort)
@@ -152,6 +159,23 @@ var containerAppScaleRules = concat([
   }
 ], serviceBusQueueScaleRules)
 
+resource managedCert 'Microsoft.App/managedEnvironments/managedCertificates@2026-01-01' = if (!empty(customDomainName)) {
+  name: '${containerAppsEnvironmentName}/staging.api.notification.nio-niobiumn-260715004353'
+  location: location
+  properties: {
+    domainControlValidation: 'CNAME'
+    subjectName: customDomainName
+  }
+}
+
+var customerDomains = empty(customDomainName) ? [] : [
+  {
+    name: customDomainName
+    bindingType: 'SniEnabled'
+    certificateId: managedCert.id
+  }
+]
+
 var currentImage = appExists ? reference(containerAppResourceId, '2026-01-01').template.containers[0].image : 'mcr.microsoft.com/dotnet/samples:dotnetapp'
 module containerApp 'br/public:avm/res/app/container-app:0.21.0' = {
   params: {
@@ -193,6 +217,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.21.0' = {
     ingressTargetPort: appPort
     ingressTransport: 'auto'
     ingressAllowInsecure: false
+    customDomains: customerDomains
   }
 }
 

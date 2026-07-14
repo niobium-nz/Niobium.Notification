@@ -1,0 +1,114 @@
+name: Reusable publish job
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      custom_domain:
+        required: true
+        type: string
+      version_suffix:
+        required: false
+        type: string
+        default: ''
+      deploy_assets:
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      AZURE_CLIENT_ID:
+        required: true
+      AZURE_TENANT_ID:
+        required: true
+      AZURE_SUBSCRIPTION_ID:
+        required: true
+      DOCKERHUB_USERNAME:
+        required: true
+      DOCKERHUB_TOKEN:
+        required: true
+      RESEND_API_KEY:
+        required: true
+      SELF_HOSTNAME:
+        required: true
+      CLOUDFLARE_API_TOKEN:
+        required: false
+      CLOUDFLARE_ACCOUNT_ID:
+        required: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    env:
+      SERVICE_NAME: "Niobium.Notification.Host"
+      VERSION_MAJOR: 1
+      VERSION_MINOR: 0
+      VERSION_SUFFIX: ${{ inputs.version_suffix }}
+      SERVICE_BUS_QUEUES: "subscribecommand,notifycommand,subscribedevent"
+      CLOUDFLARE_ASSETS_PROJECT: "assets-notification-niobium-co-nz"
+      NOTIFICATION_TEMPLATE_FOLDER: 'templates'
+      CAPTCHAOPTIONS_ISDISABLED: true
+      CUSTOM_DOMAIN_NAME: ${{ inputs.custom_domain }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+
+      - name: Install azd
+        uses: Azure/setup-azd@v2
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Azure login
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: azd login
+        run: azd auth login --federated-credential-provider github --client-id ${{ secrets.AZURE_CLIENT_ID }} --tenant-id ${{ secrets.AZURE_TENANT_ID }}
+
+      - name: Publish
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          CUSTOM_DOMAIN_NAME: ${{ env.CUSTOM_DOMAIN_NAME }}
+          SERVICE_BUS_QUEUE_NAMES: ${{ env.SERVICE_BUS_QUEUES }}
+          APPSETTING_SERVICE_NAME: ${{ env.SERVICE_NAME }}
+          APPSETTING_SERVICE_VERSION: '${{ env.VERSION_MAJOR }}.${{ env.VERSION_MINOR }}.${{ github.run_number }}${{ env.VERSION_SUFFIX }}'
+          APPSETTING_RESENDSERVICEOPTIONS__GLOBALAPIKEY: ${{ secrets.RESEND_API_KEY }}
+          APPSETTING_NOTIFICATIONOPTIONS__SELFHOSTNAME: ${{ secrets.SELF_HOSTNAME }}
+          APPSETTING_NOTIFICATIONOPTIONS__TEMPLATEFOLDER: ${{ env.NOTIFICATION_TEMPLATE_FOLDER }}
+          APPSETTING_CAPTCHAOPTIONS__ISDISABLED: ${{ env.CAPTCHAOPTIONS_ISDISABLED }}
+        run: |
+          azd package --no-prompt
+          azd provision --no-state --no-prompt
+          azd deploy --no-prompt
+
+      - name: Integration tests
+        working-directory: src/Niobium.Notification.IntegrationTests
+        env:
+          API_URL: 'https://${{ env.CUSTOM_DOMAIN_NAME }}'
+        run: |
+          npm install
+          npm test
+
+      - name: Deploy assets
+        if: ${{ inputs.deploy_assets }}
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy "./assets" --project-name="${{ env.CLOUDFLARE_ASSETS_PROJECT }}" --branch=main

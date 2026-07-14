@@ -12,7 +12,8 @@
     <File Path="infra/ServiceBusPubSub.bicep" />
   </Folder>
   <Folder Name="/Pipelines/">
-    <File Path=".github/workflows/azure-prod.yml" />
+    <File Path=".github/workflows/azure-deploy.yml" />
+    <File Path=".github/workflows/publish-job.yml" />
   </Folder>
   <Project Path="compose-niobium-notify.dcproj">
     <Build />
