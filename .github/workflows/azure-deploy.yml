@@ -18,7 +18,7 @@ jobs:
       environment: 'test'
       custom_domain: 'staging.api.notification.niobium.co.nz'
       version_suffix: '-prerelease'
-      deploy_assets: false
+      deploy_assets: true
     secrets:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
