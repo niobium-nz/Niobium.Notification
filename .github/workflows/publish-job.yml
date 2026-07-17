@@ -79,7 +79,7 @@ jobs:
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
           AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
-          CUSTOM_DOMAIN_NAME: ${{ vars.CUSTOM_DOMAIN_NAME }}
+          CUSTOM_DOMAIN_NAME: ${{ secrets.CUSTOM_DOMAIN_NAME }}
           SERVICE_BUS_QUEUE_NAMES: ${{ env.SERVICE_BUS_QUEUES }}
           APPSETTING_SERVICE_NAME: ${{ env.SERVICE_NAME }}
           APPSETTING_SERVICE_VERSION: '${{ env.VERSION_MAJOR }}.${{ env.VERSION_MINOR }}.${{ github.run_number }}${{ env.VERSION_SUFFIX }}'
@@ -95,7 +95,7 @@ jobs:
       - name: Integration tests
         working-directory: src/Niobium.Notification.IntegrationTests
         env:
-          API_URL: 'https://${{ vars.CUSTOM_DOMAIN_NAME }}'
+          API_URL: 'https://${{ secrets.CUSTOM_DOMAIN_NAME }}'
         run: |
           npm install
           npm test
