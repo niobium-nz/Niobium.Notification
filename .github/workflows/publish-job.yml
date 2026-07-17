@@ -42,21 +42,21 @@ on:
       APPSETTING_RESENDSERVICEOPTIONS__GLOBALAPIKEY:
         required: true
       APPSETTING_CAPTCHAOPTIONS__SECRETS__WWW_EDENNOODLESBAR_CO_NZ:
-        required: true
+        required: false
       APPSETTING_CAPTCHAOPTIONS__SECRETS__WWW_EDENNOODLESBARMISSIONBAY_CO_NZ:
-        required: true
+        required: false
       APPSETTING_CAPTCHAOPTIONS__SECRETS__WWW_EDENNOODLESBARMORNINGSIDE_CO_NZ:
-        required: true
+        required: false
       APPSETTING_CAPTCHAOPTIONS__SECRETS__WWW_EDENNOODLESHAMILTON_CO_NZ:
-        required: true
+        required: false
       APPSETTING_CAPTCHAOPTIONS__SECRETS__WWW_NIOBIUM_CO_NZ:
-        required: true
+        required: false
       APPSETTING_CAPTCHAOPTIONS__SECRETS__WWW_TAPSS_CARE:
-        required: true
+        required: false
       APPSETTING_CAPTCHAOPTIONS__SECRETS__WWW_ZAPS_CO_NZ:
-        required: true
+        required: false
       APPSETTING_RESENDSERVICEOPTIONS__DOMAINSCOPEDAPIKEYS__TAPSS_CARE:
-        required: true
+        required: false
 
 jobs:
   publish:
