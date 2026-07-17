@@ -3,6 +3,9 @@ name: Reusable publish job
 on:
   workflow_call:
     inputs:
+      environment:
+        required: true
+        type: string
       version_suffix:
         required: false
         type: string
@@ -34,7 +37,7 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    environment: ${{ vars.AZURE_ENV_NAME }}
+    environment: ${{ inputs.environment }}
     env:
       SERVICE_NAME: "Niobium.Notification.Host"
       VERSION_MAJOR: 1
