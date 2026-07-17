@@ -14,7 +14,7 @@ jobs:
   test:
     uses: ./.github/workflows/publish-job.yml
     with:
-      environment: ${{ vars.AZURE_ENV_NAME }}
+      environment: 'test'
       version_suffix: '-prerelease'
       deploy_assets: false
     secrets:
@@ -33,7 +33,7 @@ jobs:
     if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
     uses: ./.github/workflows/publish-job.yml
     with:
-      environment: ${{ vars.AZURE_ENV_NAME }}
+      environment: 'prod'
       version_suffix: ''
       deploy_assets: true
     secrets:
