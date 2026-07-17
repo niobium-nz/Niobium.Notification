@@ -22,11 +22,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Niobium.Platform.StorageTable" Version="4.0.35" />
-    <PackageReference Include="Niobium.Platform.Blob" Version="4.0.35" />
-    <PackageReference Include="Niobium.Platform.ServiceBus" Version="4.0.35" />
-    <PackageReference Include="Niobium.Platform.Notification.Email.Resend" Version="4.0.35" />
-    <PackageReference Include="Niobium.Platform.Captcha.Recaptcha" Version="4.0.35" />
+    <PackageReference Include="Niobium.Platform.StorageTable" Version="4.0.37" />
+    <PackageReference Include="Niobium.Platform.Blob" Version="4.0.37" />
+    <PackageReference Include="Niobium.Platform.ServiceBus" Version="4.0.37" />
+    <PackageReference Include="Niobium.Platform.Notification.Email.Resend" Version="4.0.37" />
+    <PackageReference Include="Niobium.Platform.Captcha.Recaptcha" Version="4.0.37" />
     <ProjectReference Include="..\Niobium.Notification.Core\Niobium.Notification.Core.csproj" />
   </ItemGroup>
   
