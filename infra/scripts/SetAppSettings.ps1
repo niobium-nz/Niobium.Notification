@@ -35,6 +35,7 @@ Get-ChildItem Env: |
 	ForEach-Object {
 		$settingName = $_.Name.Substring($prefix.Length)
 		if ([string]::IsNullOrWhiteSpace($settingName)) { return }
+		if ([string]::IsNullOrWhiteSpace($_.Value)) { return }
 
 		Write-Host "Resolved deployment setting '$settingName' from source '$($_.Name)'."
 		$appSettingsMap[$settingName] = $_.Value
