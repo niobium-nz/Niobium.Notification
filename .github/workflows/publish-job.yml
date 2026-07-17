@@ -3,12 +3,6 @@ name: Reusable publish job
 on:
   workflow_call:
     inputs:
-      environment:
-        required: true
-        type: string
-      custom_domain:
-        required: true
-        type: string
       version_suffix:
         required: false
         type: string
@@ -40,7 +34,7 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
+    environment: ${{ vars.AZURE_ENV_NAME }}
     env:
       SERVICE_NAME: "Niobium.Notification.Host"
       VERSION_MAJOR: 1
@@ -49,8 +43,6 @@ jobs:
       SERVICE_BUS_QUEUES: "subscribecommand,notifycommand,subscribedevent"
       CLOUDFLARE_ASSETS_PROJECT: "assets-notification-niobium-co-nz"
       NOTIFICATION_TEMPLATE_FOLDER: 'templates'
-      CAPTCHAOPTIONS_ISDISABLED: true
-      CUSTOM_DOMAIN_NAME: ${{ inputs.custom_domain }}
 
     steps:
       - name: Checkout
@@ -84,14 +76,14 @@ jobs:
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
           AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
-          CUSTOM_DOMAIN_NAME: ${{ env.CUSTOM_DOMAIN_NAME }}
+          CUSTOM_DOMAIN_NAME: ${{ vars.CUSTOM_DOMAIN_NAME }}
           SERVICE_BUS_QUEUE_NAMES: ${{ env.SERVICE_BUS_QUEUES }}
           APPSETTING_SERVICE_NAME: ${{ env.SERVICE_NAME }}
           APPSETTING_SERVICE_VERSION: '${{ env.VERSION_MAJOR }}.${{ env.VERSION_MINOR }}.${{ github.run_number }}${{ env.VERSION_SUFFIX }}'
           APPSETTING_RESENDSERVICEOPTIONS__GLOBALAPIKEY: ${{ secrets.RESEND_API_KEY }}
           APPSETTING_NOTIFICATIONOPTIONS__SELFHOSTNAME: ${{ secrets.SELF_HOSTNAME }}
           APPSETTING_NOTIFICATIONOPTIONS__TEMPLATEFOLDER: ${{ env.NOTIFICATION_TEMPLATE_FOLDER }}
-          APPSETTING_CAPTCHAOPTIONS__ISDISABLED: ${{ env.CAPTCHAOPTIONS_ISDISABLED }}
+          APPSETTING_CAPTCHAOPTIONS__ISDISABLED: ${{ vars.APPSETTING_CAPTCHAOPTIONS__ISDISABLED }}
         run: |
           azd package --no-prompt
           azd provision --no-state --no-prompt
@@ -100,7 +92,7 @@ jobs:
       - name: Integration tests
         working-directory: src/Niobium.Notification.IntegrationTests
         env:
-          API_URL: 'https://${{ env.CUSTOM_DOMAIN_NAME }}'
+          API_URL: 'https://${{ vars.CUSTOM_DOMAIN_NAME }}'
         run: |
           npm install
           npm test

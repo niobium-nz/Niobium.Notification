@@ -15,8 +15,6 @@ jobs:
     if: startsWith(github.ref, 'refs/heads/feature/')
     uses: ./.github/workflows/publish-job.yml
     with:
-      environment: 'test'
-      custom_domain: 'staging.api.notification.niobium.co.nz'
       version_suffix: '-prerelease'
       deploy_assets: false
     secrets:
@@ -34,8 +32,6 @@ jobs:
     if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
     uses: ./.github/workflows/publish-job.yml
     with:
-      environment: 'prod'
-      custom_domain: 'api.notification.niobium.co.nz'
       version_suffix: ''
       deploy_assets: true
     secrets:
