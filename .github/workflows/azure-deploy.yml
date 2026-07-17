@@ -28,7 +28,7 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CUSTOM_DOMAIN_NAME: ${{ secrets.CUSTOM_DOMAIN_NAME }}
-
+      CUSTOM_DOMAIN_CERTIFICATE_NAME: ${{ secrets.CUSTOM_DOMAIN_CERTIFICATE_NAME }}
   prod:
     if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
     uses: ./.github/workflows/publish-job.yml
@@ -47,3 +47,4 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CUSTOM_DOMAIN_NAME: ${{ secrets.CUSTOM_DOMAIN_NAME }}
+      CUSTOM_DOMAIN_CERTIFICATE_NAME: ${{ secrets.CUSTOM_DOMAIN_CERTIFICATE_NAME }}

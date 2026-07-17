@@ -10,6 +10,9 @@
     },
     "customDomainName": {
       "value": "${CUSTOM_DOMAIN_NAME}"
+    },
+    "customDomainCertificateName": {
+      "value": "${CUSTOM_DOMAIN_CERTIFICATE_NAME}"
     }
   }
 }

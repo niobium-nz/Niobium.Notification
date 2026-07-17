@@ -35,6 +35,8 @@ on:
         required: false
       CUSTOM_DOMAIN_NAME:
         required: false
+      CUSTOM_DOMAIN_CERTIFICATE_NAME:
+        required: false
 
 jobs:
   publish:
@@ -82,6 +84,7 @@ jobs:
           AZURE_ENV_NAME: ${{ inputs.environment }}
           AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
           CUSTOM_DOMAIN_NAME: ${{ secrets.CUSTOM_DOMAIN_NAME }}
+          CUSTOM_DOMAIN_CERTIFICATE_NAME: ${{ secrets.CUSTOM_DOMAIN_CERTIFICATE_NAME }}
           SERVICE_BUS_QUEUE_NAMES: ${{ env.SERVICE_BUS_QUEUES }}
           APPSETTING_SERVICE_NAME: ${{ env.SERVICE_NAME }}
           APPSETTING_SERVICE_VERSION: '${{ env.VERSION_MAJOR }}.${{ env.VERSION_MINOR }}.${{ github.run_number }}${{ env.VERSION_SUFFIX }}'

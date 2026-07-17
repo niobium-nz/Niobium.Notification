@@ -30,6 +30,9 @@ param serviceBusQueueNames string = ''
 @description('Custom domain name bind to the container app.')
 param customDomainName string = ''
 
+@description('Certificate name of the custom domain bind to the container app.')
+param customDomainCertificateName string = ''
+
 var pubSubDaprAppId = 'servicebus-dapr-worker'
 var logAnalyticsName = '${appName}-law'
 var appInsightsName = '${appName}-ai'
@@ -159,8 +162,8 @@ var containerAppScaleRules = concat([
   }
 ], serviceBusQueueScaleRules)
 
-resource managedCert 'Microsoft.App/managedEnvironments/managedCertificates@2026-01-01' = if (!empty(customDomainName)) {
-  name: '${containerAppsEnvironmentName}/staging.api.notification.nio-niobiumn-260715004353'
+resource managedCert 'Microsoft.App/managedEnvironments/managedCertificates@2026-01-01' = if (!empty(customDomainName) && !empty(customDomainCertificateName)) {
+  name: '${containerAppsEnvironmentName}/${customDomainCertificateName}'
   location: location
   properties: {
     domainControlValidation: 'CNAME'
@@ -168,7 +171,7 @@ resource managedCert 'Microsoft.App/managedEnvironments/managedCertificates@2026
   }
 }
 
-var customerDomains = empty(customDomainName) ? [] : [
+var customerDomains = empty(customDomainName) || empty(customDomainCertificateName) ? [] : [
   {
     name: customDomainName
     bindingType: 'SniEnabled'
