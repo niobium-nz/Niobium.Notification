@@ -19,7 +19,7 @@ services:
       tag: ${APPSETTING_SERVICE_VERSION:-1.0.0-prerelease}
     hooks:
       prepackage:
-        run: dotnet test --solution ./Niobium.Notification.slnx --configuration Release
+        run: dotnet test --solution ../../Niobium.Notification.slnx --configuration Release
 infra:
   provider: bicep
   layers:
