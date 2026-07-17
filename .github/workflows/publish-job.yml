@@ -33,6 +33,8 @@ on:
         required: false
       CLOUDFLARE_ACCOUNT_ID:
         required: false
+      CUSTOM_DOMAIN_NAME:
+        required: false
 
 jobs:
   publish:
