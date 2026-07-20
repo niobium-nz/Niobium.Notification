@@ -28,7 +28,7 @@ param appExists bool = false
 param serviceBusQueueNames string = ''
 
 @description('CORS origins allowed, separated by comma.')
-param corsAllowedOrigins string = 'https://*,http://*'
+param corsAllowedOrigins string = '*'
 
 @description('Custom domain name bind to the container app.')
 param customDomainName string = ''
