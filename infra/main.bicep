@@ -24,8 +24,11 @@ param appSettings array = []
 @description('Automatically set by azd. True if the container app already exists.')
 param appExists bool = false
 
-@description('Name of the Queues, seperated by comma.')
+@description('Name of the Queues, separated by comma.')
 param serviceBusQueueNames string = ''
+
+@description('CORS origins allowed, separated by comma.')
+param corsAllowedOrigins string = 'https://*,http://*'
 
 @description('Custom domain name bind to the container app.')
 param customDomainName string = ''
@@ -40,6 +43,7 @@ var storageAccountName = replace('${appName}-sa', '-', '')
 var serviceBusName = '${appName}-sbns'
 var containerAppResourceId = resourceId('Microsoft.App/containerApps', containerAppName)
 var serviceBusQueueNamesArray = empty(serviceBusQueueNames) || serviceBusQueueNames == '' ? [] : split(serviceBusQueueNames, ',')
+var corsAllowedOriginsArray = empty(corsAllowedOrigins) || corsAllowedOrigins == '' ? [] : split(corsAllowedOrigins, ',')
 
 var derivedSecrets = [for setting in appSettings: {
   name: toLower(replace(string(setting.name), '_', '-'))
@@ -221,6 +225,20 @@ module containerApp 'br/public:avm/res/app/container-app:0.21.0' = {
     ingressTransport: 'auto'
     ingressAllowInsecure: false
     customDomains: customerDomains
+    corsPolicy: {
+      allowCredentials: false
+      allowedOrigins: corsAllowedOriginsArray
+      allowedMethods: [
+        'GET'
+        'POST'
+        'PUT'
+        'DELETE'
+        'OPTIONS'
+      ]
+      allowedHeaders: [
+        '*'
+      ]
+    }
   }
 }
 
