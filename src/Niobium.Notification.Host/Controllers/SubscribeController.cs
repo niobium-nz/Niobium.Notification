@@ -27,7 +27,7 @@ namespace Niobium.Notification.Host.Controllers
             await assessor.AssessAsync(command.Token, requestID: command.ID, cancellationToken: cancellationToken);
 
             await domainFactory().SubscribeAsync(command.Tenant, command.Campaign, command.Email, command.FirstName, command.LastName, command.Track, this.Request.GetRemoteIP(), cancellationToken: cancellationToken);
-            return new OkResult();
+            return new OkObjectResult(command);
         }
     }
 }

@@ -37,7 +37,7 @@ namespace Niobium.Notification.Host.Controllers
                  },
             }, cancellationToken);
 
-            return new StatusCodeResult((int)HttpStatusCode.Created);
+            return new OkObjectResult(request);
         }
     }
 }
