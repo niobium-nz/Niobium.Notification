@@ -10,9 +10,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Azure.Monitor.OpenTelemetry.AspNetCore" Version="1.5.0" />
-    <PackageReference Include="Azure.Monitor.OpenTelemetry.Exporter" Version="1.8.2" />
-    <PackageReference Include="Dapr.AspNetCore" Version="1.18.4" />
+    <PackageReference Include="Azure.Monitor.OpenTelemetry.AspNetCore" Version="1.6.0" />
+    <PackageReference Include="Azure.Monitor.OpenTelemetry.Exporter" Version="1.8.3" />
+    <PackageReference Include="Dapr.AspNetCore" Version="1.18.5" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.17.0" />
     <PackageReference Include="OpenTelemetry.Exporter.Console" Version="1.17.0" />
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.17.0" />
@@ -26,7 +26,7 @@
     <PackageReference Include="Niobium.Platform.Blob" Version="4.0.42" />
     <PackageReference Include="Niobium.Platform.ServiceBus" Version="4.0.42" />
     <PackageReference Include="Niobium.Platform.Notification.Email.Resend" Version="4.0.42" />
-    <PackageReference Include="Niobium.Platform.Captcha.Recaptcha" Version="4.0.42" />
+    <PackageReference Include="Niobium.Platform.Captcha.Recaptcha" Version="4.0.47" />
     <ProjectReference Include="..\Niobium.Notification.Core\Niobium.Notification.Core.csproj" />
   </ItemGroup>
   
