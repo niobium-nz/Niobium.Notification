@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.HttpOverrides;
 using Niobium.Messaging.ServiceBus;
 using Niobium.Platform;
 using Niobium.Platform.Blob;
@@ -25,16 +24,8 @@ namespace Niobium.Notification.Host
 
             builder.Services.Configure<NotificationOptions>(o => options?.Invoke(o));
 
-            builder.Services.AddDaprClient();
-            builder.Services.AddControllers().AddDapr();
-            builder.Services.Configure<ForwardedHeadersOptions>(options =>
-            {
-                options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-                options.KnownIPNetworks.Clear();
-                options.KnownProxies.Clear();
-            });
-
-            builder.ConfigureOpenTelemetry();
+            builder.AddDapr();
+            builder.AddPlatform();
             builder.AddDatabase();
             builder.AddFile();
             builder.AddMessaging();
@@ -47,12 +38,8 @@ namespace Niobium.Notification.Host
 
         public static WebApplication UseNotification(this WebApplication app)
         {
-            app.UseForwardedHeaders();
-            app.UseRouting();
-            app.UseCloudEvents();
+            app.UseDapr();
             app.UsePlatform();
-            app.MapControllers();
-            app.MapSubscribeHandler();
             return app;
         }
     }
