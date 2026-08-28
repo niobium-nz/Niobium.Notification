@@ -32,7 +32,6 @@ namespace Niobium.Notification.Host
 
             used = true;
 
-            app.UseCloudEvents();
             app.MapSubscribeHandler();
             return app;
         }

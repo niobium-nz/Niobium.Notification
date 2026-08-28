@@ -10,7 +10,6 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <NoWarn>CA1848,CA2254,CA1305,CA1310,CA1711,CA1852,CS8618</NoWarn>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-
     <NeutralLanguage>en-US</NeutralLanguage>
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
