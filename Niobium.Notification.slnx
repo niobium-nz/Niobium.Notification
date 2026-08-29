@@ -5,21 +5,18 @@
     <File Path="src/Niobium.Notification.IntegrationTests/test/notification.e2e.test.js" />
   </Folder>
   <Folder Name="/Infrastructures/">
+    <File Path="infra/function-app.bicep" />
     <File Path="infra/main.bicep" />
-    <File Path="infra/main.parameters.json" />
+    <File Path="infra/main.bicepparam" />
     <File Path="infra/RBAC.bicep" />
-    <File Path="infra/ServiceBus.bicep" />
-    <File Path="infra/ServiceBusPubSub.bicep" />
+    <File Path="infra/service-bus.bicep" />
   </Folder>
   <Folder Name="/Pipelines/">
     <File Path=".github/workflows/azure-deploy.yml" />
-    <File Path=".github/workflows/publish-job.yml" />
+    <File Path=".github/workflows/package-publish.yml" />
   </Folder>
-  <Project Path="compose-niobium-notify.dcproj">
-    <Build />
-  </Project>
   <Project Path="src/Niobium.Notification.Contracts/Niobium.Notification.Contracts.csproj" />
   <Project Path="src/Niobium.Notification.Core.Tests/Niobium.Notification.Core.Tests.csproj" />
   <Project Path="src/Niobium.Notification.Core/Niobium.Notification.Core.csproj" />
-  <Project Path="src/Niobium.Notification.Host/Niobium.Notification.Host.csproj" />
+  <Project Path="src/Niobium.Notification.Server/Niobium.Notification.Server.csproj" />
 </Solution>

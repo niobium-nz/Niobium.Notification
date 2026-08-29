@@ -1,64 +1,140 @@
-@description('Name of the Service Bus namespace')
-param serviceBusNamespaceName string
+param managedIdentityPrincipalId string = '' // Principal ID for the Managed Identity
+param userIdentityPrincipalId string = '' // Principal ID for the User Identity
+param serviceBusNamespaceNames array = []
+param storageAccountNames array = []
+param appInsightsName string = ''
+param keyVaultName string = ''
 
-@description('Name of the Storage Account')
-param storageAccountName string
+// Define Role Definition IDs. See https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#storage-account-contributor 
+var storageRoleDefinitionId  = 'b7e6dc6d-f1e8-4753-8033-0f276bb0955b' //Storage Blob Data Owner role
+var tableRoleDefinitionId = '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3' // Storage Table Data Contributor role
+var monitoringRoleDefinitionId = '3913510d-42f4-4e42-8a64-420c390055eb' // Monitoring Metrics Publisher role ID
+var serviceBusRoleDefinitionId = '090c5cfd-751d-490a-894a-3ce6f1109419' // Service Bus Data Owner role ID
+var keyVaultSecretRoleDefinitionId = '4633458b-17de-408a-b874-0445c86b69e6' // Key Vault Secret Reader role ID
 
-@description('Specifies the principal ID to the resources that owns the data of this Service Bus namespace.')
-param dataOwnerPrincipalId string
+resource storageAccounts 'Microsoft.Storage/storageAccounts@2022-09-01' existing = [for saName in storageAccountNames: {
+  name: saName
+}]
 
-resource serviceBusNamespace 'Microsoft.ServiceBus/namespaces@2024-01-01' existing = {
-  name: serviceBusNamespaceName
+resource applicationInsights 'Microsoft.Insights/components@2020-02-02' existing = {
+  name: appInsightsName
 }
 
-resource storageAccount 'Microsoft.Storage/storageAccounts@2026-04-01' existing = {
-  name: storageAccountName
+resource keyVault 'Microsoft.KeyVault/vaults@2022-07-01' existing = {
+  name: keyVaultName
 }
 
-@description('This is the built-in Azure Service Bus Data Owner role. See https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#storage-account-contributor')
-resource serviceBusDataOwnerRoleDefinition 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
-  scope: subscription()
-  name: '090c5cfd-751d-490a-894a-3ce6f1109419'
-}
+// Existing Service Bus namespaces defined by name(s)
+resource serviceBusNamespaces 'Microsoft.ServiceBus/namespaces@2024-01-01' existing = [for nsName in serviceBusNamespaceNames: {
+  name: nsName
+}]
 
-resource serviceBusDataOwnerRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(serviceBusNamespace.id, dataOwnerPrincipalId, serviceBusDataOwnerRoleDefinition.id)
-  scope: serviceBusNamespace
+// Role assignment for Storage Account (Blob) - Managed Identity
+resource storageRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(storageAccountNames)): if (!empty(managedIdentityPrincipalId)) {
+  name: guid(storageAccounts[i].id, managedIdentityPrincipalId, storageRoleDefinitionId) // Use managed identity ID
+  scope: storageAccounts[i]
   properties: {
-    roleDefinitionId: serviceBusDataOwnerRoleDefinition.id
-    principalId: dataOwnerPrincipalId
-    principalType: 'ServicePrincipal'
+    roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', storageRoleDefinitionId)
+    principalId: managedIdentityPrincipalId // Use managed identity ID
+    principalType: 'ServicePrincipal' // Managed Identity is a Service Principal
+  }
+}]
+
+// Role assignment for Storage Account (Blob) - User Identity
+resource storageRoleAssignment_User 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(storageAccountNames)): if (!empty(userIdentityPrincipalId)) {
+  name: guid(storageAccounts[i].id, userIdentityPrincipalId, storageRoleDefinitionId)
+  scope: storageAccounts[i]
+  properties: {
+    roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', storageRoleDefinitionId)
+    principalId: userIdentityPrincipalId // Use user identity ID
+    principalType: 'User' // User Identity is a User Principal
+  }
+}]
+
+// Role assignment for Storage Account (Table) - Managed Identity
+resource tableRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(storageAccountNames)): if (!empty(managedIdentityPrincipalId)) {
+  name: guid(storageAccounts[i].id, managedIdentityPrincipalId, tableRoleDefinitionId) // Use managed identity ID
+  scope: storageAccounts[i]
+  properties: {
+    roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', tableRoleDefinitionId)
+    principalId: managedIdentityPrincipalId // Use managed identity ID
+    principalType: 'ServicePrincipal' // Managed Identity is a Service Principal
+  }
+}]
+
+// Role assignment for Storage Account (Table) - User Identity
+resource tableRoleAssignment_User 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(storageAccountNames)): if (!empty(userIdentityPrincipalId)) {
+  name: guid(storageAccounts[i].id, userIdentityPrincipalId, tableRoleDefinitionId)
+  scope: storageAccounts[i]
+  properties: {
+    roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', tableRoleDefinitionId)
+    principalId: userIdentityPrincipalId // Use user identity ID
+    principalType: 'User' // User Identity is a User Principal
+  }
+}]
+
+// Role assignment for Application Insights - Managed Identity
+resource appInsightsRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(appInsightsName) && !empty(managedIdentityPrincipalId)) {
+  name: guid(applicationInsights.id, managedIdentityPrincipalId, monitoringRoleDefinitionId) // Use managed identity ID
+  scope: applicationInsights
+  properties: {
+    roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', monitoringRoleDefinitionId)
+    principalId: managedIdentityPrincipalId // Use managed identity ID
+    principalType: 'ServicePrincipal' // Managed Identity is a Service Principal
   }
 }
 
-@description('This is the built-in Azure Storage Table Data Contributor role. See https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#storage-account-contributor')
-resource storageTableDataContributorRoleDefinition 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
-  scope: subscription()
-  name: '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3'
-}
-
-resource storageTableDataContributorRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(storageAccount.id, dataOwnerPrincipalId, storageTableDataContributorRoleDefinition.id)
-  scope: storageAccount
+// Role assignment for Application Insights - User Identity
+resource appInsightsRoleAssignment_User 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(appInsightsName) && !empty(userIdentityPrincipalId)) {
+  name: guid(applicationInsights.id, userIdentityPrincipalId, monitoringRoleDefinitionId)
+  scope: applicationInsights
   properties: {
-    roleDefinitionId: storageTableDataContributorRoleDefinition.id
-    principalId: dataOwnerPrincipalId
-    principalType: 'ServicePrincipal'
+    roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', monitoringRoleDefinitionId)
+    principalId: userIdentityPrincipalId // Use user identity ID
+    principalType: 'User' // User Identity is a User Principal
   }
 }
 
-@description('This is the built-in Azure Storage Blob Data Contributor role. See https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#storage-account-contributor')
-resource storageBlobDataContributorRoleDefinition 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
-  scope: subscription()
-  name: 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
-}
-
-resource storageBlobDataContributorRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(storageAccount.id, dataOwnerPrincipalId, storageBlobDataContributorRoleDefinition.id)
-  scope: storageAccount
+// Role assignment for Application Insights - Managed Identity
+resource keyVaultRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(keyVaultName) && !empty(managedIdentityPrincipalId)) {
+  name: guid(keyVault.id, managedIdentityPrincipalId, keyVaultSecretRoleDefinitionId) // Use managed identity ID
+  scope: keyVault
   properties: {
-    roleDefinitionId: storageBlobDataContributorRoleDefinition.id
-    principalId: dataOwnerPrincipalId
-    principalType: 'ServicePrincipal'
+    roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', keyVaultSecretRoleDefinitionId)
+    principalId: managedIdentityPrincipalId // Use managed identity ID
+    principalType: 'ServicePrincipal' // Managed Identity is a Service Principal
   }
 }
+
+// Role assignment for Key Vault - User Identity
+resource keyVaultRoleAssignment_User 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(keyVaultName) && !empty(userIdentityPrincipalId)) {
+  name: guid(keyVault.id, userIdentityPrincipalId, keyVaultSecretRoleDefinitionId)
+  scope: keyVault
+  properties: {
+    roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', keyVaultSecretRoleDefinitionId)
+    principalId: userIdentityPrincipalId // Use user identity ID
+    principalType: 'User' // User Identity is a User Principal
+  }
+}
+
+// Role assignment for Service Bus - Managed Identity
+resource serviceBusRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(serviceBusNamespaceNames)): if (!empty(managedIdentityPrincipalId)) {
+  name: guid(serviceBusNamespaces[i].id, managedIdentityPrincipalId, serviceBusRoleDefinitionId) // Use managed identity ID
+  scope: serviceBusNamespaces[i]
+  properties: {
+    roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', serviceBusRoleDefinitionId)
+    principalId: managedIdentityPrincipalId // Use managed identity ID
+    principalType: 'ServicePrincipal' // Managed Identity is a Service Principal
+  }
+}]
+
+// Role assignment for Service Bus - User Identity
+resource serviceBusRoleAssignment_User 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(serviceBusNamespaceNames)): if (!empty(userIdentityPrincipalId)) {
+  name: guid(serviceBusNamespaces[i].id, userIdentityPrincipalId, serviceBusRoleDefinitionId)
+  scope: serviceBusNamespaces[i]
+  properties: {
+    roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', serviceBusRoleDefinitionId)
+    principalId: userIdentityPrincipalId // Use user identity ID
+    principalType: 'User' // User Identity is a User Principal
+  }
+}]

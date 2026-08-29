@@ -1,72 +1,54 @@
 param(
-	[string]$OutputPath = "infra/main.parameters.json"
+	[string]$OutputPath = "infra/main.bicepparam",
+	[string]$BackupPath = "$OutputPath.backup"
 )
 
 $prefix = 'APPSETTING_'
+$generatedBlockStart = '// BEGIN GENERATED APP SETTINGS'
+$generatedBlockEnd = '// END GENERATED APP SETTINGS'
 
-# Read existing parameters file if present so we preserve any values not overridden by environment variables
-$existing = $null
-if (Test-Path -Path $OutputPath) {
-	$raw = Get-Content -Raw -Path $OutputPath
-	if (-not [string]::IsNullOrWhiteSpace($raw)) {
-		try {
-			$existing = $raw | ConvertFrom-Json -ErrorAction Stop
-		} catch {
-			# If file exists but isn't valid JSON, treat as no existing content
-			$existing = $null
-		}
-	}
+if (-not (Test-Path -LiteralPath $OutputPath -PathType Leaf)) {
+	throw "Bicep parameters file '$OutputPath' does not exist."
 }
 
-# Build a map of existing app settings (if any)
-$appSettingsMap = @{}
-if ($existing -and $existing.parameters -and $existing.parameters.appSettings -and $existing.parameters.appSettings.value) {
-	foreach ($item in $existing.parameters.appSettings.value) {
-		if ($item.name) {
-			$appSettingsMap[$item.name] = $item.value
-		}
-	}
+if (-not (Test-Path -LiteralPath $BackupPath)) {
+	Copy-Item -LiteralPath $OutputPath -Destination $BackupPath
+	Write-Host "Backed up Bicep parameters file to '$BackupPath'."
 }
 
-# Enumerate environment variables with the configured prefix and add/override entries in the map
-Get-ChildItem Env: |
+$content = Get-Content -Raw -LiteralPath $OutputPath
+$generatedBlockPattern = "(?ms)\r?\n?$([regex]::Escape($generatedBlockStart)).*?$([regex]::Escape($generatedBlockEnd))\r?\n?"
+$content = [regex]::Replace($content, $generatedBlockPattern, '')
+
+if ($content -match '(?m)^\s*param\s+appSettings\s*=') {
+	throw "Bicep parameters file '$OutputPath' already defines 'appSettings' outside the generated block."
+}
+
+$environmentVariables = Get-ChildItem Env: |
 	Where-Object { $_.Name.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase) } |
-	Sort-Object Name |
-	ForEach-Object {
-		$settingName = $_.Name.Substring($prefix.Length)
-		if ([string]::IsNullOrWhiteSpace($settingName)) { return }
-		if ([string]::IsNullOrWhiteSpace($_.Value)) { return }
+	Where-Object { -not [string]::IsNullOrWhiteSpace($_.Name.Substring($prefix.Length)) } |
+	Sort-Object Name
 
-		Write-Host "Resolved deployment setting '$settingName' from source '$($_.Name)'."
-		$appSettingsMap[$settingName] = $_.Value
-	}
+$lines = [System.Collections.Generic.List[string]]::new()
+$lines.Add($generatedBlockStart)
+$lines.Add('param appSettings = [')
 
-# Convert map back to ordered array of objects expected by ARM template parameters
-$appSettings = $appSettingsMap.GetEnumerator() | Sort-Object Name | ForEach-Object {
-	@{ name = $_.Key; value = $_.Value }
+foreach ($environmentVariable in $environmentVariables) {
+	$settingName = $environmentVariable.Name.Substring($prefix.Length).Replace('\', '\\').Replace("'", "\'")
+	$environmentVariableName = $environmentVariable.Name.Replace('\', '\\').Replace("'", "\'")
+
+	Write-Host "Resolved deployment setting '$settingName' from source '$($environmentVariable.Name)'."
+	$lines.Add('{0}{{' -f '  ')
+	$lines.Add("    name: '$settingName'")
+	$lines.Add("    value: readEnvironmentVariable('$environmentVariableName')")
+	$lines.Add('  }')
 }
 
-# Build resulting parameters object, preserving other existing parameter entries where possible
-$parameters = @{
-	'$schema' = if ($existing -and $existing.'$schema') { $existing.'$schema' } else { 'https://azure.com' }
-	contentVersion = if ($existing -and $existing.contentVersion) { $existing.contentVersion } else { '1.0.0.0' }
-	parameters = @{}
-}
+$lines.Add(']')
+$lines.Add($generatedBlockEnd)
 
-if ($existing -and $existing.parameters) {
-	foreach ($prop in $existing.parameters.PSObject.Properties) {
-		$parameters.parameters[$prop.Name] = $prop.Value
-	}
-}
+$trimmedContent = $content.TrimEnd("`r", "`n")
+$updatedContent = "$trimmedContent`r`n`r`n$($lines -join "`r`n")`r`n"
+[System.IO.File]::WriteAllText((Convert-Path -LiteralPath $OutputPath), $updatedContent, [System.Text.UTF8Encoding]::new($false))
 
-# Ensure appSettings is replaced with the merged set
-$parameters.parameters.appSettings = @{ value = $appSettings }
-
-# Ensure output directory exists
-$directory = Split-Path -Parent $OutputPath
-if ($directory -and -not (Test-Path $directory)) {
-	New-Item -ItemType Directory -Path $directory -Force | Out-Null
-}
-
-# Write merged parameters back to file
-$parameters | ConvertTo-Json -Depth 10 | Set-Content -Path $OutputPath
+Write-Host "Updated Bicep parameters at '$OutputPath' with $($environmentVariables.Count) generated app setting reference(s)."

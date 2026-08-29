@@ -11,53 +11,118 @@ permissions:
   id-token: write
   contents: read
 
+env:
+  buildVersion: '${{ vars.MAJOR_VERSION }}.${{ vars.MINOR_VERSION }}.${{ github.run_number }}'
+
 jobs:
   test:
-    uses: ./.github/workflows/publish-job.yml
-    with:
-      environment: 'test'
-      version_suffix: '-prerelease'
-      run_integration_test: true
-      deploy_assets: false
-    secrets:
-      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      CUSTOM_DOMAIN_NAME: ${{ secrets.CUSTOM_DOMAIN_NAME }}
-      CUSTOM_DOMAIN_CERTIFICATE_NAME: ${{ secrets.CUSTOM_DOMAIN_CERTIFICATE_NAME }}
-      CORS_ALLOWED_ORIGINS: ${{ secrets.CORS_ALLOWED_ORIGINS }}
-      APPSETTING_NOTIFICATIONOPTIONS__SELFHOSTNAME: ${{ secrets.APPSETTING_NOTIFICATIONOPTIONS__SELFHOSTNAME }}
-      APPSETTING_RESENDSERVICEOPTIONS__GLOBALAPIKEY: ${{ secrets.APPSETTING_RESENDSERVICEOPTIONS__GLOBALAPIKEY }}
+    runs-on: ubuntu-latest
+    environment: 'test'
+    concurrency:
+      group: test-deploy
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Install azd
+        uses: Azure/setup-azd@v2
+        
+      - name: Azure login
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: azd login
+        run: azd auth login --federated-credential-provider github --client-id ${{ secrets.AZURE_CLIENT_ID }} --tenant-id ${{ secrets.AZURE_TENANT_ID }}
+
+      - name: Publish
+        env:
+          AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+          AZURE_ENV_NAME: 'test'
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          CUSTOM_DOMAIN_NAME: ${{ secrets.CUSTOM_DOMAIN_NAME }}
+          IS_INTERACTIVE_DEPLOYER: false
+          APPSETTING_SERVICE_NAME: 'Niobium.Notification.Server.Test'
+          APPSETTING_SERVICE_VERSION: '${{ env.buildVersion }}-prerelease'
+          APPSETTING_NOTIFICATIONOPTIONS__SELFHOSTNAME: ${{ secrets.CUSTOM_DOMAIN_NAME }}
+          APPSETTING_NOTIFICATIONOPTIONS__TEMPLATEFOLDER: 'templates'
+          APPSETTING_CAPTCHAOPTIONS__ISDISABLED: 'true'
+          APPSETTING_KV_RESENDSERVICEOPTIONS__GLOBALAPIKEY: ${{ secrets.APPSETTING_RESENDSERVICEOPTIONS__GLOBALAPIKEY }}
+        run: |
+          azd package --no-prompt
+          azd provision --no-state --no-prompt
+          azd deploy --no-prompt
+      
+      - name: Integration tests
+        working-directory: src/Niobium.Notification.IntegrationTests
+        env:
+          API_URL: 'https://${{ secrets.CUSTOM_DOMAIN_NAME }}'
+        run: |
+          npm install
+          npm test
+
   prod:
     if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
-    uses: ./.github/workflows/publish-job.yml
-    with:
-      environment: 'prod'
-      version_suffix: ''
-      run_integration_test: false
-      deploy_assets: true
-    secrets:
-      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      CUSTOM_DOMAIN_NAME: ${{ secrets.CUSTOM_DOMAIN_NAME }}
-      CUSTOM_DOMAIN_CERTIFICATE_NAME: ${{ secrets.CUSTOM_DOMAIN_CERTIFICATE_NAME }}
-      CORS_ALLOWED_ORIGINS: ${{ secrets.CORS_ALLOWED_ORIGINS }}
-      APPSETTING_NOTIFICATIONOPTIONS__SELFHOSTNAME: ${{ secrets.APPSETTING_NOTIFICATIONOPTIONS__SELFHOSTNAME }}
-      APPSETTING_RESENDSERVICEOPTIONS__GLOBALAPIKEY: ${{ secrets.APPSETTING_RESENDSERVICEOPTIONS__GLOBALAPIKEY }}
-      APPSETTING_CAPTCHAOPTIONS__SECRETS__WWW_EDENNOODLESBAR_CO_NZ: ${{ secrets.APPSETTING_CAPTCHAOPTIONS__SECRETS__WWW_EDENNOODLESBAR_CO_NZ }}
-      APPSETTING_CAPTCHAOPTIONS__SECRETS__WWW_EDENNOODLESBARMISSIONBAY_CO_NZ: ${{ secrets.APPSETTING_CAPTCHAOPTIONS__SECRETS__WWW_EDENNOODLESBARMISSIONBAY_CO_NZ }}
-      APPSETTING_CAPTCHAOPTIONS__SECRETS__WWW_EDENNOODLESBARMORNINGSIDE_CO_NZ: ${{ secrets.APPSETTING_CAPTCHAOPTIONS__SECRETS__WWW_EDENNOODLESBARMORNINGSIDE_CO_NZ }}
-      APPSETTING_CAPTCHAOPTIONS__SECRETS__WWW_EDENNOODLESHAMILTON_CO_NZ: ${{ secrets.APPSETTING_CAPTCHAOPTIONS__SECRETS__WWW_EDENNOODLESHAMILTON_CO_NZ }}
-      APPSETTING_CAPTCHAOPTIONS__SECRETS__WWW_NIOBIUM_CO_NZ: ${{ secrets.APPSETTING_CAPTCHAOPTIONS__SECRETS__WWW_NIOBIUM_CO_NZ }}
-      APPSETTING_CAPTCHAOPTIONS__SECRETS__WWW_TAPSS_CARE: ${{ secrets.APPSETTING_CAPTCHAOPTIONS__SECRETS__WWW_TAPSS_CARE }}
-      APPSETTING_CAPTCHAOPTIONS__SECRETS__WWW_ZAPS_CO_NZ: ${{ secrets.APPSETTING_CAPTCHAOPTIONS__SECRETS__WWW_ZAPS_CO_NZ }}
-      APPSETTING_RESENDSERVICEOPTIONS__DOMAINSCOPEDAPIKEYS__TAPSS_CARE: ${{ secrets.APPSETTING_RESENDSERVICEOPTIONS__DOMAINSCOPEDAPIKEYS__TAPSS_CARE }}
+    runs-on: ubuntu-latest
+    environment: 'prod'
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Install azd
+        uses: Azure/setup-azd@v2
+
+      - name: Azure login
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: azd login
+        run: azd auth login --federated-credential-provider github --client-id ${{ secrets.AZURE_CLIENT_ID }} --tenant-id ${{ secrets.AZURE_TENANT_ID }}
+
+      - name: Publish
+        env:
+          AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+          AZURE_ENV_NAME: 'prod'
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          CUSTOM_DOMAIN_NAME: ${{ secrets.CUSTOM_DOMAIN_NAME }}
+          IS_INTERACTIVE_DEPLOYER: false
+          APPSETTING_SERVICE_NAME: 'Niobium.Notification.Server.Prod'
+          APPSETTING_SERVICE_VERSION: ${{ env.buildVersion }}
+          APPSETTING_NOTIFICATIONOPTIONS__SELFHOSTNAME: ${{ secrets.CUSTOM_DOMAIN_NAME }}
+          APPSETTING_NOTIFICATIONOPTIONS__TEMPLATEFOLDER: 'templates'
+          APPSETTING_CAPTCHAOPTIONS__ISDISABLED: 'false'
+          APPSETTING_KV_RESENDSERVICEOPTIONS__GLOBALAPIKEY: ${{ secrets.APPSETTING_RESENDSERVICEOPTIONS__GLOBALAPIKEY }}
+          APPSETTING_KV_CAPTCHAOPTIONS__SECRETS__WWW_EDENNOODLESBAR_CO_NZ: ${{ secrets.APPSETTING_CAPTCHAOPTIONS__SECRETS__WWW_EDENNOODLESBAR_CO_NZ }}
+          APPSETTING_KV_CAPTCHAOPTIONS__SECRETS__WWW_EDENNOODLESBARMISSIONBAY_CO_NZ: ${{ secrets.APPSETTING_CAPTCHAOPTIONS__SECRETS__WWW_EDENNOODLESBARMISSIONBAY_CO_NZ }}
+          APPSETTING_KV_CAPTCHAOPTIONS__SECRETS__WWW_EDENNOODLESBARMORNINGSIDE_CO_NZ: ${{ secrets.APPSETTING_CAPTCHAOPTIONS__SECRETS__WWW_EDENNOODLESBARMORNINGSIDE_CO_NZ }}
+          APPSETTING_KV_CAPTCHAOPTIONS__SECRETS__WWW_EDENNOODLESHAMILTON_CO_NZ: ${{ secrets.APPSETTING_CAPTCHAOPTIONS__SECRETS__WWW_EDENNOODLESHAMILTON_CO_NZ }}
+          APPSETTING_KV_CAPTCHAOPTIONS__SECRETS__WWW_NIOBIUM_CO_NZ: ${{ secrets.APPSETTING_CAPTCHAOPTIONS__SECRETS__WWW_NIOBIUM_CO_NZ }}
+          APPSETTING_KV_CAPTCHAOPTIONS__SECRETS__WWW_TAPSS_CARE: ${{ secrets.APPSETTING_CAPTCHAOPTIONS__SECRETS__WWW_TAPSS_CARE }}
+          APPSETTING_KV_CAPTCHAOPTIONS__SECRETS__WWW_ZAPS_CO_NZ: ${{ secrets.APPSETTING_CAPTCHAOPTIONS__SECRETS__WWW_ZAPS_CO_NZ }}
+          APPSETTING_KV_RESENDSERVICEOPTIONS__DOMAINSCOPEDAPIKEYS__TAPSS_CARE: ${{ secrets.APPSETTING_RESENDSERVICEOPTIONS__DOMAINSCOPEDAPIKEYS__TAPSS_CARE }}
+        run: |
+          azd package --no-prompt
+          azd provision --no-state --no-prompt
+          azd deploy --no-prompt
+      
+      - name: Deploy assets
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy "./assets" --project-name="assets-notification-niobium-co-nz" --branch=main

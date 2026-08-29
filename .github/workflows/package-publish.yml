@@ -1,0 +1,87 @@
+name: Publish
+
+on:
+  push:
+    branches: ["*"]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+  
+env:  
+  nugetFeedUrl: "https://api.nuget.org/v3/index.json"
+
+jobs:
+  pre-release:
+    if: github.ref != 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pre-release-publish
+      cancel-in-progress: true
+    env:
+      buildVersion: '${{ vars.MAJOR_VERSION }}.${{ vars.MINOR_VERSION }}.${{ github.run_number }}-prerelease'
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v7
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v6
+      with:
+        dotnet-version: '10.x.x'
+
+    - name: Restore Packages
+      run: dotnet restore
+
+    - name: Build Projects
+      run: dotnet build --configuration Release /p:BUILD_BUILDNUMBER=${{ env.buildVersion }}
+      
+    - name: NuGet login (OIDC)
+      uses: NuGet/login@v1
+      id: login
+      with:
+        user: ${{ secrets.NUGET_USER }}
+    
+    - name: NuGet Publish
+      run: |
+        dotnet nuget push "src/Niobium.Notification.Contracts/bin/Release/*.nupkg" --source $NUGET_FEED_URL --api-key $NUGET_API_KEY
+      env:
+        NUGET_FEED_URL: ${{ env.nugetFeedUrl }}
+        NUGET_API_KEY: ${{steps.login.outputs.NUGET_API_KEY}}
+
+  prod-release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: prod-release-publish
+      cancel-in-progress: true
+    env:
+      buildVersion: '${{ vars.MAJOR_VERSION }}.${{ vars.MINOR_VERSION }}.${{ github.run_number }}'
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v7
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v6
+      with:
+        dotnet-version: '10.x.x'
+
+    - name: Restore Packages
+      run: dotnet restore
+
+    - name: Build Projects
+      run: dotnet build --configuration Release /p:BUILD_BUILDNUMBER=${{ env.buildVersion }}
+      
+    - name: NuGet login (OIDC)
+      uses: NuGet/login@v1
+      id: login
+      with:
+        user: ${{ secrets.NUGET_USER }}
+    
+    - name: NuGet Publish
+      run: |
+        dotnet nuget push "src/Niobium.Notification.Contracts/bin/Release/*.nupkg" --source $NUGET_FEED_URL --api-key $NUGET_API_KEY
+      env:
+        NUGET_FEED_URL: ${{ env.nugetFeedUrl }}
+        NUGET_API_KEY: ${{steps.login.outputs.NUGET_API_KEY}}
+      

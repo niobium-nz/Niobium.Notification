@@ -10,11 +10,11 @@ namespace Niobium.Notification
     {
         private static volatile bool loaded;
 
-        public static void AddCore(this IHostApplicationBuilder builder)
+        public static TBuilder AddCore<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
         {
             if (loaded)
             {
-                return;
+                return builder;
             }
 
             loaded = true;
@@ -22,6 +22,7 @@ namespace Niobium.Notification
             builder.Services.AddSingleton(HtmlEncoder.Create(allowedRanges: [UnicodeRanges.BasicLatin, UnicodeRanges.CjkUnifiedIdeographs]));
             builder.Services.RegisterDomainComponents(typeof(DependencyModule));
             builder.Services.EnableExternalEvent<SubscribedEvent, Subscription>();
+            return builder;
         }
     }
 }

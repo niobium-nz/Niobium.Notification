@@ -1,15 +1,11 @@
 param(
-	[string]$OutputPath = "infra/main.parameters.json"
+	[string]$OutputPath = "infra/main.bicepparam",
+	[string]$BackupPath = "$OutputPath.backup"
 )
 
-$parameters = @{
-	'$schema' = 'https://azure.com'
-	contentVersion = '1.0.0.0'
-	parameters = @{
-		environmentName = @{ value = '${AZURE_ENV_NAME}' }
-		appSettings = @{ value = @() }
-	}
+if (-not (Test-Path -LiteralPath $BackupPath -PathType Leaf)) {
+	throw "Bicep parameters backup '$BackupPath' does not exist."
 }
 
-$parameters | ConvertTo-Json -Depth 10 | Set-Content -Path $OutputPath
-Write-Host "Cleared generated deployment parameters at '$OutputPath'."
+Move-Item -LiteralPath $BackupPath -Destination $OutputPath -Force
+Write-Host "Restored Bicep parameters from '$BackupPath' to '$OutputPath'."

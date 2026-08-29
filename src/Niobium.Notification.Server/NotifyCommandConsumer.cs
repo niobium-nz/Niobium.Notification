@@ -1,32 +1,44 @@
 using System.Text.Json;
-using Microsoft.AspNetCore.Mvc;
+using Azure.Messaging.ServiceBus;
+using Microsoft.Azure.Functions.Worker;
+using Microsoft.Extensions.Logging;
+using Niobium.Messaging.ServiceBus;
+using Niobium.Platform.ServiceBus;
 
-namespace Niobium.Notification.Host.Controllers
+namespace Niobium.Notification.Server
 {
-    [ApiController]
-    [Route("notifycmd")]
-    public class NotifyCommandHandler(NotificationFlow flow, ILogger<NotifyCommandHandler> logger) : ControllerBase
+    public class NotifyCommandConsumer(
+        NotificationFlow flow,
+        ILogger<NotifyCommandConsumer> logger)
     {
-        [HttpPost]
-        public async Task<IActionResult> ConsumeAsync([FromBody] NotifyCommand message, CancellationToken cancellationToken)
+        [Function(nameof(NotifyCommandConsumer))]
+        public async Task Run(
+            [ServiceBusTrigger("notifycommand")]
+            ServiceBusReceivedMessage message,
+            CancellationToken cancellationToken)
         {
-            Transform(message);
-            message.TryValidate(out ValidationState? validationState);
+            if (!message.TryParse(out NotifyCommand? evt, out var rawBody))
+            {
+                logger.LogError($"Failed to parse message {message.MessageId}: {rawBody}");
+                return;
+            }
+
+            Transform(evt);
+            _ = evt.TryValidate(out var validationState);
             if (!validationState.IsValid)
             {
                 logger.LogError($"Validation failed for order evt: {JsonMarshaller.Marshall(validationState.ToDictionary())}");
-                return this.BadRequest(validationState);
+                return;
             }
 
-            await flow.RunAsync(message, cancellationToken);
-            return this.NoContent();
+            await flow.RunAsync(evt, cancellationToken);
         }
 
         private static void Transform(NotifyCommand evt)
         {
             // NotifyCommand.Parameters is a Dictionary<string, object>, there could be JsonElement values because of deserialization
             // Transform them to string or IEnumerable<Dictionary<string, string>> for easier usage in templates
-            foreach (string? key in evt.Parameters.Keys.ToList())
+            foreach (var key in evt.Parameters.Keys.ToList())
             {
                 if (evt.Parameters[key] is JsonElement jsonElement)
                 {
@@ -36,13 +48,13 @@ namespace Niobium.Notification.Host.Controllers
                             evt.Parameters[key] = jsonElement.GetString() ?? String.Empty;
                             break;
                         case JsonValueKind.Array:
-                            List<Dictionary<string, string>> list = [];
-                            foreach (JsonElement item in jsonElement.EnumerateArray())
+                            var list = new List<Dictionary<string, string>>();
+                            foreach (var item in jsonElement.EnumerateArray())
                             {
                                 if (item.ValueKind == JsonValueKind.Object)
                                 {
-                                    Dictionary<string, string> dict = [];
-                                    foreach (JsonProperty prop in item.EnumerateObject())
+                                    var dict = new Dictionary<string, string>();
+                                    foreach (var prop in item.EnumerateObject())
                                     {
                                         dict[prop.Name] = prop.Value.GetString() ?? String.Empty;
                                     }
