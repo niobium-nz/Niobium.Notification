@@ -2,7 +2,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Niobium.Messaging.ServiceBus;
-using Niobium.Platform;
 using Niobium.Platform.Blob;
 using Niobium.Platform.Captcha.ReCaptcha;
 using Niobium.Platform.ServiceBus;
@@ -16,7 +15,7 @@ namespace Niobium.Notification.Server
 
         public static TBuilder AddNotification<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
         {
-            builder.AddPlatform();
+            Platform.Functions.DependencyModule.AddPlatform(builder);
             builder.AddDatabase();
             builder.AddFile();
             builder.AddMessaging();
