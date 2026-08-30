@@ -11,6 +11,8 @@ permissions:
   
 env:  
   nugetFeedUrl: "https://api.nuget.org/v3/index.json"
+  nugetProjects: |
+    src/Niobium.Invoicing.Contracts
 
 jobs:
   pre-release:
@@ -44,9 +46,33 @@ jobs:
     
     - name: NuGet Publish
       run: |
-        dotnet nuget push "src/Niobium.Notification.Contracts/bin/Release/*.nupkg" --source $NUGET_FEED_URL --api-key $NUGET_API_KEY
+        set -euo pipefail
+
+        if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+          comparisonBase="$BEFORE_SHA"
+
+          if [[ "$comparisonBase" == "0000000000000000000000000000000000000000" ]]; then
+            comparisonBase="$(git hash-object -t tree /dev/null)"
+          else
+            git fetch --no-tags --depth=1 origin "$comparisonBase"
+          fi
+        fi
+
+        while IFS= read -r project; do
+          [[ -z "$project" ]] && continue
+
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]] && git diff --quiet "$comparisonBase" "$GITHUB_SHA" -- "$project"; then
+            echo "Skipping $project because it has no changes."
+            continue
+          fi
+
+          echo "Publishing $project."
+          dotnet nuget push "$project/bin/Release/*.nupkg" --source "$NUGET_FEED_URL" --api-key "$NUGET_API_KEY"
+        done <<< "$NUGET_PROJECTS"
       env:
+        BEFORE_SHA: ${{ github.event.before }}
         NUGET_FEED_URL: ${{ env.nugetFeedUrl }}
+        NUGET_PROJECTS: ${{ env.nugetProjects }}
         NUGET_API_KEY: ${{steps.login.outputs.NUGET_API_KEY}}
 
   prod-release:
@@ -80,8 +106,32 @@ jobs:
     
     - name: NuGet Publish
       run: |
-        dotnet nuget push "src/Niobium.Notification.Contracts/bin/Release/*.nupkg" --source $NUGET_FEED_URL --api-key $NUGET_API_KEY
+        set -euo pipefail
+
+        if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+          comparisonBase="$BEFORE_SHA"
+
+          if [[ "$comparisonBase" == "0000000000000000000000000000000000000000" ]]; then
+            comparisonBase="$(git hash-object -t tree /dev/null)"
+          else
+            git fetch --no-tags --depth=1 origin "$comparisonBase"
+          fi
+        fi
+
+        while IFS= read -r project; do
+          [[ -z "$project" ]] && continue
+
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]] && git diff --quiet "$comparisonBase" "$GITHUB_SHA" -- "$project"; then
+            echo "Skipping $project because it has no changes."
+            continue
+          fi
+
+          echo "Publishing $project."
+          dotnet nuget push "$project/bin/Release/*.nupkg" --source "$NUGET_FEED_URL" --api-key "$NUGET_API_KEY"
+        done <<< "$NUGET_PROJECTS"
       env:
+        BEFORE_SHA: ${{ github.event.before }}
         NUGET_FEED_URL: ${{ env.nugetFeedUrl }}
+        NUGET_PROJECTS: ${{ env.nugetProjects }}
         NUGET_API_KEY: ${{steps.login.outputs.NUGET_API_KEY}}
       
