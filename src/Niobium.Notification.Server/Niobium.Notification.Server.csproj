@@ -35,12 +35,12 @@
     <PackageReference Include="Azure.Monitor.OpenTelemetry.Exporter" Version="1.8.3" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore" Version="2.1.1" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker.Sdk" Version="2.1.0" />
-    <PackageReference Include="Niobium.Platform.Functions" Version="4.0.58" />
-    <PackageReference Include="Niobium.Platform.StorageTable" Version="4.0.56" />
-    <PackageReference Include="Niobium.Platform.Blob" Version="4.0.56" />
-    <PackageReference Include="Niobium.Platform.ServiceBus" Version="4.0.56" />
-    <PackageReference Include="Niobium.Platform.Notification.Email.Resend" Version="4.0.53" />
-    <PackageReference Include="Niobium.Platform.Captcha.Recaptcha" Version="4.0.53" />
+    <PackageReference Include="Niobium.Platform.Functions" Version="4.0.60" />
+    <PackageReference Include="Niobium.Platform.StorageTable" Version="4.0.60" />
+    <PackageReference Include="Niobium.Platform.Blob" Version="4.0.60" />
+    <PackageReference Include="Niobium.Platform.ServiceBus" Version="4.0.60" />
+    <PackageReference Include="Niobium.Platform.Notification.Email.Resend" Version="4.0.60" />
+    <PackageReference Include="Niobium.Platform.Captcha.Recaptcha" Version="4.0.60" />
   </ItemGroup>
   
   <ItemGroup>
