@@ -12,7 +12,7 @@ permissions:
 env:  
   nugetFeedUrl: "https://api.nuget.org/v3/index.json"
   nugetProjects: |
-    src/Niobium.Invoicing.Contracts
+    src/Niobium.Notification.Contracts
 
 jobs:
   pre-release:
