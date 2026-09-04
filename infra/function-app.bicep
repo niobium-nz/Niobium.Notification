@@ -6,6 +6,9 @@ param environmentName string
 @description('Short name used as a prefix for Azure resources. Keep it globally unique where required.')
 param appShortName string
 
+@description('Name of the shared user-assigned managed identity used for identitying the function app.')
+param userAssignedManagedIdentityName string
+
 @description('App settings to project into the container app environment.')
 param appSettings array = []
 
@@ -28,7 +31,6 @@ var location = resourceGroup().location
 var abbrs = loadJsonContent('./abbreviations.json')
 var resourceToken = toLower(uniqueString(subscription().id, environmentName, location))
 
-var sharedManagedIdentityName = '${appShortName}-${abbrs.managedIdentityUserAssignedIdentities}${environmentName}'
 var functionAppName = '${appShortName}-${abbrs.webSitesFunctions}${environmentName}'
 var appServicePlanName = '${appShortName}-${abbrs.webServerFarms}${environmentName}'
 var storageAccountName = replace('${appShortName}-${abbrs.storageStorageAccounts}s${environmentName}', '-', '')
@@ -36,6 +38,11 @@ var logAnalyticsName = '${appShortName}-${abbrs.operationalInsightsWorkspaces}${
 var appInsightsName = '${appShortName}-${abbrs.insightsComponents}${environmentName}'
 var keyVaultName = '${appShortName}-${abbrs.keyVaultVaults}${environmentName}'
 var deploymentStorageContainerName = 'app-package-${take(functionAppName, 32)}-${take(toLower(uniqueString(functionAppName, resourceToken)), 7)}'
+
+resource sharedManagedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
+  name: userAssignedManagedIdentityName
+  location: location
+}
 
 var allAppSettings = union(
     reduce(appSettings, {}, (currentObj, nextItem) => union(currentObj, {
@@ -45,21 +52,10 @@ var allAppSettings = union(
     })),
     {
       AZURE_FUNCTIONS_ENVIRONMENT: environmentName
-      APPLICATIONINSIGHTS_AUTHENTICATION_STRING: 'ClientId=${sharedManagedIdentity.outputs.clientId};Authorization=AAD'
-      AzureWebJobsStorage__credential: 'managedidentity'
-      AzureWebJobsStorage__clientId: sharedManagedIdentity.outputs.clientId
+      APPLICATIONINSIGHTS_AUTHENTICATION_STRING: 'ClientId=${sharedManagedIdentity.properties.clientId};Authorization=AAD'
       AzureFunctionsJobHost__logging__logLevel__default: 'Information'
     }
 )
-
-// User assigned managed identity to be used by the function app to reach storage and other dependencies
-// Assign specific roles to this identity in the RBAC module
-module sharedManagedIdentity 'br/public:avm/res/managed-identity/user-assigned-identity:0.6.0' = {
-  params: {
-    name: sharedManagedIdentityName
-    location: location
-  }
-}
 
 module logAnalytics 'br/public:avm/res/operational-insights/workspace:0.15.1' = {
   params: {
@@ -110,10 +106,10 @@ module functionApp 'br/public:avm/res/web/site:0.24.0' = {
     location: location
     tags: { 'azd-service-name': appShortName }
     serverFarmResourceId: appServicePlan.outputs.resourceId
-    keyVaultAccessIdentityResourceId: sharedManagedIdentity.outputs.resourceId
+    keyVaultAccessIdentityResourceId: sharedManagedIdentity.id
     managedIdentities: {
       systemAssigned: true
-      userAssignedResourceIds: [sharedManagedIdentity.outputs.resourceId]
+      userAssignedResourceIds: [sharedManagedIdentity.id]
     }
     publicNetworkAccess: 'Enabled'
     siteConfig: {
@@ -134,7 +130,7 @@ module functionApp 'br/public:avm/res/web/site:0.24.0' = {
           type: 'blobContainer'
           value: '${storageAccount.outputs.serviceEndpoints.blob}${deploymentStorageContainerName}'
           authentication: {
-            userAssignedIdentityResourceId: sharedManagedIdentity.outputs.resourceId
+            userAssignedIdentityResourceId: sharedManagedIdentity.id
             type: 'UserAssignedIdentity'
           }
         }
@@ -191,7 +187,7 @@ module keyVault 'br/public:avm/res/key-vault/vault:0.14.0' = {
 module rbac 'rbac.bicep' = {
   params: {
     userIdentityPrincipalId: userIdentityPrincipalId
-    managedIdentityPrincipalId: sharedManagedIdentity.outputs.principalId
+    managedIdentityPrincipalId: sharedManagedIdentity.properties.principalId
     appInsightsName: appInsightsName
     keyVaultName: keyVaultName
     storageAccountNames: [storageAccountName]
@@ -236,5 +232,4 @@ resource keyVaultSecretRoleAssignment_Deployer 'Microsoft.Authorization/roleAssi
 output functionAppName string = functionApp.outputs.name
 output storageAccountName string = storageAccount.outputs.name
 output appInsightsName string = appInsights.outputs.name
-output managedIdentityPrincipalId string = sharedManagedIdentity.outputs.principalId
 output keyVaultName string = keyVault.outputs.name
