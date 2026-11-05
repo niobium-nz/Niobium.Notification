@@ -1,0 +1,33 @@
+name: PR readiness
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review]
+  workflow_run:
+    workflows: [Azure Deployment]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+  statuses: write
+
+jobs:
+  readiness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Pin policy code to the immutable default-branch commit that defined this controller.
+          # Never check out the feature SHA or consume executable run artifacts here.
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            await require('./scripts/delivery-policy.cjs').readiness({
+              github, context, core,
+              trustedSha: process.env.GITHUB_WORKFLOW_SHA,
+              workflowRef: process.env.GITHUB_WORKFLOW_REF
+            });
