@@ -23,6 +23,6 @@ Application coverage includes authored Contracts, Core and Server files, includi
 
 Push a feature branch to run builds, coverage, test deployment and real integration tests. After success, the author creates the PR, requests the designated reviewer, handles feedback and merges only with current-head approval and repository protections satisfied. A merged PR deploys production and runs a GET-only health check. The merging agent must monitor both production and package workflows to terminal results.
 
-Do not run the legacy `test/` scripts against deployed services: their recipients are not scoped to the authorized invoice test mailbox. The new deployed harness uses only `TEST_NOTIFICATION_RECIPIENT` from the test environment secret and run-owned fixtures in existing resources. Never run test fixture or notification operations in production.
+Do not run the legacy `src/Niobium.Notification.IntegrationTests/test/` scripts against deployed services: their recipients are not scoped to the authorized invoice test mailbox. The new deployed harness uses only `TEST_NOTIFICATION_RECIPIENT` from the test environment secret and run-owned fixtures in existing resources. Never run test fixture or notification operations in production.
 
 `GET /health` returns only readiness and the compiled commit SHA. It does not assert storage, messaging or provider health. The production checker is intentionally limited to this route; even `GET /Unsubscribe` changes data.

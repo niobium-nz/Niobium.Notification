@@ -24,8 +24,22 @@ readonly = load_read_only()
 Failure = readonly.VerificationFailure
 
 
+def fixture_settings(environ):
+    if environ.get("AZURE_ENV_NAME") != "test":
+        raise Failure("test_environment_required")
+    recipient = environ.get("TEST_NOTIFICATION_RECIPIENT", "")
+    if not re.fullmatch(r"[^\s,;<>@]+@[^\s,;<>@]+\.[^\s,;<>@]+", recipient):
+        raise Failure("approved_test_recipient_required")
+    try:
+        tenant = str(uuid.UUID(environ.get("TEST_TEMPLATE_TENANT", "")))
+    except ValueError:
+        raise Failure("existing_template_tenant_required") from None
+    return recipient, tenant
+
+
 def configuration(environ):
-    if environ.get("TEST_ENVIRONMENT") != "test" or environ.get("AZURE_ENV_NAME") != "test":
+    recipient, tenant = fixture_settings(environ)
+    if environ.get("TEST_ENVIRONMENT") != "test":
         raise Failure("test_environment_required")
     base = readonly.origin(environ.get("TEST_API_URL", ""))
     host = urlsplit(base).hostname
@@ -34,13 +48,6 @@ def configuration(environ):
     account = environ.get("TEST_STORAGE_ACCOUNT")
     if account != "niobiumnotifystdtest":
         raise Failure("test_storage_required")
-    recipient = environ.get("TEST_NOTIFICATION_RECIPIENT", "")
-    if not re.fullmatch(r"[^\s,;<>@]+@[^\s,;<>@]+\.[^\s,;<>@]+", recipient):
-        raise Failure("approved_test_recipient_required")
-    try:
-        tenant = str(uuid.UUID(environ.get("TEST_TEMPLATE_TENANT", "")))
-    except ValueError:
-        raise Failure("existing_template_tenant_required") from None
     key = environ.get("TEST_STORAGE_KEY", "")
     if not key or "\n" in key or "\r" in key:
         raise Failure("test_storage_credential_required")
@@ -170,8 +177,18 @@ def run(environ, reporter):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--report", required=True)
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--report")
+    mode.add_argument("--check-configuration", action="store_true")
     args = parser.parse_args()
+    if args.check_configuration:
+        try:
+            fixture_settings(os.environ)
+            print("PASS test_fixture_configuration")
+            return 0
+        except Failure as error:
+            print("FAIL " + str(error))
+            return 1
     report = {"commit": os.environ.get("TEST_EXPECTED_COMMIT"), "checks": [], "success": False}
     def passed(name):
         report["checks"].append({"check": name, "passed": True})

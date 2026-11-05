@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
@@ -138,6 +139,21 @@ class FixtureStorage:
 
 
 class DeployedTests(unittest.TestCase):
+    def test_preflight_requires_no_resource_credentials_or_network(self):
+        settings = {k: ENV[k] for k in ("AZURE_ENV_NAME", "TEST_TEMPLATE_TENANT", "TEST_NOTIFICATION_RECIPIENT")}
+        with patch.dict(os.environ, settings, clear=True), patch.object(sys, "argv", ["deployed-integration.py", "--check-configuration"]), patch.object(deployed, "Storage") as storage, patch.object(deployed.readonly, "verify") as health, contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(0, deployed.main())
+        storage.assert_not_called()
+        health.assert_not_called()
+        self.assertEqual("PASS test_fixture_configuration\n", output.getvalue())
+        self.assertNotIn(settings["TEST_NOTIFICATION_RECIPIENT"], output.getvalue())
+
+    def test_preflight_fails_closed_for_missing_settings(self):
+        with patch.dict(os.environ, {"AZURE_ENV_NAME": "test"}, clear=True), patch.object(sys, "argv", ["deployed-integration.py", "--check-configuration"]), patch.object(deployed, "Storage") as storage, contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(1, deployed.main())
+        storage.assert_not_called()
+        self.assertEqual("FAIL approved_test_recipient_required\n", output.getvalue())
+
     def run_fixture(self, storage, statuses=(500, 201, 400)):
         posted = []
         checks = []

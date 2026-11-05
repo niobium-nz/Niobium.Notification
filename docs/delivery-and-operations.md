@@ -53,9 +53,9 @@ The candidate and trusted harnesses each perform six checks:
 - Invalid input must be rejected before another send.
 - Cleanup must verify ownership and use conditional ETags before deleting only this run's records/blob.
 
-The source `Invoice` template and its recipient are never modified or used as the destination. The fixture uses a unique tenant and the existing HTTP entry point to observe the real provider result synchronously. No separate sink, provider stub or Azure stack is introduced. Missing configuration is failure, not skip. A POST with an unknown outcome is never retried by the harness. Cleanup reconciles attempted writes, including lost responses; if ownership or outcome cannot be established it fails without deleting unowned data. Resolve any reported test-fixture cleanup failure before claiming completion.
+The source `Invoice` template and its recipient are never modified or used as the destination. The fixture uses a unique tenant and the existing HTTP entry point to observe the real provider result synchronously. No separate sink, provider stub or Azure stack is introduced. A configuration-only preflight checks the required recipient and source tenant before cloud login/provisioning. Missing configuration is failure, not skip. A POST with an unknown outcome is never retried by the harness. Cleanup reconciles attempted writes, including lost responses; if ownership or outcome cannot be established it fails without deleting unowned data. Resolve any reported test-fixture cleanup failure before claiming completion.
 
-The six checks demonstrate provider submission on this path, not recipient mail-server delivery, queue deduplication or B02 recovery. Future B02/B06 cases must verify those contracts separately. The old `test/` scripts are not invoked because their fallback recipients are not scoped to this authorization.
+The six checks demonstrate provider submission on this path, not recipient mail-server delivery, queue deduplication or B02 recovery. Future B02/B06 cases must verify those contracts separately. The old `src/Niobium.Notification.IntegrationTests/test/` scripts are not invoked because their fallback recipients are not scoped to this authorization.
 
 ## Production verification
 
