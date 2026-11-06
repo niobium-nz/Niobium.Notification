@@ -47,4 +47,8 @@
     <ProjectReference Include="..\Niobium.Notification.Core\Niobium.Notification.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <AssemblyMetadata Include="Commit" Value="$(SourceRevisionId)" />
+  </ItemGroup>
+
 </Project>

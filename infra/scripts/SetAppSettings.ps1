@@ -40,7 +40,14 @@ foreach ($environmentVariable in $environmentVariables) {
 	Write-Host "Resolved deployment setting '$settingName' from source '$($environmentVariable.Name)'."
 	$lines.Add('{0}{{' -f '  ')
 	$lines.Add("    name: '$settingName'")
-	$lines.Add("    value: readEnvironmentVariable('$environmentVariableName')")
+	if ($settingName.StartsWith('KV_', [System.StringComparison]::OrdinalIgnoreCase)) {
+		# Bicep needs only the name to build the Key Vault reference. The postprovision hook
+		# reads the actual value from the runner, so it must not enter deployment parameters.
+		$lines.Add("    value: ''")
+	}
+	else {
+		$lines.Add("    value: readEnvironmentVariable('$environmentVariableName')")
+	}
 	$lines.Add('  }')
 }
 
