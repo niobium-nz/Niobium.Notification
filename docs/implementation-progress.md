@@ -21,7 +21,7 @@ live repository configuration or run another deployed harness.
 | Plan item | Implemented in this branch | Remaining acceptance dependency |
 | --- | --- | --- |
 | B02 / Q28 #1 | Conditional inbox registration/claims, frozen provider JSON, stable tenant/operation key, durable first-submission boundary and jittered schedule, recovery wake before provider call, persisted provider acceptance, durable replay suppression, explicit held/failed outcomes | Disabled by default pending legacy-operation cutover; enabled queue/provider integration and operator recovery must be verified before rollout |
-| B07 / Q28 #13 | Component failure/concurrency/restart cases and an explicit loopback Table suite for real conditional insert/update semantics | Actual Service Bus scheduling, Blob storage and provider replay remain unverified; existing deployed tests still cover the legacy synchronous path |
+| B07 / Q28 #13 | Component failure/concurrency/restart cases, real local conditional Table operations and pinned Blob adapter recovery tests | Cloud identity/Blob access, actual Service Bus scheduling and provider replay remain unverified; existing deployed tests still cover the legacy synchronous path |
 | B06 / Q28 #2-4 | Preserved as the next milestone; provider submission is never labelled recipient delivery | Activated/verified B02, signed provider events/internal confirmation contract and payment-history compatibility for cancellation |
 | B08 / Q28 #6-7 | Inbox/payload retention dependency and orphan-blob reconciliation documented; no automated purge | Invoice/history commit consistency and direct-writer compatibility, retention-clock/hold/privacy validation, backup/restore evidence and ownership |
 
@@ -63,6 +63,37 @@ The Table test used a disposable Azurite process launched with
 It deleted its uniquely named table; the emulator was stopped after verification.
 The live queue, provider and cloud storage were not accessed. Delivery/cancellation,
 invoice audit history, MCP and payments are not marked complete by this milestone.
+
+### B02/B07 local Blob and recovery follow-through
+
+The storage suite now also runs the actual Niobium.File.Blob 4.0.60 repository
+against a disposable Blob emulator. It verifies a private container, immutable
+payload writes, missing-payload failure and the composed durable flow recovering
+from a lost result-write response before or after commit. Fresh store/provider
+instances must preserve the payload, operation key and first-submission boundary;
+accepted state suppresses further submissions beyond the provider window.
+
+The pinned factory has no injectable client constructor. The test seeds and later
+removes a unique entry in its internal client cache using a real shared-key SDK
+client directed only at loopback Azurite. Actual repository I/O is exercised, but
+managed identity is not. Queue scheduling and provider replies remain simulated.
+No framework, package, application or workflow changes accompany these tests.
+
+After sourcing `/workspace/.niobium-tools/env.sh`:
+
+| Exact command | Result |
+| --- | --- |
+| `dotnet build src/Niobium.Notification.Storage.Tests/Niobium.Notification.Storage.Tests.csproj --configuration Release --no-restore --nologo --disable-build-servers -m:1` | Passed, zero warnings/errors |
+| `NIOBIUM_NOTIFICATION_TEST_TABLE_ENDPOINT=http://127.0.0.1:18492/devstoreaccount1 NIOBIUM_NOTIFICATION_TEST_BLOB_ENDPOINT=http://127.0.0.1:18490/devstoreaccount1 dotnet test --project src/Niobium.Notification.Storage.Tests/Niobium.Notification.Storage.Tests.csproj --configuration Release --no-build --no-restore --report-trx --results-directory /workspace/scratch/notification-b02-storage-blob` | Four passed, zero failed/skipped |
+| `git -c core.whitespace=cr-at-eol diff --check` | Passed |
+
+The Table emulator command above was reused alongside
+`azurite-blob --silent --inMemoryPersistence --disableTelemetry --blobHost 127.0.0.1 --blobPort 18490 --skipApiVersionCheck`.
+Owned tables/containers were deleted and both emulator processes stopped.
+The earlier 88 application tests and 98.17% authored coverage still describe the
+unchanged application source; that suite was not repeated for this test-only change.
+These results close the local payload-adapter gap, not the live activation or B06
+confirmation-contract dependencies.
 
 ## Baseline and reconciliation
 

@@ -127,6 +127,18 @@ storage failures and the actual runtime HTTP-handler composition.
 solution. It fails when its loopback emulator setting is absent, rather than
 silently skipping. It uses the real pinned Azure Table client to test competing
 inserts, competing ETag claims, stale rejection, round trips and cleared nullable
-fields. It creates and deletes only a uniquely named emulator table. Blob payloads
-are held in memory in this suite; no live Azure Blob or queue/provider behavior is
-claimed. Exact commands and results are in the implementation ledger.
+fields. Additional cases exercise the pinned Niobium Blob adapter against Azurite:
+private-container creation, leading-slash path round trips, create-only content,
+missing payloads and durable flow recovery after a lost completion-write response,
+both before and after that write commits. Reconstructed stores/providers reuse the
+persisted key, payload and window; accepted operations stay suppressed after two days.
+
+Set both `NIOBIUM_NOTIFICATION_TEST_TABLE_ENDPOINT` and
+`NIOBIUM_NOTIFICATION_TEST_BLOB_ENDPOINT` to disposable loopback Azurite endpoints.
+Every case creates and deletes only its uniquely named emulator table/container.
+The Blob fixture seeds one isolated client-cache entry in the pinned internal
+factory with a real shared-key emulator client, then runs the unmodified Niobium
+repository. The entry is removed during cleanup. This deliberate test-only seam
+does not certify managed identity or modify framework code. Queue scheduling and
+provider HTTP replies are simulated; no live queue/provider behavior is claimed.
+Exact commands and results are in the implementation ledger.
