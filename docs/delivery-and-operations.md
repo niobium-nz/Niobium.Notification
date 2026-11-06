@@ -34,13 +34,17 @@ The connector cannot administer rulesets, Actions settings, environment configur
 
 ## Real test integration
 
-Required GitHub `test` environment configuration:
+Required GitHub `test` environment configuration in `niobium-nz/Niobium.Notification`:
 
 | Name | Kind | Consumer |
 | --- | --- | --- |
 | `TEST_NOTIFICATION_RECIPIENT` | Secret | One owner-authorized mailbox; runner-only fixture destination |
-| `TEST_BILLER_ID` | Variable | Existing test biller GUID with an `Invoice` row in `Template`; only its verified `From` is reused |
+| `TEST_INVOICE_BILLER` | Variable | Existing approved test biller GUID, mapped by the workflow into runner input `TEST_BILLER_ID`; its existing `Invoice` template supplies only the verified `From` |
 | Existing Azure OIDC IDs, resource group and deployment settings | Existing secrets/variables | Same environment resources and runtime settings as baseline |
+
+The owner reconfirmed that Invoicing already has the valid biller in `TEST_INVOICE_BILLER` and the authorized mailbox in secret `TEST_NOTIFICATION_RECIPIENT`. Reuse those same approved values and stored names; no new fixture identity or separate `TEST_BILLER_ID` GitHub variable is required. The latter is a harness input name, not a second setting. GitHub environments are repository scoped: Notification does not inherit Invoicing's settings merely because both environments are called `test`. An empty input here requires checking this repository's binding and workflow projection, not asking the owner to choose another biller or recipient. The connector cannot inspect or administer these environment settings.
+
+The three workflow projections (preflight, candidate and trusted suites) use `TEST_BILLER_ID: ${{ vars.TEST_INVOICE_BILLER }}` and `TEST_NOTIFICATION_RECIPIENT: ${{ secrets.TEST_NOTIFICATION_RECIPIENT }}`. These are runner-only inputs, not Function App settings. Keep Notification's existing `Tenant` wire/storage contract and map the biller at that boundary. Do not copy private values into source, logs or review comments.
 
 `scripts/test-resources.py` uses the workflow's Azure identity to read the existing test Function App's ARM hostname and data-account key. It validates application/environment, masks the key and exports runner-only test settings. It creates no key, app setting, table, queue or Azure resource and never runs in production.
 
