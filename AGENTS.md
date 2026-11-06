@@ -20,7 +20,7 @@ This service is a dependency of Niobium.Invoicing. Follow the owner's accepted Q
 - Use existing real test resources. The deployed harness may send only to the approved test environment `TEST_NOTIFICATION_RECIPIENT` secret and clean up only its own marked fixtures with ETags. Do not use the legacy contact-form integration scripts with their unscoped recipients.
 - Production verification may only GET `/health`. It has no fixture setup, credentials for writes, queues, notifications, subscriptions, unsubscribe or cleanup. Do not infer that a GET endpoint is read-only.
 - Do not print credentials, recipient addresses, provider response bodies or raw operational payloads. Use synthetic local test data and fixed diagnostics.
-- Notification tenant is the sender/biller. Do not confuse it with Invoicing's management-group tenant.
+- Use Invoicing terminology for invoice-related configuration, documentation and tests, including work against Notification or other dependencies. The existing test biller GUID is `TEST_BILLER_ID`. Map it explicitly to Notification's `Tenant` field/template partition at the integration boundary; keep established wire/storage contracts compatible. Invoicing's management-group tenant is a separate identity.
 
 ## Infrastructure composition
 

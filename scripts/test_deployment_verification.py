@@ -24,10 +24,10 @@ deployed = module("deployed-integration")
 resources = module("test-resources")
 SHA = "a" * 40
 HOST = "https://niobiumnotify-func-test.synthetic.azurewebsites.net"
-TENANT = "00000000-0000-0000-0000-000000000001"
+BILLER_ID = "00000000-0000-0000-0000-000000000001"
 ENV = {"AZURE_ENV_NAME": "test", "TEST_ENVIRONMENT": "test", "TEST_API_URL": HOST,
        "TEST_STORAGE_ACCOUNT": "niobiumnotifystdtest", "TEST_STORAGE_KEY": "synthetic-key",
-       "TEST_TEMPLATE_TENANT": TENANT, "TEST_NOTIFICATION_RECIPIENT": "approved@example.invalid",
+       "TEST_BILLER_ID": BILLER_ID, "TEST_NOTIFICATION_RECIPIENT": "approved@example.invalid",
        "TEST_EXPECTED_COMMIT": SHA}
 
 
@@ -110,13 +110,13 @@ class FixtureStorage:
         self.owned = None
         self.blob = None
 
-    def entity(self, tenant, channel="ContactUs"):
+    def entity(self, biller_id, channel="ContactUs"):
         if channel == "Invoice":
-            if tenant != TENANT:
-                raise AssertionError("Wrong source tenant")
+            if biller_id != BILLER_ID:
+                raise AssertionError("Wrong source biller")
             return {"From": "verified@example.invalid", "FallbackTo": "never-use@example.invalid"}
-        if tenant != self.owned["PartitionKey"]:
-            raise AssertionError("Wrong fixture tenant")
+        if biller_id != self.owned["PartitionKey"]:
+            raise AssertionError("Wrong fixture biller")
         value = dict(self.owned, etag="entity-etag")
         if self.mode == "entity-owner-changed" and any(c[:2] == ("blob", "upload") for c in self.calls):
             value["VerificationRun"] = "someone-else"
@@ -140,7 +140,7 @@ class FixtureStorage:
 
 class DeployedTests(unittest.TestCase):
     def test_preflight_requires_no_resource_credentials_or_network(self):
-        settings = {k: ENV[k] for k in ("AZURE_ENV_NAME", "TEST_TEMPLATE_TENANT", "TEST_NOTIFICATION_RECIPIENT")}
+        settings = {k: ENV[k] for k in ("AZURE_ENV_NAME", "TEST_BILLER_ID", "TEST_NOTIFICATION_RECIPIENT")}
         with patch.dict(os.environ, settings, clear=True), patch.object(sys, "argv", ["deployed-integration.py", "--check-configuration"]), patch.object(deployed, "Storage") as storage, patch.object(deployed.readonly, "verify") as health, contextlib.redirect_stdout(io.StringIO()) as output:
             self.assertEqual(0, deployed.main())
         storage.assert_not_called()
@@ -173,7 +173,7 @@ class DeployedTests(unittest.TestCase):
                            ("TEST_API_URL", "https://niobiumnotify-func-prod.synthetic.azurewebsites.net"),
                            ("TEST_API_URL", "https://niobiumnotify-func-test.synthetic.azurewebsites.net.attacker.invalid"),
                            ("TEST_STORAGE_ACCOUNT", "niobiumnotifystdprod"), ("TEST_STORAGE_KEY", ""),
-                           ("TEST_TEMPLATE_TENANT", ""), ("TEST_NOTIFICATION_RECIPIENT", "a@example.invalid,b@example.invalid"),
+                           ("TEST_BILLER_ID", ""), ("TEST_NOTIFICATION_RECIPIENT", "a@example.invalid,b@example.invalid"),
                            ("TEST_NOTIFICATION_RECIPIENT", "")]:
             with self.subTest(key=key, value=value), patch.object(deployed, "Storage") as storage, self.assertRaises(deployed.Failure):
                 deployed.run(dict(ENV, **{key: value}), Mock())
@@ -184,7 +184,7 @@ class DeployedTests(unittest.TestCase):
         posted, checks = self.run_fixture(storage)
         self.assertEqual(ENV["TEST_NOTIFICATION_RECIPIENT"], storage.owned["FallbackTo"])
         self.assertEqual("verified@example.invalid", storage.owned["From"])
-        self.assertNotEqual(TENANT, storage.owned["PartitionKey"])
+        self.assertNotEqual(BILLER_ID, storage.owned["PartitionKey"])
         self.assertEqual([storage.owned["PartitionKey"]] * 3, [p["Tenant"] for p in posted])
         self.assertNotEqual(posted[0]["ID"], posted[1]["ID"])
         self.assertEqual("", posted[2]["Message"])
@@ -246,7 +246,7 @@ class DeployedTests(unittest.TestCase):
         runner = Mock(return_value=subprocess.CompletedProcess([], 1, "secret", "secret"))
         storage = deployed.Storage(deployed.configuration(ENV), runner)
         with self.assertRaisesRegex(deployed.Failure, "^test_storage_operation_failed$"):
-            storage.entity(TENANT, "Invoice")
+            storage.entity(BILLER_ID, "Invoice")
         call = runner.call_args
         self.assertNotIn(ENV["TEST_STORAGE_KEY"], call.args[0])
         self.assertEqual(ENV["TEST_STORAGE_KEY"], call.kwargs["env"]["AZURE_STORAGE_KEY"])

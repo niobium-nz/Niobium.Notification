@@ -31,14 +31,14 @@ def fixture_settings(environ):
     if not re.fullmatch(r"[^\s,;<>@]+@[^\s,;<>@]+\.[^\s,;<>@]+", recipient):
         raise Failure("approved_test_recipient_required")
     try:
-        tenant = str(uuid.UUID(environ.get("TEST_TEMPLATE_TENANT", "")))
+        biller_id = str(uuid.UUID(environ.get("TEST_BILLER_ID", "")))
     except ValueError:
-        raise Failure("existing_template_tenant_required") from None
-    return recipient, tenant
+        raise Failure("existing_test_biller_required") from None
+    return recipient, biller_id
 
 
 def configuration(environ):
-    recipient, tenant = fixture_settings(environ)
+    recipient, biller_id = fixture_settings(environ)
     if environ.get("TEST_ENVIRONMENT") != "test":
         raise Failure("test_environment_required")
     base = readonly.origin(environ.get("TEST_API_URL", ""))
@@ -51,7 +51,7 @@ def configuration(environ):
     key = environ.get("TEST_STORAGE_KEY", "")
     if not key or "\n" in key or "\r" in key:
         raise Failure("test_storage_credential_required")
-    return {"base": base, "account": account, "key": key, "recipient": recipient, "template_tenant": tenant}
+    return {"base": base, "account": account, "key": key, "recipient": recipient, "biller_id": biller_id}
 
 
 class Storage:
@@ -69,8 +69,8 @@ class Storage:
         except ValueError:
             raise Failure("invalid_storage_metadata") from None
 
-    def entity(self, tenant, channel="ContactUs"):
-        return self.call("entity", "show", "--table-name", "Template", "--partition-key", tenant, "--row-key", channel)
+    def entity(self, biller_id, channel="ContactUs"):
+        return self.call("entity", "show", "--table-name", "Template", "--partition-key", biller_id, "--row-key", channel)
 
 
 def post(base, payload, opener=None):
@@ -104,15 +104,15 @@ def run(environ, reporter):
     health = readonly.verify(config["base"], environ.get("TEST_EXPECTED_COMMIT", ""))
     reporter("deployed_commit")
     storage = Storage(config)
-    source = storage.entity(config["template_tenant"], "Invoice")
+    source = storage.entity(config["biller_id"], "Invoice")
     sender = source.get("From", "")
     if not re.fullmatch(r"[^\s,;<>@]+@[^\s,;<>@]+\.[^\s,;<>@]+", sender):
         raise Failure("existing_verified_sender_required")
-    tenant = str(uuid.uuid4())
-    blob = tenant + "/delivery-verification.html"
-    owned = {"PartitionKey": tenant, "RowKey": "ContactUs", "From": sender,
+    fixture_biller_id = str(uuid.uuid4())
+    blob = fixture_biller_id + "/delivery-verification.html"
+    owned = {"PartitionKey": fixture_biller_id, "RowKey": "ContactUs", "From": sender,
              "FromName": "Niobium deployment verification", "Subject": "Invoice notification deployment verification",
-             "FallbackTo": config["recipient"], "Blob": "delivery-verification.html", "VerificationRun": tenant}
+             "FallbackTo": config["recipient"], "Blob": "delivery-verification.html", "VerificationRun": fixture_biller_id}
     entity_attempted = False
     blob_attempted = False
     try:
@@ -121,11 +121,12 @@ def run(environ, reporter):
         entity_attempted = True
         storage.call("entity", "insert", "--table-name", "Template", "--if-exists", "fail", "--entity",
                      *(k + "=" + v for k, v in owned.items()))
-        entity = storage.entity(tenant)
+        entity = storage.entity(fixture_biller_id)
         if any(entity.get(k) != v for k, v in owned.items()):
             raise Failure("fixture_readback_mismatch")
         original_etag = entity_etag(entity)
-        request = {"ID": str(uuid.uuid4()), "Tenant": tenant, "Message": "Invoice notification test environment verification",
+        # The Notification wire contract calls the invoice biller identity Tenant.
+        request = {"ID": str(uuid.uuid4()), "Tenant": fixture_biller_id, "Message": "Invoice notification test environment verification",
                    "Name": "Deployment verification", "Contact": "Synthetic fixture", "Token": "test-captcha-disabled"}
         # Missing body must fail, proving this host actually reads our unique template instead of silently skipping it.
         if post(config["base"], request) != 500:
@@ -136,12 +137,12 @@ def run(environ, reporter):
             body.write_text("<html><body><p>Invoice notification deployment verification in the test environment.</p><p>{{MESSAGE}}</p></body></html>", encoding="utf-8")
             blob_attempted = True
             storage.call("blob", "upload", "--container-name", "templates", "--name", blob, "--file", str(body),
-                         "--overwrite", "false", "--metadata", "verificationrun=" + tenant)
+                         "--overwrite", "false", "--metadata", "verificationrun=" + fixture_biller_id)
         request["ID"] = str(uuid.uuid4())
         if post(config["base"], request) != 201:
             raise Failure("real_provider_send_failed")
         reporter("real_provider_submission")
-        if entity_etag(storage.entity(tenant)) != original_etag:
+        if entity_etag(storage.entity(fixture_biller_id)) != original_etag:
             raise Failure("template_changed_by_send")
         reporter("template_unchanged")
         request["Message"] = ""
@@ -155,7 +156,7 @@ def run(environ, reporter):
         if blob_attempted:
             try:
                 info = storage.call("blob", "show", "--container-name", "templates", "--name", blob)
-                if info.get("metadata", {}).get("verificationrun") != tenant:
+                if info.get("metadata", {}).get("verificationrun") != fixture_biller_id:
                     raise Failure("blob_ownership_changed")
                 storage.call("blob", "delete", "--container-name", "templates", "--name", blob,
                              "--if-match", info["properties"]["etag"])
@@ -163,10 +164,10 @@ def run(environ, reporter):
                 cleanup_errors.append("blob")
         if entity_attempted:
             try:
-                current = storage.entity(tenant)
-                if current.get("VerificationRun") != tenant or any(current.get(k) != v for k, v in owned.items()):
+                current = storage.entity(fixture_biller_id)
+                if current.get("VerificationRun") != fixture_biller_id or any(current.get(k) != v for k, v in owned.items()):
                     raise Failure("entity_ownership_changed")
-                storage.call("entity", "delete", "--table-name", "Template", "--partition-key", tenant,
+                storage.call("entity", "delete", "--table-name", "Template", "--partition-key", fixture_biller_id,
                              "--row-key", "ContactUs", "--if-match", entity_etag(current))
             except Failure:
                 cleanup_errors.append("entity")
