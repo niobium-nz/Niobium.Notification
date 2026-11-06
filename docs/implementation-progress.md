@@ -2,6 +2,22 @@
 
 This repository is the downstream dependency for the supplied Niobium.Invoicing research plan. Preserve the original plan IDs and acceptance criteria. The owner's accepted recommendations are recorded in [Invoicing Q28](https://github.com/niobium-nz/Niobium.Invoicing/blob/50df240f8212af33a152a13bcce11c848d6b51a8/docs/decisions-and-risks.md#q28-business-decision-follow-up); that decision-only change completed production verification as PR #14. This milestone does not claim those business behaviors are implemented.
 
+## Automatic review authorization: 2026-11-06
+
+The owner's instruction, "approve auto review", supersedes the earlier manual-only
+Notification choice recorded below. `AGENTS.md` and the delivery guide now authorize
+native code review for All PRs On every push, with security review for All PRs
+Whenever code review runs, matching Invoicing's recorded configuration. Formal
+reviewer approval remains separate; this is not an approval of the implementation.
+
+External activation remains unverified: the GitHub connector does not expose these
+settings and the session has no browser-control tool. No native review comment was
+present on Notification draft PR #2 or Invoicing draft PR #17 when checked. The
+delivery guide links the exact settings page and distinguishes authorization,
+saved configuration and execution evidence. The no-deployment/no-merge boundary
+persists. This documentation-only update passed `git diff --check`; application
+tests were not rerun, and no automatic-review execution is claimed.
+
 ## B02 continuation: 2026-11-06
 
 Baseline: clean `origin/main` at `4a93385be1b09a9d97d0c2384e1085f254c7d84c`,
