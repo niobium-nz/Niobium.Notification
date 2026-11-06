@@ -2,6 +2,68 @@
 
 This repository is the downstream dependency for the supplied Niobium.Invoicing research plan. Preserve the original plan IDs and acceptance criteria. The owner's accepted recommendations are recorded in [Invoicing Q28](https://github.com/niobium-nz/Niobium.Invoicing/blob/50df240f8212af33a152a13bcce11c848d6b51a8/docs/decisions-and-risks.md#q28-business-decision-follow-up); that decision-only change completed production verification as PR #14. This milestone does not claim those business behaviors are implemented.
 
+## B02 continuation: 2026-11-06
+
+Baseline: clean `origin/main` at `4a93385be1b09a9d97d0c2384e1085f254c7d84c`,
+branch `codex/notification-durable-retries`, `/workspace/Niobium.Notification`.
+The user explicitly included this repository in the implementation scope.
+The original report is preserved unchanged in
+[Invoicing PR #17](https://github.com/niobium-nz/Niobium.Invoicing/pull/17), with
+SHA-256 `1321b7712c4c9e10b477d03b230e12fce5485fbde3375d94c374fc96290313eb`.
+
+The current task expressly prohibits deployment, publication, merging, production
+data access and production migrations. That overrides the standing delivery
+sequence for this branch: commits use `[skip ci]` to prevent feature deployment,
+and delivery stops at a draft PR. No live readiness/approval status is fabricated.
+The earlier safeguards are present on main; this task has not certified their
+live repository configuration or run another deployed harness.
+
+| Plan item | Implemented in this branch | Remaining acceptance dependency |
+| --- | --- | --- |
+| B02 / Q28 #1 | Conditional inbox registration/claims, frozen provider JSON, stable tenant/operation key, durable first-submission boundary and jittered schedule, recovery wake before provider call, persisted provider acceptance, durable replay suppression, explicit held/failed outcomes | Disabled by default pending legacy-operation cutover; enabled queue/provider integration and operator recovery must be verified before rollout |
+| B07 / Q28 #13 | Component failure/concurrency/restart cases and an explicit loopback Table suite for real conditional insert/update semantics | Actual Service Bus scheduling, Blob storage and provider replay remain unverified; existing deployed tests still cover the legacy synchronous path |
+| B06 / Q28 #2-4 | Preserved as the next milestone; provider submission is never labelled recipient delivery | Activated/verified B02, signed provider events/internal confirmation contract and payment-history compatibility for cancellation |
+| B08 / Q28 #6-7 | Inbox/payload retention dependency and orphan-blob reconciliation documented; no automated purge | Invoice/history commit consistency and direct-writer compatibility, retention-clock/hold/privacy validation, backup/restore evidence and ownership |
+
+See [durable submission](durable-submission.md) for the concrete schema, defaults,
+failure ordering, provider classification, cutover prerequisites and limits.
+The opt-in applies only to `NotifyCommandConsumer`; direct HTTP/contact and
+subscription-triggered notification flows retain their existing behavior.
+No wire Contracts, infrastructure/workflow definitions, framework code or existing
+package versions changed. The new explicitly invoked storage test project reuses
+MSTest.Sdk 4.4.0 and Moq 4.20.72 already used here.
+
+Matched framework inspection covered `IFileService`/Blob create-only upload,
+`IAzureTableClientFactory`, the existing Resend options/client and global HTTP
+resilience defaults, plus `MessagingEntry.Schedule` and the Service Bus broker.
+Niobium.Abstractions remains 4.0.61 (`c2462746614ee6c768d725c99e3c54df2e3848c8`);
+the relevant platform/file/messaging packages remain 4.0.60
+(`1fa044968f504ef575021720c728a17dc72bb067`). The new provider uses the stable
+HTTP-handler configuration extension point to remove inherited automatic retries;
+no experimental-API suppression was added. Resend's 24-hour behavior was checked
+against its official documentation linked in the protocol page.
+
+Verification used the existing reviewed `/workspace/.niobium-tools/env.sh` and
+.NET SDK 10.0.403. The initial `--no-restore` build failed because this fresh
+checkout had no assets; restore resolved that setup issue. The restored baseline
+then built with zero warnings/errors and passed its 45 tests.
+
+| Exact command (after sourcing the environment script) | Result |
+| --- | --- |
+| `dotnet restore Niobium.Notification.slnx --nologo` | Passed using the configured cache/feeds; not an empty-cache certification |
+| `dotnet build Niobium.Notification.slnx --configuration Release --no-restore --nologo --disable-build-servers -m:1` | Passed, zero warnings/errors |
+| `dotnet test --project src/Niobium.Notification.Core.Tests/Niobium.Notification.Core.Tests.csproj --configuration Release --no-build --no-restore --report-trx --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml --results-directory /workspace/scratch/notification-b02-tests` | 88 passed, zero failed/skipped |
+| `python scripts/check-coverage.py /workspace/scratch/notification-b02-tests/coverage.cobertura.xml` | Passed: 536/546 authored lines, 98.17%; Contracts 100%, Core 98.76%, Server 97.52% |
+| `dotnet restore src/Niobium.Notification.Storage.Tests/Niobium.Notification.Storage.Tests.csproj --nologo` | Passed |
+| `NIOBIUM_NOTIFICATION_TEST_TABLE_ENDPOINT=http://127.0.0.1:18492/devstoreaccount1 dotnet test --project src/Niobium.Notification.Storage.Tests/Niobium.Notification.Storage.Tests.csproj --configuration Release --no-restore --report-trx --results-directory /workspace/scratch/notification-b02-storage` | One real-adapter scenario passed, zero failed/skipped; competing inserts/claims, stale ETags, restart read-back and nullable-field removal |
+| `git -c core.whitespace=cr-at-eol diff --check` | Passed; existing CRLF file conventions preserved |
+
+The Table test used a disposable Azurite process launched with
+`azurite-table --silent --inMemoryPersistence --disableTelemetry --tableHost 127.0.0.1 --tablePort 18492 --skipApiVersionCheck`.
+It deleted its uniquely named table; the emulator was stopped after verification.
+The live queue, provider and cloud storage were not accessed. Delivery/cancellation,
+invoice audit history, MCP and payments are not marked complete by this milestone.
+
 ## Baseline and reconciliation
 
 - Repository: `niobium-nz/Niobium.Notification`; feature: `codex/notification-reliability`.

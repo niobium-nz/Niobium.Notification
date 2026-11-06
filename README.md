@@ -4,6 +4,10 @@
 
 Read [agent instructions](AGENTS.md), [delivery and operations](docs/delivery-and-operations.md), and the [implementation ledger](docs/implementation-progress.md) before changing delivery or recovery behavior.
 
+The [durable queue submission path](docs/durable-submission.md) adds an opt-in inbox,
+frozen provider requests and recovery scheduling for B02. It remains disabled
+until its legacy-message cutover and live verification prerequisites are met.
+
 ## Local verification
 
 Use the pinned SDK and packages in `global.json` and the project files. Python 3, Node.js 22 and PowerShell 7 are needed for deployment-tooling tests. These commands do not contact deployed services:

@@ -74,3 +74,11 @@ Keep Bicep environment agnostic. `infra/main.bicep` owns application resources a
 The workflow explicitly projects GitHub settings into runner `env`. `SetAppSettings.ps1` turns ordinary `APPSETTING_` entries into environment references in generated `appSettings`; `APPSETTING_KV_` entries carry only the setting name and an empty placeholder. The reusable module converts them to Key Vault references. `SetKeyVaultSecrets.ps1` reads actual values from runner environment, writes the existing vault, then refreshes Function App references after all writes succeed. `ClearAppSettings.ps1` restores the original parameter file. The hook behavior matches the already reviewed Invoicing correction and does not introduce an environment-specific module path.
 
 The runner's `TEST_STORAGE_KEY` is used only for owned integration fixtures. Runtime Table/Blob access retains existing identity configuration; Resend uses existing runtime provider secrets. Do not publish credential values, mailbox values or provider responses in source, logs, reports or review comments.
+
+## B02 draft activation boundary
+
+The [durable queued submission path](durable-submission.md) is disabled by default.
+Its draft does not activate resources or bypass the protected delivery sequence.
+The current task prohibits deployment and merging; review its concrete cutover
+and verification prerequisites before a separately authorized activation.
+The existing deployed ContactUs harness does not certify the enabled queue path.

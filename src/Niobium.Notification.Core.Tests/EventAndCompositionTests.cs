@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Moq;
 using Niobium.Messaging;
+using Niobium.Notification.Delivery;
 using Niobium.Platform.Notification.Email;
 using static Niobium.Notification.Core.Tests.Helpers.NotificationTestHelper;
 
@@ -70,6 +71,16 @@ public sealed class EventAndCompositionTests
         NotificationOptions options = services.GetRequiredService<IOptions<NotificationOptions>>().Value;
         Assert.AreEqual("test.example.invalid", options.SelfHostName);
         Assert.AreEqual("templates", options.TemplateFolder);
+        Assert.IsNotNull(services.GetRequiredService<DurableNotificationFlow>());
+        Assert.IsFalse(services.GetRequiredService<IOptions<NotificationDeliveryOptions>>().Value.Enabled);
+        HttpMessageHandler handler = services.GetRequiredService<IHttpMessageHandlerFactory>().CreateHandler(nameof(IIdempotentNotificationProvider));
+        while (handler is DelegatingHandler wrapper)
+        {
+            Assert.IsFalse(wrapper.GetType().Name.Contains("Resilience", StringComparison.Ordinal), "The durable provider must not inherit hidden HTTP retries.");
+            handler = wrapper.InnerHandler!;
+        }
+        Assert.IsInstanceOfType<HttpClientHandler>(handler);
+        Assert.IsFalse(((HttpClientHandler)handler).AllowAutoRedirect);
         Assert.IsTrue(builder.Services.Any(s => s.ServiceType == typeof(IEmailNotificationClient)));
         Assert.IsTrue(builder.Services.Any(s => s.ServiceType == typeof(IExternalEventAdaptor<,>)));
     }
