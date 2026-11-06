@@ -2,7 +2,7 @@
 
 Read this file and [delivery and operations](docs/delivery-and-operations.md) before changes. Record the current branch, SHA and working-tree state. Preserve other work, use feature branches from current `main`, and keep the Niobium framework and package versions unchanged unless explicitly authorized.
 
-This service is a dependency of Niobium.Invoicing. Follow the owner's accepted Q28 milestone order: Notification delivery safeguards, B02 durable retry recovery, then B06 delivery confirmation and lifecycle. The [ledger](docs/implementation-progress.md) distinguishes implemented controls from requirements. Do not silently interpret enqueue acceptance as delivery.
+Notification is an independent shared service that renders and sends generic notifications. It must not depend on Invoicing configuration, biller IDs or invoice templates. Invoicing owns its invoice-specific end-to-end tests and maps its biller to the existing Notification `Tenant` contract at the caller boundary. Follow the owner's accepted Q28 milestone order: Notification delivery safeguards, B02 durable retry recovery, then B06 delivery confirmation and lifecycle. The [ledger](docs/implementation-progress.md) distinguishes implemented controls from requirements. Do not silently interpret enqueue acceptance as delivery.
 
 ## Delivery and review
 
@@ -20,8 +20,8 @@ This service is a dependency of Niobium.Invoicing. Follow the owner's accepted Q
 - Use existing real test resources. The deployed harness may send only to the approved test environment `TEST_NOTIFICATION_RECIPIENT` secret and clean up only its own marked fixtures with ETags. Do not use the legacy contact-form integration scripts with their unscoped recipients.
 - Production verification may only GET `/health`. It has no fixture setup, credentials for writes, queues, notifications, subscriptions, unsubscribe or cleanup. Do not infer that a GET endpoint is read-only.
 - Do not print credentials, recipient addresses, provider response bodies or raw operational payloads. Use synthetic local test data and fixed diagnostics.
-- Use Invoicing terminology for invoice-related configuration, documentation and tests, including work against Notification or other dependencies. The harness input is `TEST_BILLER_ID`, projected from the existing GitHub environment variable `TEST_INVOICE_BILLER`; do not require a second stored variable. Map it explicitly to Notification's `Tenant` field/template partition at the integration boundary; keep established wire/storage contracts compatible. Invoicing's management-group tenant is a separate identity.
-- Reuse the owner-approved biller and mailbox already configured in Invoicing as `TEST_INVOICE_BILLER` and secret `TEST_NOTIFICATION_RECIPIENT`. GitHub environment settings are repository scoped: this repository needs its own binding to those same approved values. A missing binding does not require a new biller, recipient or Azure resource. See the configuration inventory in [delivery and operations](docs/delivery-and-operations.md#real-test-integration); never log or document the values.
+- Service-owned configuration, documentation and tests use Notification terminology (`Tenant`, `Channel`, sender, template and recipient). Consumer-specific vocabulary belongs in the consuming service. Preserve established wire/storage contracts.
+- The deployed harness uses runner-only secrets `TEST_NOTIFICATION_SENDER` and `TEST_NOTIFICATION_RECIPIENT`. The sender must be explicitly approved and permitted by the existing test provider configuration; the recipient must be an approved test mailbox. Do not infer either from an arbitrary tenant/template or require any Invoicing setting. Create only this run's generic template and blob in existing test resources, with ownership-checked cleanup.
 
 ## Infrastructure composition
 

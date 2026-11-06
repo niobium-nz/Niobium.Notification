@@ -55,12 +55,20 @@ Actual test publication and credential preparation succeeded, but deployed integ
 
 The follow-up adds a configuration-only preflight before cloud login/provisioning and two tests proving it cannot access resources or log the recipient. The owner must populate the Notification test environment settings independently of Invoicing's. The next run still must perform the complete actual deployment/candidate verification, and the initial trusted-main installation dependency remains explicit.
 
-## Invoice terminology correction
+## Invoice terminology correction (superseded)
 
 The owner requires Invoicing terminology for invoice-related configuration, documentation and tests even when another service is under test. The source biller setting is now `TEST_BILLER_ID` throughout the workflow, preflight, deployed harness and test fixtures. It remains the existing test biller GUID whose `Invoice` template supplies the configured sender. The Notification API's established `Tenant` field is mapped explicitly at the HTTP boundary; its wire/storage contract is unchanged. This rule is recorded in the repository and workspace agent memory.
 
-## Existing environment settings reused (2026-11-06)
+## Existing environment settings reused (2026-11-06, superseded)
 
 The owner reconfirmed the existing Invoicing test variable `TEST_INVOICE_BILLER` and secret `TEST_NOTIFICATION_RECIPIENT`. All three Notification workflow projections now read that stored biller name into the invoice-oriented runner input `TEST_BILLER_ID`; the recipient secret name is unchanged. The delivery guide and agent memory distinguish stored names, runner names and repository scope. The earlier naming correction did not justify requesting a new biller or mailbox. Notification still needs its own binding to the same approved values because GitHub environments are repository scoped.
 
 This correction changes no application, wire/storage, Bicep or package contract. Local checks passed: YAML parsing and all three stored-to-runner projections, 32 Python preflight/tooling tests, 20 Node policy tests and `git diff --check`. Exact-head CI and real deployed results must still be recorded before PR creation. The earlier missing-configuration failure is not evidence that the owner's Invoicing settings are absent.
+
+## Shared-service boundary correction (2026-11-06)
+
+The owner clarified that Notification is an independent shared service. The earlier invoice terminology and environment-copy guidance above overextended an Invoicing-side naming rule; those instructions are superseded. No `TEST_INVOICE_BILLER`/`TEST_BILLER_ID`, biller identity or `Invoice` template is now consumed by Notification's workflow or deployed harness. Consumer-specific tests remain in Invoicing.
+
+The generic harness instead requires an explicitly approved `TEST_NOTIFICATION_SENDER` and `TEST_NOTIFICATION_RECIPIENT`, creates only its own tenant/template/blob in existing test resources, exercises the real provider, and conditionally cleans its owned records. It never scans or borrows another consumer's sender/template. The sender/recipient values still need service-owned configuration; they are not inferred from the removed invoice binding. Local tests cover the no-existing-template path, sender validation before I/O, address redaction, and the existing send/cleanup failure boundaries. No application, public contract, package or Bicep change is made by this correction. Exact-head CI remains required; unconfigured real tests must not be represented as passed.
+
+Correction validation: 34 Python checks and 20 Node policy checks passed; all three generic sender/recipient workflow projections and YAML parsing passed, as did `git diff --check`. Application code is unchanged; the next exact-head CI run establishes build/coverage and any deployment result.

@@ -24,10 +24,10 @@ deployed = module("deployed-integration")
 resources = module("test-resources")
 SHA = "a" * 40
 HOST = "https://niobiumnotify-func-test.synthetic.azurewebsites.net"
-BILLER_ID = "00000000-0000-0000-0000-000000000001"
+TENANT = "00000000-0000-0000-0000-000000000001"
 ENV = {"AZURE_ENV_NAME": "test", "TEST_ENVIRONMENT": "test", "TEST_API_URL": HOST,
        "TEST_STORAGE_ACCOUNT": "niobiumnotifystdtest", "TEST_STORAGE_KEY": "synthetic-key",
-       "TEST_BILLER_ID": BILLER_ID, "TEST_NOTIFICATION_RECIPIENT": "approved@example.invalid",
+       "TEST_NOTIFICATION_SENDER": "verified@example.invalid", "TEST_NOTIFICATION_RECIPIENT": "approved@example.invalid",
        "TEST_EXPECTED_COMMIT": SHA}
 
 
@@ -110,13 +110,9 @@ class FixtureStorage:
         self.owned = None
         self.blob = None
 
-    def entity(self, biller_id, channel="ContactUs"):
-        if channel == "Invoice":
-            if biller_id != BILLER_ID:
-                raise AssertionError("Wrong source biller")
-            return {"From": "verified@example.invalid", "FallbackTo": "never-use@example.invalid"}
-        if biller_id != self.owned["PartitionKey"]:
-            raise AssertionError("Wrong fixture biller")
+    def entity(self, tenant, channel="ContactUs"):
+        if self.owned is None or tenant != self.owned["PartitionKey"] or channel != "ContactUs":
+            raise AssertionError("Only this run's owned template may be read")
         value = dict(self.owned, etag="entity-etag")
         if self.mode == "entity-owner-changed" and any(c[:2] == ("blob", "upload") for c in self.calls):
             value["VerificationRun"] = "someone-else"
@@ -140,13 +136,14 @@ class FixtureStorage:
 
 class DeployedTests(unittest.TestCase):
     def test_preflight_requires_no_resource_credentials_or_network(self):
-        settings = {k: ENV[k] for k in ("AZURE_ENV_NAME", "TEST_BILLER_ID", "TEST_NOTIFICATION_RECIPIENT")}
+        settings = {k: ENV[k] for k in ("AZURE_ENV_NAME", "TEST_NOTIFICATION_SENDER", "TEST_NOTIFICATION_RECIPIENT")}
         with patch.dict(os.environ, settings, clear=True), patch.object(sys, "argv", ["deployed-integration.py", "--check-configuration"]), patch.object(deployed, "Storage") as storage, patch.object(deployed.readonly, "verify") as health, contextlib.redirect_stdout(io.StringIO()) as output:
             self.assertEqual(0, deployed.main())
         storage.assert_not_called()
         health.assert_not_called()
         self.assertEqual("PASS test_fixture_configuration\n", output.getvalue())
         self.assertNotIn(settings["TEST_NOTIFICATION_RECIPIENT"], output.getvalue())
+        self.assertNotIn(settings["TEST_NOTIFICATION_SENDER"], output.getvalue())
 
     def test_preflight_fails_closed_for_missing_settings(self):
         with patch.dict(os.environ, {"AZURE_ENV_NAME": "test"}, clear=True), patch.object(sys, "argv", ["deployed-integration.py", "--check-configuration"]), patch.object(deployed, "Storage") as storage, contextlib.redirect_stdout(io.StringIO()) as output:
@@ -173,7 +170,10 @@ class DeployedTests(unittest.TestCase):
                            ("TEST_API_URL", "https://niobiumnotify-func-prod.synthetic.azurewebsites.net"),
                            ("TEST_API_URL", "https://niobiumnotify-func-test.synthetic.azurewebsites.net.attacker.invalid"),
                            ("TEST_STORAGE_ACCOUNT", "niobiumnotifystdprod"), ("TEST_STORAGE_KEY", ""),
-                           ("TEST_BILLER_ID", ""), ("TEST_NOTIFICATION_RECIPIENT", "a@example.invalid,b@example.invalid"),
+                           ("TEST_NOTIFICATION_SENDER", ""), ("TEST_NOTIFICATION_SENDER", "not-an-address"),
+                           ("TEST_NOTIFICATION_SENDER", "a@example.invalid,b@example.invalid"),
+                           ("TEST_NOTIFICATION_SENDER", "a@example.invalid\r\nBcc:other@example.invalid"),
+                           ("TEST_NOTIFICATION_RECIPIENT", "a@example.invalid,b@example.invalid"),
                            ("TEST_NOTIFICATION_RECIPIENT", "")]:
             with self.subTest(key=key, value=value), patch.object(deployed, "Storage") as storage, self.assertRaises(deployed.Failure):
                 deployed.run(dict(ENV, **{key: value}), Mock())
@@ -183,8 +183,8 @@ class DeployedTests(unittest.TestCase):
         storage = FixtureStorage()
         posted, checks = self.run_fixture(storage)
         self.assertEqual(ENV["TEST_NOTIFICATION_RECIPIENT"], storage.owned["FallbackTo"])
-        self.assertEqual("verified@example.invalid", storage.owned["From"])
-        self.assertNotEqual(BILLER_ID, storage.owned["PartitionKey"])
+        self.assertEqual(ENV["TEST_NOTIFICATION_SENDER"], storage.owned["From"])
+        self.assertNotEqual(TENANT, storage.owned["PartitionKey"])
         self.assertEqual([storage.owned["PartitionKey"]] * 3, [p["Tenant"] for p in posted])
         self.assertNotEqual(posted[0]["ID"], posted[1]["ID"])
         self.assertEqual("", posted[2]["Message"])
@@ -194,6 +194,23 @@ class DeployedTests(unittest.TestCase):
         self.assertTrue(all("--if-match" in c for c in deletions))
         self.assertEqual(storage.blob, deletions[0][deletions[0].index("--name") + 1])
         self.assertEqual(storage.owned["PartitionKey"], deletions[1][deletions[1].index("--partition-key") + 1])
+
+    def test_sender_is_required_before_health_or_storage_access(self):
+        settings = dict(ENV)
+        settings.pop("TEST_NOTIFICATION_SENDER")
+        with patch.object(deployed.readonly, "verify") as health, patch.object(deployed, "Storage") as storage, self.assertRaisesRegex(deployed.Failure, "^approved_test_sender_required$"):
+            deployed.run(settings, Mock())
+        health.assert_not_called()
+        storage.assert_not_called()
+
+    def test_generic_fixture_needs_no_existing_consumer_template(self):
+        storage = FixtureStorage()
+        posted, checks = self.run_fixture(storage)
+        self.assertEqual(("entity", "insert"), storage.calls[0][:2])
+        self.assertEqual("ContactUs", storage.owned["RowKey"])
+        self.assertEqual("Notification deployment verification", storage.owned["Subject"])
+        self.assertEqual("Notification test environment verification", posted[1]["Message"])
+        self.assertIn("real_provider_submission", checks)
 
     def test_uncertain_fixture_writes_are_reconciled(self):
         for mode, expected in [("insert-response-lost", 1), ("upload-response-lost", 2)]:
@@ -246,7 +263,7 @@ class DeployedTests(unittest.TestCase):
         runner = Mock(return_value=subprocess.CompletedProcess([], 1, "secret", "secret"))
         storage = deployed.Storage(deployed.configuration(ENV), runner)
         with self.assertRaisesRegex(deployed.Failure, "^test_storage_operation_failed$"):
-            storage.entity(BILLER_ID, "Invoice")
+            storage.entity(TENANT, "ContactUs")
         call = runner.call_args
         self.assertNotIn(ENV["TEST_STORAGE_KEY"], call.args[0])
         self.assertEqual(ENV["TEST_STORAGE_KEY"], call.kwargs["env"]["AZURE_STORAGE_KEY"])

@@ -72,7 +72,7 @@ jobs:
           persist-credentials: false
       - name: Verify test fixture configuration
         env:
-          TEST_BILLER_ID: ${{ vars.TEST_INVOICE_BILLER }}
+          TEST_NOTIFICATION_SENDER: ${{ secrets.TEST_NOTIFICATION_SENDER }}
           TEST_NOTIFICATION_RECIPIENT: ${{ secrets.TEST_NOTIFICATION_RECIPIENT }}
         run: python scripts/deployed-integration.py --check-configuration
       - uses: actions/setup-dotnet@v6
@@ -111,7 +111,7 @@ jobs:
       - name: Run deployed integration tests
         timeout-minutes: 15
         env:
-          TEST_BILLER_ID: ${{ vars.TEST_INVOICE_BILLER }}
+          TEST_NOTIFICATION_SENDER: ${{ secrets.TEST_NOTIFICATION_SENDER }}
           TEST_NOTIFICATION_RECIPIENT: ${{ secrets.TEST_NOTIFICATION_RECIPIENT }}
         run: python scripts/deployed-integration.py --report artifacts/deployed/integration.json
       - uses: actions/upload-artifact@v4
@@ -170,7 +170,7 @@ jobs:
         if: steps.source.outputs.available == 'true'
         timeout-minutes: 15
         env:
-          TEST_BILLER_ID: ${{ vars.TEST_INVOICE_BILLER }}
+          TEST_NOTIFICATION_SENDER: ${{ secrets.TEST_NOTIFICATION_SENDER }}
           TEST_NOTIFICATION_RECIPIENT: ${{ secrets.TEST_NOTIFICATION_RECIPIENT }}
         run: python scripts/deployed-integration.py --report artifacts/deployed/integration.json
       - uses: actions/upload-artifact@v4
