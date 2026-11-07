@@ -35,7 +35,7 @@ namespace Niobium.Notification.Server.Delivery
             if (NotificationFingerprint.Hash(credential) != content.CredentialFingerprint
                 || clock.GetUtcNow() + NotificationRetryPolicy.SendMargin >= deadline)
             {
-                return new(SubmissionResult.Hold);
+                return new(SubmissionOutcome.Hold);
             }
             using HttpRequestMessage request = new(HttpMethod.Post, "https://api.resend.com/emails");
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", credential);
@@ -53,7 +53,7 @@ namespace Niobium.Notification.Server.Delivery
                     using JsonDocument result = await JsonDocument.ParseAsync(body, cancellationToken: timeout.Token);
                     return result.RootElement.TryGetProperty("id", out JsonElement id)
                         && id.ValueKind == JsonValueKind.String && !String.IsNullOrWhiteSpace(id.GetString())
-                        ? new(SubmissionResult.Accepted, id.GetString()) : new(SubmissionResult.Retry);
+                        ? new(SubmissionOutcome.Accepted, id.GetString()) : new(SubmissionOutcome.Retry);
                 }
                 if (response.StatusCode == HttpStatusCode.Conflict)
                 {
@@ -61,22 +61,22 @@ namespace Niobium.Notification.Server.Delivery
                     using JsonDocument result = await JsonDocument.ParseAsync(body, cancellationToken: timeout.Token);
                     return result.RootElement.TryGetProperty("name", out JsonElement name)
                         && name.ValueKind == JsonValueKind.String && name.GetString() == "concurrent_idempotent_requests"
-                        ? new(SubmissionResult.Retry) : new(SubmissionResult.Hold);
+                        ? new(SubmissionOutcome.Retry) : new(SubmissionOutcome.Hold);
                 }
                 return response.StatusCode is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests || (int)response.StatusCode >= 500
-                    ? new(SubmissionResult.Retry) : new(SubmissionResult.Rejected);
+                    ? new(SubmissionOutcome.Retry) : new(SubmissionOutcome.Rejected);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
-                return new(SubmissionResult.Retry);
+                return new(SubmissionOutcome.Retry);
             }
             catch (HttpRequestException)
             {
-                return new(SubmissionResult.Retry);
+                return new(SubmissionOutcome.Retry);
             }
             catch (JsonException)
             {
-                return new(SubmissionResult.Retry);
+                return new(SubmissionOutcome.Retry);
             }
         }
 

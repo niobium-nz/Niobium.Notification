@@ -72,7 +72,7 @@ public sealed class EventAndCompositionTests
         Assert.AreEqual("test.example.invalid", options.SelfHostName);
         Assert.AreEqual("templates", options.TemplateFolder);
         Assert.IsNotNull(services.GetRequiredService<DurableNotificationFlow>());
-        Assert.IsFalse(services.GetRequiredService<IOptions<NotificationDeliveryOptions>>().Value.Enabled);
+        Assert.IsFalse(services.GetRequiredService<IOptions<NotificationOptions>>().Value.EnableDurableSubmission);
         HttpMessageHandler handler = services.GetRequiredService<IHttpMessageHandlerFactory>().CreateHandler(nameof(IIdempotentNotificationProvider));
         while (handler is DelegatingHandler wrapper)
         {

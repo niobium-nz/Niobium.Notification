@@ -13,7 +13,7 @@ namespace Niobium.Notification.Server
         NotificationFlow flow,
         ILogger<NotifyCommandConsumer> logger,
         DurableNotificationFlow? durable = null,
-        IOptions<NotificationDeliveryOptions>? deliveryOptions = null)
+        IOptions<NotificationOptions>? options = null)
     {
         [Function(nameof(NotifyCommandConsumer))]
         public async Task Run(
@@ -21,7 +21,8 @@ namespace Niobium.Notification.Server
             ServiceBusReceivedMessage message,
             CancellationToken cancellationToken)
         {
-            if (!message.TryParse(out NotifyCommand? evt, out var rawBody))
+            bool parsed = message.TryParse(out NotifyCommand? evt, out var rawBody);
+            if (!parsed || evt == null)
             {
                 logger.LogError("Notification message could not be parsed.");
                 return;
@@ -35,7 +36,7 @@ namespace Niobium.Notification.Server
                 return;
             }
 
-            if (deliveryOptions?.Value.Enabled == true)
+            if (options?.Value.EnableDurableSubmission == true)
             {
                 // The queue envelope supplies stable identity even for legacy producers whose
                 // body omits DomainEvent.ID. Never generate a new ID on redelivery.

@@ -1,5 +1,8 @@
 # Niobium.Notification
 
+Read [rich domains and data access](docs/domain-data-access.md) before business or persistence changes.
+
+
 .NET 10 Azure Functions service for templated email notifications, subscription events and contact requests. Consumers submit generic `NotifyCommand` messages; their business-specific data remains opaque to this shared service. Successful queue acceptance is not proof of provider submission or recipient delivery.
 
 Read [agent instructions](AGENTS.md), [delivery and operations](docs/delivery-and-operations.md), and the [implementation ledger](docs/implementation-progress.md) before changing delivery or recovery behavior.

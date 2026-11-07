@@ -1,49 +1,61 @@
 namespace Niobium.Notification.Delivery
 {
-    // Internal persistence contract. Never serialize this as NotifyCommand.
+    public enum SubmissionState { Pending = 1, Sending = 2, Accepted = 3, Failed = 4, Held = 5 }
+
+    public enum SubmissionOutcome
+    {
+        None = 0, TemplateMissing = 1, SubmissionUnknown = 2, RetryWindowExhausted = 3,
+        Accepted = 4, Retry = 5, Rejected = 6, Hold = 7,
+    }
+
+    // Persistence snapshot owned by NotificationSubmissionDomain. Integer columns follow
+    // the pinned mapper's supported scalar types; all decisions use the enums above.
     public sealed record NotificationSubmission
     {
-        public required string PartitionKey { get; init; }
-        public required string RowKey { get; init; }
-        public required string Fingerprint { get; init; }
-        public required string PayloadName { get; init; }
+        public const int CurrentVersion = 2;
+
+        [EntityKey(EntityKeyKind.PartitionKey)]
+        public string PartitionKey { get; init; } = String.Empty;
+        [EntityKey(EntityKeyKind.RowKey)]
+        public string RowKey { get; init; } = String.Empty;
+        [EntityKey(EntityKeyKind.ETag)]
         public string? ETag { get; init; }
-        public int Version { get; init; } = 1;
-        public string State { get; init; } = "pending";
+        [EntityKey(EntityKeyKind.Timestamp)]
+        public DateTimeOffset? Timestamp { get; init; }
+        public int Version { get; init; }
+        public string Fingerprint { get; init; } = String.Empty;
+        public string PayloadName { get; init; } = String.Empty;
+        public string WriteID { get; init; } = String.Empty;
+        public int StateCode { get; init; }
+        public int OutcomeCode { get; init; }
         public DateTimeOffset? FirstSubmission { get; init; }
         public DateTimeOffset? NextAttempt { get; init; }
         public int Attempts { get; init; }
         public string? ProviderID { get; init; }
-        public string? Outcome { get; init; }
     }
 
     public sealed record FrozenNotification(string Json, string SenderDomain, string CredentialFingerprint);
+    public sealed record SubmissionResult(SubmissionOutcome Outcome, string? ProviderID = null);
+    public enum SubmissionAction { Suppress, Wait, Submit }
 
-    public sealed record SubmissionResult(string Outcome, string? ProviderID = null)
+    public sealed record SubmissionAttempt
     {
-        public const string Accepted = "accepted";
-        public const string Retry = "retry";
-        public const string Rejected = "rejected";
-        public const string Hold = "hold";
-    }
+        internal SubmissionAttempt(SubmissionAction action, DateTimeOffset? due = null,
+            DateTimeOffset? deadline = null, FrozenNotification? payload = null, NotificationSubmission? claim = null)
+        {
+            Action = action; Due = due; Deadline = deadline; Payload = payload; Claim = claim;
+        }
 
-    public interface INotificationSubmissionStore
-    {
-        Task<NotificationSubmission?> ReadAsync(string partition, string id, CancellationToken cancellationToken);
-        Task<bool> CreateAsync(NotificationSubmission submission, FrozenNotification? payload, CancellationToken cancellationToken);
-        Task<NotificationSubmission?> UpdateAsync(NotificationSubmission submission, CancellationToken cancellationToken);
-        Task<FrozenNotification> ReadPayloadAsync(string name, CancellationToken cancellationToken);
+        public SubmissionAction Action { get; }
+        public DateTimeOffset? Due { get; }
+        public DateTimeOffset? Deadline { get; }
+        public FrozenNotification? Payload { get; }
+        internal NotificationSubmission? Claim { get; }
     }
 
     public interface IIdempotentNotificationProvider
     {
         FrozenNotification Freeze(TemplateDomain.Deliverable content);
         Task<SubmissionResult> SubmitAsync(FrozenNotification content, string key, DateTimeOffset deadline, CancellationToken cancellationToken);
-    }
-
-    public sealed class NotificationDeliveryOptions
-    {
-        // Activation requires a reviewed cutover for messages previously sent without inbox records.
-        public bool Enabled { get; set; }
     }
 }

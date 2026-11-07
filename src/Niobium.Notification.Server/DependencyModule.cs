@@ -39,10 +39,8 @@ namespace Niobium.Notification.Server
             loaded = true;
 
             builder.Services.Configure<NotificationOptions>(o => options?.Invoke(o));
-            builder.Services.Configure<NotificationDeliveryOptions>(builder.Configuration.GetSection(nameof(NotificationDeliveryOptions)));
             builder.Services.AddSingleton(TimeProvider.System);
             builder.Services.AddSingleton<NotificationRetryPolicy>();
-            builder.Services.AddTransient<INotificationSubmissionStore, TableNotificationSubmissionStore>();
             builder.Services.AddHttpClient<IIdempotentNotificationProvider, ResendSubmissionProvider>()
                 .ConfigureAdditionalHttpMessageHandlers((handlers, _) =>
                 {

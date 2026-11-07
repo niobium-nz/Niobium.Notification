@@ -43,7 +43,7 @@ public sealed class ResendSubmissionTests
         FrozenNotification frozen = provider.Freeze(source);
         source.Subject = "Changed";
         Assert.IsFalse(frozen.Json.Contains("synthetic-scoped-key", StringComparison.Ordinal));
-        Assert.AreEqual(SubmissionResult.Accepted, (await provider.SubmitAsync(frozen, "stable-operation", clock.Now.AddDays(1), default)).Outcome);
+        Assert.AreEqual(SubmissionOutcome.Accepted, (await provider.SubmitAsync(frozen, "stable-operation", clock.Now.AddDays(1), default)).Outcome);
         SubmissionResult second = await provider.SubmitAsync(frozen, "stable-operation", clock.Now.AddDays(1), default);
         Assert.AreEqual("provider-1", second.ProviderID);
         Assert.AreEqual(bodies[0], bodies[1]);
@@ -52,19 +52,19 @@ public sealed class ResendSubmissionTests
     }
 
     [TestMethod]
-    [DataRow(200, "{\"id\":\"accepted-id\"}", "accepted")]
-    [DataRow(200, "{}", "retry")]
-    [DataRow(200, "{\"id\":12}", "retry")]
-    [DataRow(200, "invalid json", "retry")]
-    [DataRow(409, "{\"name\":\"concurrent_idempotent_requests\"}", "retry")]
-    [DataRow(409, "{\"name\":\"invalid_idempotent_request\"}", "hold")]
-    [DataRow(409, "{}", "hold")]
-    [DataRow(429, "", "retry")]
-    [DataRow(408, "", "retry")]
-    [DataRow(503, "", "retry")]
-    [DataRow(401, "", "rejected")]
-    [DataRow(422, "", "rejected")]
-    public async Task Responses_HaveExplicitOutcomes(int status, string body, string outcome)
+    [DataRow(200, "{\"id\":\"accepted-id\"}", SubmissionOutcome.Accepted)]
+    [DataRow(200, "{}", SubmissionOutcome.Retry)]
+    [DataRow(200, "{\"id\":12}", SubmissionOutcome.Retry)]
+    [DataRow(200, "invalid json", SubmissionOutcome.Retry)]
+    [DataRow(409, "{\"name\":\"concurrent_idempotent_requests\"}", SubmissionOutcome.Retry)]
+    [DataRow(409, "{\"name\":\"invalid_idempotent_request\"}", SubmissionOutcome.Hold)]
+    [DataRow(409, "{}", SubmissionOutcome.Hold)]
+    [DataRow(429, "", SubmissionOutcome.Retry)]
+    [DataRow(408, "", SubmissionOutcome.Retry)]
+    [DataRow(503, "", SubmissionOutcome.Retry)]
+    [DataRow(401, "", SubmissionOutcome.Rejected)]
+    [DataRow(422, "", SubmissionOutcome.Rejected)]
+    public async Task Responses_HaveExplicitOutcomes(int status, string body, SubmissionOutcome outcome)
     {
         DurableNotificationTests.Clock clock = new();
         int calls = 0;
@@ -86,9 +86,9 @@ public sealed class ResendSubmissionTests
         using HttpClient client = new(new Handler((_, _) => throw new AssertFailedException("Network access was not expected.")));
         ResendSubmissionProvider provider = new(client, Options.Create(config), clock);
         FrozenNotification frozen = provider.Freeze(Content());
-        Assert.AreEqual(SubmissionResult.Hold, (await provider.SubmitAsync(frozen, "key", clock.Now.AddMinutes(1), default)).Outcome);
+        Assert.AreEqual(SubmissionOutcome.Hold, (await provider.SubmitAsync(frozen, "key", clock.Now.AddMinutes(1), default)).Outcome);
         config.GlobalAPIKey = "new-synthetic-account";
-        Assert.AreEqual(SubmissionResult.Hold, (await provider.SubmitAsync(frozen, "key", clock.Now.AddDays(1), default)).Outcome);
+        Assert.AreEqual(SubmissionOutcome.Hold, (await provider.SubmitAsync(frozen, "key", clock.Now.AddDays(1), default)).Outcome);
         config.GlobalAPIKey = "";
         Assert.ThrowsExactly<InvalidOperationException>(() => provider.Freeze(Content()));
     }
@@ -101,7 +101,7 @@ public sealed class ResendSubmissionTests
         DurableNotificationTests.Clock clock = new();
         using HttpClient client = new(new Handler((_, _) => timeout ? throw new TaskCanceledException() : throw new HttpRequestException()));
         ResendSubmissionProvider provider = new(client, Options.Create(Config()), clock);
-        Assert.AreEqual(SubmissionResult.Retry, (await provider.SubmitAsync(provider.Freeze(Content()), "key", clock.Now.AddDays(1), default)).Outcome);
+        Assert.AreEqual(SubmissionOutcome.Retry, (await provider.SubmitAsync(provider.Freeze(Content()), "key", clock.Now.AddDays(1), default)).Outcome);
     }
 
     [TestMethod]

@@ -7,7 +7,7 @@ subscription-triggered calls to `NotificationFlow` keep their existing behavior.
 
 ## Identity and persistence
 
-`NotificationDeliveryOptions:Enabled` defaults to false. When enabled, the queue
+`NotificationOptions:EnableDurableSubmission` defaults to false. When enabled, the queue
 consumer uses the Service Bus `MessageId` as the operation ID, including for old
 producers that omit the body ID. Scheduled retries carry the same ID in both
 places. Invoicing already supplies its full invoice identity in both places.
@@ -18,9 +18,18 @@ significant. A deliberately requested additional copy needs a new operation ID.
 
 `NotificationSubmission` is a new internal Table entity, not a public Contracts
 change. It stores schema version, request fingerprint, immutable payload pointer,
-state, ETag, first-submission time, next-attempt time, attempt count, provider ID
-and a fixed outcome code. Every claim/result transition uses its actual ETag.
-Unknown schema/state versions fail closed. Existing framework packages are unchanged.
+integer state/outcome codes, ETag, first-submission time, next-attempt time, attempt
+count, provider ID and a unique write identity. Domain decisions use `SubmissionState`
+and `SubmissionOutcome` enums. Schema version 2 rejects the unpublished version 1
+draft's string state fields; it does not reinterpret or replay those records.
+The provider key format remains unchanged. Unknown versions/codes fail closed.
+
+`NotificationSubmissionDomain` owns these rules and uses the existing framework
+`IRepository<NotificationSubmission>` through `GenericDomain.SaveAsync`. There is
+no application Table SDK adapter. The pinned mapper loses ETags from write results,
+so the domain reads back and verifies its own write identity and complete snapshot
+before using the returned version. Conflicts propagate for redelivery. Existing
+framework packages are unchanged; see [domain/data access](domain-data-access.md).
 
 The rendered provider JSON is frozen once in the private
 `notification-submissions` blob container. It includes sender, recipient, subject
@@ -40,12 +49,12 @@ the same access controls as other private notification data.
 ## Submission and recovery
 
 1. Load or conditionally register the operation and its frozen content. A missing
-   template creates an explicit `failed/template_missing` record without sending.
-2. Suppress `accepted`, `failed` and `held` records. Accepted submissions remain
+   template creates an explicit Failed/TemplateMissing outcome without sending.
+2. Suppress Accepted, Failed and Held records. Accepted submissions remain
    suppressed after the provider's 24-hour window; no expiry is configured.
 3. Check the persisted first-submission boundary and due time. Early redelivery
    only schedules a wake for the stored due time; it does not call the provider.
-4. Conditionally claim `sending`, persist the first-submission time, increment
+4. Conditionally claim Sending, persist the first-submission time, increment
    the attempt count and save the next-attempt time.
 5. Successfully schedule a recovery message on the existing `notifycommand`
    queue **before** calling Resend. A scheduling error propagates so the current
@@ -67,7 +76,7 @@ The initial retry policy doubles from 60 seconds, caps at one hour, applies
 80%-100% jitter and enforces a one-minute minimum. There are at most 48 claims.
 These are implementation defaults to review, not a delivery SLA. The 24-hour
 window starts before the first possible provider call and is never reset.
-The flow and provider both stop new calls one minute before its end; a provider
+The domain and provider both stop new calls one minute before its end; a provider
 request has a 30-second timeout. Window/attempt exhaustion holds the record for
 investigation and an explicit resend decision. No automatic new operation ID is
 created. Provider/network timeouts remain uncertain; a subsequent rejection does
@@ -97,9 +106,11 @@ Before activation, review the concrete internal schema and failure policy and:
   or explicitly delimit an approved new-operation cohort. A recent queue enqueue
   time alone cannot prove an old logical operation has never sent. Do not replay
   historical invoices to populate the new store.
-- Verify the existing app identity can use the new private table/container and
-  schedule to the existing queue. Application clients create these resources in
-  the existing account when first used; no new Azure stack is required.
+- Provision the declared `NotificationSubmission` table through `infra/main.bicep`
+  in the existing data account before enabling the option. The generic repository
+  does not create tables. Verify the app identity can use it, create/read the private
+  payload container through `IFileService`, and schedule to the existing queue.
+  No new Azure stack is required; this draft has not deployed the declaration.
 - Verify configured provider keys belong to the intended account and preserve
   their selection across retries. Do not infer key/account continuity on rotation.
 - Exercise the enabled consumer, actual scheduled queue redelivery, provider
@@ -125,12 +136,12 @@ storage failures and the actual runtime HTTP-handler composition.
 
 `Niobium.Notification.Storage.Tests` is an explicitly invoked suite outside the
 solution. It fails when its loopback emulator setting is absent, rather than
-silently skipping. It uses the real pinned Azure Table client to test competing
+silently skipping. It uses the real pinned Niobium Table repository to test competing
 inserts, competing ETag claims, stale rejection, round trips and cleared nullable
 fields. Additional cases exercise the pinned Niobium Blob adapter against Azurite:
 private-container creation, leading-slash path round trips, create-only content,
 missing payloads and durable flow recovery after a lost completion-write response,
-both before and after that write commits. Reconstructed stores/providers reuse the
+both before and after that write commits. Reconstructed domains/providers reuse the
 persisted key, payload and window; accepted operations stay suppressed after two days.
 
 Set both `NIOBIUM_NOTIFICATION_TEST_TABLE_ENDPOINT` and

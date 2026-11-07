@@ -1,19 +1,9 @@
-using System.Collections.Concurrent;
 using System.Net;
-using System.Reflection;
 using Azure;
-using Azure.Data.Tables;
-using Azure.Storage;
-using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
-using Niobium.Database.StorageTable;
-using Niobium.File;
-using Niobium.File.Blob;
-using Niobium.Identity;
 using Niobium.Messaging;
 using Niobium.Notification.Delivery;
 using Niobium.Notification.Server.Delivery;
@@ -25,97 +15,6 @@ namespace Niobium.Notification.Storage.Tests;
 [TestClass]
 public sealed class BlobRecoveryTests
 {
-    private sealed class IsolatedTables(Uri uri, TableSharedKeyCredential key, string name) : TableServiceClient(uri, key)
-    {
-        public override TableClient GetTableClient(string tableName)
-        {
-            Assert.AreEqual(TableNotificationSubmissionStore.TableName, tableName);
-            return base.GetTableClient(name);
-        }
-    }
-
-    private sealed class IsolatedBlobs(Uri uri, StorageSharedKeyCredential key, string name) : BlobServiceClient(uri, key)
-    {
-        public BlobContainerClient OwnedContainer => base.GetBlobContainerClient(name);
-        public override BlobContainerClient GetBlobContainerClient(string containerName)
-        {
-            Assert.AreEqual(TableNotificationSubmissionStore.PayloadContainer, containerName);
-            return OwnedContainer;
-        }
-    }
-
-    private sealed class StorageFixture : IAsyncDisposable
-    {
-        // Published Azurite key. No application credentials or cloud endpoints are accepted.
-        private const string EmulatorKey = "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==";
-        private readonly string tableName = "NotificationTest" + Guid.NewGuid().ToString("N");
-        private readonly IsolatedTables tables;
-        private readonly IsolatedBlobs blobs;
-        private readonly Mock<IAzureTableClientFactory> tableFactory = new(MockBehavior.Strict);
-        private readonly ConcurrentDictionary<string, BlobServiceClient> clients;
-        private readonly Type factoryType;
-        private readonly string cacheKey;
-
-        public StorageFixture()
-        {
-            Uri tableUri = Endpoint("NIOBIUM_NOTIFICATION_TEST_TABLE_ENDPOINT");
-            Uri blobUri = Endpoint("NIOBIUM_NOTIFICATION_TEST_BLOB_ENDPOINT");
-            tables = new(tableUri, new("devstoreaccount1", EmulatorKey), tableName);
-            blobs = new(blobUri, new("devstoreaccount1", EmulatorKey), "notification-test-" + Guid.NewGuid().ToString("N"));
-            tableFactory.Setup(f => f.CreateClientAsync(It.IsAny<IEnumerable<DatabasePermissions>>(), TableNotificationSubmissionStore.TableName, null, It.IsAny<CancellationToken>())).ReturnsAsync(tables);
-
-            // The pinned 4.0.60 factory is internal/sealed and creates a managed-identity
-            // client. Seed only this fixture's cache entry with a real loopback SDK client;
-            // the actual CloudBlobRepository implementation still performs all Blob I/O.
-            // This does not test cloud authentication or alter the framework package.
-            factoryType = typeof(StorageBlobOptions).Assembly.GetType("Niobium.File.Blob.AzureBlobClientFactory", throwOnError: true)!;
-            clients = (ConcurrentDictionary<string, BlobServiceClient>)factoryType.GetField("clients", BindingFlags.Static | BindingFlags.NonPublic)!.GetValue(null)!;
-            cacheKey = blobUri.AbsoluteUri.TrimEnd('/') + "/" + Guid.NewGuid().ToString("N");
-            Assert.IsTrue(clients.TryAdd(cacheKey, blobs));
-        }
-
-        public BlobContainerClient Container => blobs.OwnedContainer;
-
-        public TableNotificationSubmissionStore NewStore()
-        {
-            object factory = Activator.CreateInstance(factoryType,
-                Options.Create(new StorageBlobOptions { FullyQualifiedDomainName = cacheKey }),
-                new ConfigurationBuilder().Build(),
-                new Lazy<IAuthenticator>(() => throw new AssertFailedException("Identity access is forbidden in a local fixture.")))!;
-            Type repositoryType = typeof(StorageBlobOptions).Assembly.GetType("Niobium.File.Blob.CloudBlobRepository", throwOnError: true)!;
-            IFileService files = (IFileService)Activator.CreateInstance(repositoryType, factory)!;
-            return new(tableFactory.Object, files);
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            try
-            {
-                try
-                {
-                    await tables.DeleteTableAsync(tableName);
-                }
-                catch (RequestFailedException error) when (error.Status == 404) { }
-            }
-            finally
-            {
-                try { await Container.DeleteIfExistsAsync(); }
-                finally { Assert.IsTrue(clients.TryRemove(cacheKey, out _)); }
-            }
-        }
-
-        private static Uri Endpoint(string setting)
-        {
-            string value = Environment.GetEnvironmentVariable(setting)
-                ?? throw new InvalidOperationException($"Set {setting} to a disposable loopback Azurite endpoint.");
-            Uri uri = new(value);
-            Assert.IsTrue(uri.IsLoopback && uri.Scheme == "http" && String.IsNullOrEmpty(uri.Query)
-                && String.IsNullOrEmpty(uri.UserInfo) && String.IsNullOrEmpty(uri.Fragment)
-                && uri.AbsolutePath.TrimEnd('/') == "/devstoreaccount1");
-            return uri;
-        }
-    }
-
     private sealed class Clock : TimeProvider
     {
         public DateTimeOffset Now { get; set; } = new(2026, 11, 6, 0, 0, 0, TimeSpan.Zero);
@@ -127,51 +26,31 @@ public sealed class BlobRecoveryTests
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token) => send(request, token);
     }
 
-    private sealed class LostCompletion(INotificationSubmissionStore inner, bool commitBeforeFailure) : INotificationSubmissionStore
-    {
-        public Task<NotificationSubmission?> ReadAsync(string partition, string id, CancellationToken token) => inner.ReadAsync(partition, id, token);
-        public Task<bool> CreateAsync(NotificationSubmission value, FrozenNotification? payload, CancellationToken token) => inner.CreateAsync(value, payload, token);
-        public Task<FrozenNotification> ReadPayloadAsync(string name, CancellationToken token) => inner.ReadPayloadAsync(name, token);
-        public async Task<NotificationSubmission?> UpdateAsync(NotificationSubmission value, CancellationToken token)
-        {
-            if (value.State != "accepted") return await inner.UpdateAsync(value, token);
-            if (commitBeforeFailure) Assert.IsNotNull(await inner.UpdateAsync(value, token));
-            throw new IOException("Synthetic lost result-write response.");
-        }
-    }
-
     private static NotifyCommand Request() => new()
     {
         ID = "synthetic-operation", Tenant = Guid.NewGuid(), Channel = "Notice",
         Destination = "recipient@example.invalid", Parameters = new() { ["text"] = "Frozen" },
     };
 
-    private static NotificationSubmission Entry(NotifyCommand request) => new()
-    {
-        PartitionKey = request.Tenant.ToString("N"), RowKey = NotificationFingerprint.Hash(request.ID),
-        Fingerprint = NotificationFingerprint.Of(request), PayloadName = "payload/frozen.json",
-    };
-
     [TestMethod]
     public async Task PinnedBlobAdapter_PreservesPrivateCreateOnlyPayload_AndRejectsMissingContent()
     {
-        await using StorageFixture storage = new();
-        TableNotificationSubmissionStore store = storage.NewStore();
-        NotificationSubmission entry = Entry(Request());
-        FrozenNotification payload = new("{\"html\":\"Frozen ✓\"}", "example.invalid", "synthetic-digest");
-        Assert.IsTrue(await store.CreateAsync(entry, payload, default));
+        await using LocalStorageFixture storage = new();
+        await storage.InitializeAsync();
+        NotificationSubmissionDomain domain = storage.Domain("tenant", "operation");
+        FrozenNotification payload = new("{html:Frozen ✓}", "example.invalid", "synthetic-digest");
+        await domain.RegisterAsync("fingerprint", payload);
+        NotificationSubmission entry = await domain.GetEntityAsync();
         Assert.AreEqual(PublicAccessType.None, (await storage.Container.GetAccessPolicyAsync()).Value.BlobPublicAccess);
-        Assert.IsTrue((await storage.Container.GetBlobClient("/" + entry.PayloadName).ExistsAsync()).Value);
-        Assert.AreEqual(payload, await storage.NewStore().ReadPayloadAsync(entry.PayloadName, default));
-
+        SubmissionAttempt attempt = await domain.PrepareAttemptAsync("fingerprint", DateTimeOffset.UtcNow, new NotificationRetryPolicy());
+        Assert.AreEqual(payload, attempt.Payload);
+        using MemoryStream changed = new("changed"u8.ToArray());
         RequestFailedException conflict = await Assert.ThrowsExactlyAsync<RequestFailedException>(() =>
-            store.CreateAsync(entry with { RowKey = "new-operation" }, payload with { Json = "changed" }, default));
+            storage.Files().PutAsync(NotificationSubmissionDomain.PayloadContainer, entry.PayloadName, changed, replaceIfExist: false));
         Assert.AreEqual(409, conflict.Status);
-        Assert.IsNull(await store.ReadAsync(entry.PartitionKey, "new-operation", default));
-        Assert.AreEqual(payload, await storage.NewStore().ReadPayloadAsync(entry.PayloadName, default));
-
         await storage.Container.DeleteBlobAsync("/" + entry.PayloadName);
-        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => storage.NewStore().ReadPayloadAsync(entry.PayloadName, default));
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => storage.Domain("tenant", "operation")
+            .PrepareAttemptAsync("fingerprint", attempt.Due!.Value, new NotificationRetryPolicy()));
     }
 
     [TestMethod]
@@ -179,17 +58,19 @@ public sealed class BlobRecoveryTests
     [DataRow(true)]
     public async Task RealTableAndBlob_LostCompletion_RestartReconcilesSameOperation(bool commitBeforeFailure)
     {
-        await using StorageFixture storage = new();
-        TableNotificationSubmissionStore store = storage.NewStore();
+        await using LocalStorageFixture storage = new();
+        await storage.InitializeAsync();
+        IRepository<NotificationSubmission> repository = storage.Repository();
         Clock clock = new();
         NotifyCommand request = Request();
-        NotificationSubmission entry = Entry(request);
+        string partition = request.Tenant.ToString("N");
+        string id = NotificationFingerprint.Hash(request.ID);
         List<(string Key, string Json)> submissions = [];
         List<MessagingEntry<NotifyCommand>> scheduled = [];
         using HttpClient client = new(new Handler(async (message, token) =>
         {
-            NotificationSubmission claimed = (await storage.NewStore().ReadAsync(entry.PartitionKey, entry.RowKey, token))!;
-            Assert.AreEqual("sending", claimed.State);
+            NotificationSubmission claimed = (await storage.Repository().RetrieveAsync(partition, id, cancellationToken: token))!;
+            Assert.AreEqual((int)SubmissionState.Sending, claimed.StateCode);
             Assert.IsTrue(scheduled.Count >= claimed.Attempts, "Recovery must be scheduled before provider submission.");
             submissions.Add((message.Headers.GetValues("Idempotency-Key").Single(), await message.Content!.ReadAsStringAsync(token)));
             return new(HttpStatusCode.OK) { Content = new StringContent("{\"id\":\"synthetic-provider-id\"}") };
@@ -200,32 +81,40 @@ public sealed class BlobRecoveryTests
         {
             From = "sender@example.invalid", To = request.Destination!, Subject = "Frozen subject", Body = "<p>Frozen ✓</p>",
         });
-        Assert.IsTrue(await store.CreateAsync(entry, frozen, default));
+        await storage.Domain(partition, id).RegisterAsync(NotificationFingerprint.Of(request), frozen);
         Mock<IMessagingBroker<NotifyCommand>> queue = new(MockBehavior.Strict);
         queue.Setup(q => q.EnqueueAsync(It.IsAny<IEnumerable<MessagingEntry<NotifyCommand>>>(), It.IsAny<CancellationToken>()))
             .Callback<IEnumerable<MessagingEntry<NotifyCommand>>, CancellationToken>((entries, _) => scheduled.AddRange(entries))
             .Returns(Task.CompletedTask);
-        // Any template access or legacy send would fail: recovery must use stored content.
         NotificationFlow renderer = new(new Mock<IDomainRepository<TemplateDomain, Template>>(MockBehavior.Strict).Object,
             new Mock<IEmailNotificationClient>(MockBehavior.Strict).Object, NullLogger<NotificationFlow>.Instance);
-        DurableNotificationFlow Flow(INotificationSubmissionStore current) => new(renderer, current, Provider(), queue.Object, clock, new NotificationRetryPolicy());
-
-        await Assert.ThrowsExactlyAsync<IOException>(() => Flow(new LostCompletion(store, commitBeforeFailure)).RunAsync(request));
+        DurableNotificationFlow Flow(IRepository<NotificationSubmission>? current = null) => new(renderer, storage.Domains(current), Provider(), queue.Object, clock, new NotificationRetryPolicy());
+        Mock<IRepository<NotificationSubmission>> uncertain = new(MockBehavior.Strict);
+        uncertain.Setup(r => r.RetrieveAsync(It.IsAny<string>(), It.IsAny<string>(), null, It.IsAny<CancellationToken>()))
+            .Returns((string pk, string rk, IList<string>? _, CancellationToken token) => repository.RetrieveAsync(pk, rk, cancellationToken: token));
+        uncertain.Setup(r => r.UpdateAsync(It.IsAny<IEnumerable<NotificationSubmission>>(), true, false, It.IsAny<CancellationToken>()))
+            .Returns(async (IEnumerable<NotificationSubmission> entries, bool _, bool _, CancellationToken token) =>
+            {
+                if (entries.Single().StateCode != (int)SubmissionState.Accepted)
+                    return await repository.UpdateAsync(entries, cancellationToken: token);
+                if (commitBeforeFailure) await repository.UpdateAsync(entries, cancellationToken: token);
+                throw new IOException("Synthetic lost result-write response.");
+            });
+        await Assert.ThrowsExactlyAsync<IOException>(() => Flow(uncertain.Object).RunAsync(request));
         Assert.AreEqual(1, submissions.Count);
         Assert.AreEqual(request.ID, scheduled.Single().ID);
         DateTimeOffset first = clock.Now;
         clock.Now = scheduled.Single().Schedule!.Value;
-        await Flow(storage.NewStore()).RunAsync(scheduled[0].Value);
+        await Flow().RunAsync(scheduled[0].Value);
         Assert.AreEqual(commitBeforeFailure ? 1 : 2, submissions.Count);
         Assert.IsTrue(submissions.All(call => call.Key == submissions[0].Key && call.Json == frozen.Json));
-        NotificationSubmission accepted = (await storage.NewStore().ReadAsync(entry.PartitionKey, entry.RowKey, default))!;
-        Assert.AreEqual("accepted", accepted.State);
+        NotificationSubmission accepted = (await storage.Repository().RetrieveAsync(partition, id))!;
+        Assert.AreEqual((int)SubmissionState.Accepted, accepted.StateCode);
         Assert.AreEqual("synthetic-provider-id", accepted.ProviderID);
         Assert.AreEqual(first, accepted.FirstSubmission);
         Assert.IsNull(accepted.NextAttempt);
-
         clock.Now = first.AddDays(2);
-        await Flow(storage.NewStore()).RunAsync(request);
+        await Flow().RunAsync(request);
         Assert.AreEqual(commitBeforeFailure ? 1 : 2, submissions.Count);
     }
 }

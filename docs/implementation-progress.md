@@ -2,6 +2,63 @@
 
 This repository is the downstream dependency for the supplied Niobium.Invoicing research plan. Preserve the original plan IDs and acceptance criteria. The owner's accepted recommendations are recorded in [Invoicing Q28](https://github.com/niobium-nz/Niobium.Invoicing/blob/50df240f8212af33a152a13bcce11c848d6b51a8/docs/decisions-and-risks.md#q28-business-decision-follow-up); that decision-only change completed production verification as PR #14. This milestone does not claim those business behaviors are implemented.
 
+## PR #2 domain review follow-up: 2026-11-07
+
+The owner requested an investigation of DDD, rich domains and Niobium data access
+across Notification, Store, Invoicing and the framework. Work continued from clean
+Notification head `46e93c85f79322eb5b765295c0e323eb60f8fdb0` on the existing PR branch.
+The five inline requests in the owner's changes-requested review are addressed:
+
+| Review request | Result |
+| --- | --- |
+| Enum states | Explicit `SubmissionState`/`SubmissionAction` decisions, scalar integer storage codes, unknown-code rejection |
+| Actions outside conditions | Flow operations execute before branching; queue parsing results are named; project rule added to AGENTS.md |
+| Enum outcomes | `SubmissionOutcome` used across domain, provider and tests |
+| Reuse options | `NotificationOptions:EnableDurableSubmission`, false by default; separate delivery options removed |
+| Rich domain and framework data access | `NotificationSubmissionDomain` owns registration, claims, retry eligibility and outcomes through `GenericDomain`/`IRepository`; the custom Table SDK store is removed |
+
+The installed repository already supports conditional create/update. Real-adapter
+verification reproduced its missing write-response ETag; the domain now verifies
+its unique write identity and complete snapshot on read-back before using the
+returned ETag. No framework runtime change or package upgrade is required for this
+refactor. The [domain/data-access guide](domain-data-access.md) records the inspected
+source versions, examples and framework follow-ups. Equivalent guides and agent
+entry points were added at the user's request in
+[Niobium PR #1](https://github.com/niobium-nz/Niobium/pull/1),
+[Store PR #2](https://github.com/niobium-nz/Niobium.Store/pull/2) and
+[Invoicing PR #17](https://github.com/niobium-nz/Niobium.Invoicing/pull/17).
+
+Internal schema version 2 rejects the earlier unpublished string-state version.
+The provider idempotency key stays stable. The old draft option does not enable
+the new path. Generic repositories do not create tables, so `infra/main.bicep`
+declares `NotificationSubmission` in the existing data account. Deploy that table
+and satisfy the [cutover prerequisites](durable-submission.md#activation-and-remaining-dependencies)
+before enabling the feature. No deployment or data migration was performed.
+
+Validation used .NET SDK 10.0.403 after sourcing `/workspace/.niobium-tools/env.sh`:
+
+| Exact command | Result |
+| --- | --- |
+| `dotnet build Niobium.Notification.slnx --configuration Release --no-restore --nologo --disable-build-servers -m:1` | Passed, zero warnings/errors |
+| `dotnet test --project src/Niobium.Notification.Core.Tests/Niobium.Notification.Core.Tests.csproj --configuration Release --no-build --no-restore --report-trx --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml --results-directory /workspace/scratch/notification-domain-tests-final` | 96 passed, zero failed/skipped |
+| `python scripts/check-coverage.py /workspace/scratch/notification-domain-tests-final/coverage.cobertura.xml` | Passed: 530/540 lines, 98.15%; Contracts 100%, Core 98.99%, Server 96.82% |
+| `NIOBIUM_NOTIFICATION_TEST_TABLE_ENDPOINT=http://127.0.0.1:18492/devstoreaccount1 NIOBIUM_NOTIFICATION_TEST_BLOB_ENDPOINT=http://127.0.0.1:18490/devstoreaccount1 dotnet test --project src/Niobium.Notification.Storage.Tests/Niobium.Notification.Storage.Tests.csproj --configuration Release --no-restore --report-trx --results-directory /workspace/scratch/notification-domain-storage-final` | Four passed, zero failed/skipped; real pinned Table repository and Blob adapter |
+| `/workspace/scratch/bicep-v0.49.2 format infra/main.bicep --outfile /workspace/scratch/notification-domain-main.formatted.bicep` | Syntax accepted; repository formatting unchanged |
+| `/workspace/scratch/bicep-v0.49.2 build infra/main.bicep --outfile /workspace/scratch/notification-domain-main.json` | Blocked: proxy 403 while restoring existing AVM modules from MCR, BCP192 and dependent errors |
+| `git -c core.whitespace=cr-at-eol diff --check` | Passed; relative documentation targets also checked |
+
+The baseline Bicep files also cannot compile without those modules (BCP190 with
+`--no-restore`). Full infrastructure type validation remains unverified, not a
+successful check. The local suites cover ownership read-back, competing/stale
+claims, uncertain writes, frozen payloads, missing data, corrupt state and retry
+boundaries. Queue/provider replies are simulated. Fixtures removed their owned
+local tables/containers and both in-memory Azurite processes were stopped.
+
+The no-deployment/no-merge/no-publication boundary still applies; commits use
+`[skip ci]`. These results do not satisfy the live deployment readiness gate or
+formal current-head review. The feature remains disabled. The dated sections below
+record earlier stages and their then-current implementation and test evidence.
+
 ## Automatic review authorization: 2026-11-06
 
 The owner's instruction, "approve auto review", supersedes the earlier manual-only
