@@ -53,7 +53,7 @@ recorded in AGENTS.md for future changes.
 The existing repository provides conditional create, ETag-checked update, replacement,
 and retrieval, so the feature needs no new backend API or package upgrade. The
 inspected abstraction and Table files match installed Abstractions 4.0.61 and Table
-4.0.60. See the [framework guide](https://github.com/niobium-nz/Niobium/blob/codex/domain-data-access-guidance/docs/domain-data-access.md)
+4.0.60. See the [framework guide](https://github.com/niobium-nz/Niobium/blob/1e370fccd38635f7209c1c4b01ddafcbe10ea618/docs/domain-data-access.md)
 for exact source commits and the adapter/domain boundary.
 
 The 4.0.60 mapper drops response ETags from returned write models. The domain verifies
@@ -63,9 +63,14 @@ A future framework fix should preserve write ETags centrally; it would remove th
 extra read without changing this business contract. An uncertain write or conflict
 propagates for queue recovery; force-save is never used to bypass it.
 
-The generic repository does not create tables. `infra/main.bicep` now declares
-`NotificationSubmission` in the existing data account. This replaces runtime table
-creation; no deployment was performed. Blob creation still uses the existing
+The generic repository does not create tables. `infra/main.bicep` creates the
+input `storageTableNames` in the existing data account. `main.bicepparam` reads
+`STORAGE_TABLE_NAMES`, defaulting to `Subscription,Template,NotificationSubmission`.
+Business names remain outside the Bicep resource declarations; the new table
+uses its entity type name, as the historical tables do. See
+[resource-name configuration](delivery-and-operations.md#resource-name-configuration)
+for defaults and workflow projection. This replaces runtime table creation; no
+deployment was performed. Blob creation still uses the existing
 `IFileService` behavior. Claims, blobs, queues and provider calls are not atomic;
 [durable submission](durable-submission.md) records the failure order and cutover.
 

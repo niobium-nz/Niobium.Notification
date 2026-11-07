@@ -106,9 +106,12 @@ Before activation, review the concrete internal schema and failure policy and:
   or explicitly delimit an approved new-operation cohort. A recent queue enqueue
   time alone cannot prove an old logical operation has never sent. Do not replay
   historical invoices to populate the new store.
-- Provision the declared `NotificationSubmission` table through `infra/main.bicep`
-  in the existing data account before enabling the option. The generic repository
-  does not create tables. Verify the app identity can use it, create/read the private
+- Provision `NotificationSubmission` through the generic `storageTableNames` input
+  to `infra/main.bicep` in the existing data account before enabling the option.
+  `main.bicepparam` reads `STORAGE_TABLE_NAMES` and includes the existing
+  `Subscription` and `Template` tables in its default list; see
+  [resource-name configuration](delivery-and-operations.md#resource-name-configuration).
+  The generic repository does not create tables. Verify the app identity can use it, create/read the private
   payload container through `IFileService`, and schedule to the existing queue.
   No new Azure stack is required; this draft has not deployed the declaration.
 - Verify configured provider keys belong to the intended account and preserve

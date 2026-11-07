@@ -2,6 +2,44 @@
 
 This repository is the downstream dependency for the supplied Niobium.Invoicing research plan. Preserve the original plan IDs and acceptance criteria. The owner's accepted recommendations are recorded in [Invoicing Q28](https://github.com/niobium-nz/Niobium.Invoicing/blob/50df240f8212af33a152a13bcce11c848d6b51a8/docs/decisions-and-risks.md#q28-business-decision-follow-up); that decision-only change completed production verification as PR #14. This milestone does not claim those business behaviors are implemented.
 
+## PR #2 table-input review follow-up: 2026-11-07
+
+The owner's [new review comment](https://github.com/niobium-nz/Niobium.Notification/pull/2#discussion_r4500079992)
+asks for resource names to follow the existing queue parameter pattern. Starting
+from `eea196e71adfb24ad8d4cadc435f81e9506f7bfb`, `main.bicep` now accepts generic
+`storageTableNames` and creates only the names supplied by that input.
+`main.bicepparam` reads `STORAGE_TABLE_NAMES` with the application default
+`Subscription,Template,NotificationSubmission`, including the historical service
+entities. The new name stays singular PascalCase and matches the entity type used
+by the framework repository. No runtime mapping or table rename is introduced.
+
+[Resource-name configuration](delivery-and-operations.md#resource-name-configuration)
+and AGENTS.md record the ownership boundary, defaults, naming and explicit workflow
+projection needed for GitHub variables. Current workflows use parameter defaults;
+no workflow or host-module change is needed for these tables. The shared framework
+guide link is pinned to its immutable documentation commit, now merged in Niobium
+PR #1.
+
+Validation used Bicep CLI 0.49.2 and PowerShell 7.6.9. The latter was installed in
+this workspace from the official release with its published SHA-256 verified after
+the initial hook check found `pwsh` missing.
+
+| Check | Result |
+| --- | --- |
+| Bicep `format` on `infra/main.bicep` and `infra/main.bicepparam`, writing only temporary output | Syntax accepted for both files |
+| Bicep `build-params` on a temporary copy using `using none`, preserving every parameter binding | Passed for absent, overridden and explicitly empty `STORAGE_TABLE_NAMES`; this isolates binding evaluation from external modules and does not validate resource types |
+| `python -m unittest discover -s scripts -p test_app_settings.py` with PowerShell on PATH | Four passed |
+| Run `SetAppSettings.ps1` and `ClearAppSettings.ps1` on a temporary copy of the actual parameter file with synthetic settings | Table binding preserved and original file restored exactly |
+| `/workspace/scratch/bicep-v0.49.2 build infra/main.bicep --outfile /workspace/scratch/notification-table-main.json` | Blocked by proxy 403 restoring existing MCR AVM modules (BCP192); full resource type validation remains unverified |
+| Relative documentation file targets and `git -c core.whitespace=cr-at-eol diff --check` | Passed |
+
+No application code changed in this follow-up; the previous 96 application tests,
+four Table/Blob scenarios and 98.15% coverage remain evidence for that unchanged
+code and were not repeated. The owner requested merging the other approved PRs;
+Notification remains open for review. This follow-up retains Notification's
+no-deployment/no-merge/no-publication boundary and uses `[skip ci]`. The option
+remains disabled and no storage data was changed.
+
 ## PR #2 domain review follow-up: 2026-11-07
 
 The owner requested an investigation of DDD, rich domains and Niobium data access

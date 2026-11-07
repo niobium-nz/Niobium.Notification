@@ -34,6 +34,8 @@ Notification is an independent shared service that renders and sends generic not
 
 The owner requires environment-agnostic Bicep and reusable Function App modules. `infra/function-app.bicep` owns host-bound resources and unions generic caller `appSettings` with internal host settings. `infra/main.bicep` owns application-specific resources. Environment suffixes and supplied values select the actual resources.
 
+Business resource names belong in `infra/main.bicepparam` defaults or deployment inputs. Bicep takes generic lists and creates resources; do not hardcode table or queue names in resource declarations. Follow `serviceBusQueueNames`/`SERVICE_BUS_QUEUE_NAMES` and `storageTableNames`/`STORAGE_TABLE_NAMES`. Include existing service-owned tables in the default list, and match the entity type names used by the repository. See [resource-name configuration](docs/delivery-and-operations.md#resource-name-configuration).
+
 Workflow/environment variables and secrets reach the runner only through explicit workflow `env` projection or a reviewed export. The `infra/scripts` hooks convert `APPSETTING_` values into `appSettings`; `APPSETTING_KV_` values go directly from the runner to Key Vault, with only names and empty placeholders in Bicep parameters. Refresh the host's Key Vault references after successful writes. Do not add test-only credentials or application-specific secret parameters to the host module.
 
 The new `TEST_STORAGE_KEY` is a masked runner-only fixture credential read from the existing test account. It is not a Function App setting, a new SAS, a new secret resource or a provider credential. The fixture credential does not require a separate Azure stack; application-owned tables are declared in `infra/main.bicep`.

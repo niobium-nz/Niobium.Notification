@@ -92,7 +92,44 @@ Only `scripts/read-only-deployment.py` runs after production deployment. It perm
 
 ## Provisioning and credentials
 
-Keep Bicep environment agnostic. `infra/main.bicep` owns application resources and passes their environment-specific settings to the generic Function App module. `infra/function-app.bicep` owns host resources and combines caller settings with internal host settings. No Bicep resource declarations change in this milestone.
+Keep Bicep environment agnostic. `infra/main.bicep` owns application resources and passes their environment-specific settings to the generic Function App module. `infra/function-app.bicep` owns host resources and combines caller settings with internal host settings. Resource-name defaults belong in the parameter file rather than resource declarations.
+
+### Resource-name configuration
+
+`main.bicep` accepts comma-separated `serviceBusQueueNames` and `storageTableNames`.
+It converts each nonempty input to the resource list; it contains no service queue
+or table names. `main.bicepparam` owns the application defaults and reads deployment
+environment variables, using the same pattern for queues and tables:
+
+| Parameter | Runner variable | Default |
+| --- | --- | --- |
+| `serviceBusQueueNames` | `SERVICE_BUS_QUEUE_NAMES` | `subscribecommand,notifycommand,subscribedevent` |
+| `storageTableNames` | `STORAGE_TABLE_NAMES` | `Subscription,Template,NotificationSubmission` |
+
+The table list includes historical service-owned tables as well as the new inbox.
+Table names use singular PascalCase entity names: the Niobium repository defaults
+to `typeof(TEntity).Name`. `NotificationSubmission` therefore matches its persisted
+entity just as `Subscription` and `Template` do. A provisioning override does not
+rename a table or change the runtime repository mapping. Keep every required table
+in an override, comma-separated without surrounding spaces. An explicit empty
+string produces an empty provisioning list; an absent variable uses the default.
+
+Current workflows use the parameter defaults. A local deployment or a workflow
+may supply `STORAGE_TABLE_NAMES`. GitHub environment variables are not automatically
+runner environment variables: when adding a GitHub override, explicitly project
+it in the deployment job's `env`, for example:
+
+```yaml
+env:
+  STORAGE_TABLE_NAMES: ${{ vars.STORAGE_TABLE_NAMES || 'Subscription,Template,NotificationSubmission' }}
+```
+
+The fallback matters because an undefined GitHub variable expands to an empty
+string, and `readEnvironmentVariable` uses its default only when the runner variable
+is absent. Keep defaults in step with the parameter file when adding a projection.
+These are infrastructure inputs, not `APPSETTING_` host settings. The application
+settings hook must preserve the resource-name parameter bindings. No generic host
+module or environment-specific Bicep branch is needed for a new table or queue.
 
 The workflow explicitly projects GitHub settings into runner `env`. `SetAppSettings.ps1` turns ordinary `APPSETTING_` entries into environment references in generated `appSettings`; `APPSETTING_KV_` entries carry only the setting name and an empty placeholder. The reusable module converts them to Key Vault references. `SetKeyVaultSecrets.ps1` reads actual values from runner environment, writes the existing vault, then refreshes Function App references after all writes succeed. `ClearAppSettings.ps1` restores the original parameter file. The hook behavior matches the already reviewed Invoicing correction and does not introduce an environment-specific module path.
 
