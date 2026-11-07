@@ -2,6 +2,22 @@
 
 This repository is the downstream dependency for the supplied Niobium.Invoicing research plan. Preserve the original plan IDs and acceptance criteria. The owner's accepted recommendations are recorded in [Invoicing Q28](https://github.com/niobium-nz/Niobium.Invoicing/blob/50df240f8212af33a152a13bcce11c848d6b51a8/docs/decisions-and-risks.md#q28-business-decision-follow-up); that decision-only change completed production verification as PR #14. This milestone does not claim those business behaviors are implemented.
 
+## PR #2 review-policy documentation follow-up: 2026-11-07
+
+The native review of `9132976ad6524edbf356341a99a870309d037918`
+[found the README still instructing manual-only review](https://github.com/niobium-nz/Niobium.Notification/pull/2#discussion_r4500222647).
+The README now matches the owner's automatic-review authorization in AGENTS.md.
+The delivery guide records observed automatic code/security execution on PR #2,
+keeps formal owner approval separate and requires a fresh receipt for each head.
+Historical manual-only and unverified-activation entries below are explicitly marked
+as superseded; the already-installed main listener/harness is distinguished from
+its original installation constraints.
+
+This follow-up changes documentation only. Relative file links and whitespace
+checks passed. Application code is unchanged from the 106-test, 98.17% coverage
+result below, so those tests were not repeated. Notification remains open for review;
+no merge, deployment, publication or native-setting administration was performed.
+
 ## PR #2 malformed-conflict review follow-up: 2026-11-07
 
 The native review of `3933e1c7693cd7d563e370004482e3c69e1baf43`
@@ -124,7 +140,7 @@ The no-deployment/no-merge/no-publication boundary still applies; commits use
 formal current-head review. The feature remains disabled. The dated sections below
 record earlier stages and their then-current implementation and test evidence.
 
-## Automatic review authorization: 2026-11-06
+## Historical automatic-review authorization checkpoint: 2026-11-06
 
 The owner's instruction, "approve auto review", supersedes the earlier manual-only
 Notification choice recorded below. `AGENTS.md` and the delivery guide now authorize
@@ -132,13 +148,14 @@ native code review for All PRs On every push, with security review for All PRs
 Whenever code review runs, matching Invoicing's recorded configuration. Formal
 reviewer approval remains separate; this is not an approval of the implementation.
 
-External activation remains unverified: the GitHub connector does not expose these
-settings and the session has no browser-control tool. No native review comment was
+At that checkpoint, activation was unverified: the GitHub connector did not expose
+these settings and no browser-control tool was available. No native review comment was
 present on Notification draft PR #2 or Invoicing draft PR #17 when checked. The
 delivery guide links the exact settings page and distinguishes authorization,
 saved configuration and execution evidence. The no-deployment/no-merge boundary
 persists. This documentation-only update passed `git diff --check`; application
-tests were not rerun, and no automatic-review execution is claimed.
+tests were not rerun, and that checkpoint claimed no automatic-review execution.
+The 2026-11-07 review-policy follow-up above records later observed execution.
 
 ## B02 continuation: 2026-11-06
 
@@ -304,10 +321,10 @@ The generic harness instead requires an explicitly approved `TEST_NOTIFICATION_S
 
 Correction validation: 34 Python checks and 20 Node policy checks passed; all three generic sender/recipient workflow projections and YAML parsing passed, as did `git diff --check`. Application code is unchanged; the next exact-head CI run establishes build/coverage and any deployment result.
 
-## Confirmed fixture bindings and manual review (2026-11-06)
+## Historical fixture bindings and manual-review choice (2026-11-06)
 
 The owner configured `TEST_NOTIFICATION_SENDER` as a GitHub `test` environment variable and `TEST_NOTIFICATION_RECIPIENT` as an environment secret. All three workflow projections now read the sender from `vars` and the recipient from `secrets`. No address value is committed, no additional stored setting is requested, and the fixture identity remains independent of Invoicing. Application code, packages, public contracts and Bicep are unchanged.
 
-The connector verified `5he11` now has Write permission. The owner intentionally left Notification native automatic review disabled and will review manually. The delivery guide and agent memory preserve that choice; no native-review completion or delegated approval will be substituted for the owner's formal current-head review. Main protection and this repository's one-time trusted-harness installation decision remain pending. Exact-new-head CI and actual candidate deployment evidence are still required before PR creation.
+At this earlier checkpoint, the connector verified `5he11` had Write permission, and the owner had chosen manual-only review. The later automatic-review authorization superseded that choice; the README, AGENTS.md and delivery guide now require native review alongside formal approval. Main protection and the initial trusted-harness installation were pending at this historical checkpoint, before PR #1 installed the safeguards. Current feature work still requires verification for its actual head.
 
 Local verification passed: `python -m unittest discover -s scripts -p 'test_*.py'` (34), `node --test scripts/delivery-policy.test.cjs` (20), YAML parsing with all three sender-variable/recipient-secret projections checked, and `git diff --check`. The next feature run must establish build/coverage and actual deployment results on the pushed head.

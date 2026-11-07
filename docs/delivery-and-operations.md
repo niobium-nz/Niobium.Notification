@@ -34,26 +34,40 @@ repository settings match those already recorded for Invoicing:
 | Trigger | On every push | Whenever code review runs |
 
 These settings belong to [Codex Code review settings](https://chatgpt.com/settings/code-review),
-not a repository workflow. At this authorization checkpoint the GitHub connector
-cannot inspect/change them and no browser-control tool is available in the session.
-Activation has therefore not been verified. Saving repository documentation does
-not enable the native service. No native review receipt was observed on draft PR #2.
+not a repository workflow. The connector cannot inspect/change the settings, and
+saving repository documentation does not enable the native service.
 
-Once the settings are saved, verify an automatic review for the actual PR head and
-read all findings. Do not equate a reviewer assignment, manual `@codex review`
-request, bot comment or reaction with automatic execution or formal PR approval.
-Keep reviews separate from the implementation conversation. This authorization
-does not change the current task's no-merge/no-deployment/no-publication boundary.
+On 2026-11-07, PR #2's native summary recorded completed code and security reviews
+for `eea196e` after the draft was marked ready, and for `3933e1c` and `9132976` after
+new commits. The [review of 9132976](https://github.com/niobium-nz/Niobium.Notification/pull/2#pullrequestreview-5810246112)
+identified the stale README policy corrected in this follow-up. These receipts
+establish execution for those heads; they do not certify every external setting
+or approve the implementation.
+
+Verify an automatic receipt for each new head and read all findings. A reviewer
+assignment or a manual `@codex review` request does not prove automatic execution;
+a bot comment or reaction does not supply formal owner approval. Keep formal review
+separate from the implementation conversation. Notification remains subject to its
+current no-merge/no-deployment/no-publication task boundary while awaiting approval.
 
 ## Required repository administration and installation
 
 Source changes cannot configure repository permissions/rules. The inspected baseline `989b7c4b36154c5da2cdd3391ec297e1f453ea14` had unprotected main, no rulesets and read-only access for `5he11`. On 2026-11-06, the owner granted `5he11` Write access and the connector verified it; main still had no protection. Recheck current settings before acting.
 
-Normal protection requires PR-only main updates, one approval, dismissal of stale approvals, resolved threads, up-to-date main, required successful `test` deployment, squash-only merges and the GitHub Actions `Test deployment verified` status, with no bypass actors. `5he11` needs permission for an approval to satisfy protection. Disable Actions permission to create/approve PRs. Native code/security review is now authorized, with the configuration and execution checkpoint above still outstanding; its absence must not be reported as a completed automatic review.
+Normal protection requires PR-only main updates, one approval, dismissal of stale approvals, resolved threads, up-to-date main, required successful `test` deployment, squash-only merges and the GitHub Actions `Test deployment verified` status, with no bypass actors. `5he11` needs permission for an approval to satisfy protection. Disable Actions permission to create/approve PRs. Native code/security review is authorized and has executed on the heads recorded above. Verify external settings and the receipt for the actual head separately; automatic review does not replace formal approval.
 
-This first installation has no listener or deployed harness on main. The candidate must still pass every applicable check and actual test deployment, but the trusted step explicitly skips and the custom status remains unavailable. An owner must explicitly decide the one-time installation policy. A possible reviewed installation is to temporarily require both native checks `Build and local tests` and `Deploy test and run integration`, preserving the test-deployment, approval, thread, strict-up-to-date, squash and no-bypass rules, then restore the custom status immediately after the approved merge. This is a proposal, not an authorized exception. Do not infer approval from prior Invoicing installations, unchanged configuration confirmations or elapsed time. Do not open a PR while the baseline's unsafe PR-triggered production workflow would still apply without first confirming the candidate workflow replaces that trigger.
+The listener and reviewed harness are now present on main at
+`4a93385be1b09a9d97d0c2384e1085f254c7d84c` from PR #1. The earlier installation gap
+is historical; ordinary feature work uses that installed protection. During first
+installation, a missing main harness caused the trusted step to skip, which could
+not certify the candidate. Future changes to protected pipeline definitions still
+need a concrete reviewed activation decision when they cannot be authenticated
+against current main. A skipped trusted step is never a successful verification.
+Do not infer an exception from an earlier installation or fabricate status.
 
-The connector cannot administer rulesets, Actions settings, environment configuration or collaborator roles. Prepare concrete changes and actual candidate evidence before asking for an installation decision. A skipped trusted step must remain explicit in the handoff and PR.
+The connector cannot administer rulesets, Actions settings, environment configuration
+or collaborator roles. Prepare concrete changes and candidate evidence before
+requesting any necessary installation decision; verify current rules separately.
 
 ## Real test integration
 
