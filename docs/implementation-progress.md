@@ -7,9 +7,9 @@ This repository is the downstream dependency for the supplied Niobium.Invoicing 
 The owner's [new transport comment](https://github.com/niobium-nz/Niobium.Notification/pull/2#discussion_r4500908254)
 requests framework-owned redirect configuration. [Niobium PR #2](https://github.com/niobium-nz/Niobium/pull/2)
 adds `ConfigureAutoRedirect(bool)`, preserving the existing transport rather than
-replacing it. Framework head `d18564c7b4d5c1e915e94f41ba6e9968f6bdf277` passed its
-[PR build and tests](https://github.com/niobium-nz/Niobium/actions/runs/42356694355),
-including all 10 transport tests and 16 workflow script assertions. Publication was
+replacing it. Framework head `63d61bc8a7302ba213a352705a8891ddeecf4c13` passed its
+[PR build and tests](https://github.com/niobium-nz/Niobium/actions/runs/42357187515),
+including all 18 transport tests and 16 workflow script assertions. Publication was
 skipped for that PR event, as intended.
 
 An isolated copy of Notification head `49faf17589b7d2950197dc7cf9bf87dbdfa60a7d`
@@ -22,7 +22,7 @@ source changes and exact remaining release dependency.
 
 The candidate was restored from a scratch local feed plus NuGet.org, then validated
 with the ordinary application commands using
-`-p:BUILD_BUILDNUMBER=0.0.0-local.redirect.1` for its Release build so generated local
+`-p:BUILD_BUILDNUMBER=0.0.0-local.redirect.2` for its Release build so generated local
 packages had a prerelease version. Tests used `--no-build --no-restore --report-trx
 --coverage --coverage-output-format cobertura`; the standard coverage gate passed.
 No candidate package or source copy is used by this branch or a deployed service.

@@ -12,8 +12,9 @@ The owner requested moving redirect configuration into Niobium in
 `ConfigureAutoRedirect(bool)` to `Niobium.Platform`. The extension configures an
 existing `SocketsHttpHandler` or `HttpClientHandler`, preserving its connection
 lifetime, proxy/cookie settings and delegating handlers. It can be used for one
-client or for shared defaults. See the
-[framework guide at the reviewed candidate](https://github.com/niobium-nz/Niobium/blob/d18564c7b4d5c1e915e94f41ba6e9968f6bdf277/docs/http-clients.md).
+client or for shared defaults. The policy runs after custom transport selection,
+and explicit client settings take precedence in either registration order. See the
+[framework guide at the reviewed candidate](https://github.com/niobium-nz/Niobium/blob/63d61bc8a7302ba213a352705a8891ddeecf4c13/docs/http-clients.md).
 
 Notification's current published Platform dependency is 4.0.60 and has no such API.
 The current primary-handler factory therefore remains until the framework release
@@ -43,10 +44,10 @@ Notification remains unmerged, undeployed and disabled by default.
 
 An isolated copy of Notification head `49faf17589b7d2950197dc7cf9bf87dbdfa60a7d`
 was tested with the two source edits above and local candidate packages built from
-framework head `d18564c7b4d5c1e915e94f41ba6e9968f6bdf277`.
+framework head `63d61bc8a7302ba213a352705a8891ddeecf4c13`.
 Platform, Helper and Abstractions used the clearly local version
-`4.2.0-local.redirect.1`; only this scratch copy's package references were changed.
-Its own build version was `0.0.0-local.redirect.1` so it did not create a stable
+`4.2.0-local.redirect.2`; only this scratch copy's package references were changed.
+Its own build version was `0.0.0-local.redirect.2` so it did not create a stable
 package depending on prerelease inputs. No candidate package was published.
 
 The Release build passed with zero warnings/errors. All 106 application tests
@@ -54,4 +55,4 @@ passed, including composition with the real candidate package and its default
 `SocketsHttpHandler`. Coverage remained 98.17% overall: Contracts 100%, Core 98.99%
 and Server 96.92%. This validates the proposed source integration locally; it does
 not establish a published dependency or deployed provider behavior. The framework's
-10 tests additionally cover real loopback redirected POSTs and transport settings.
+18 tests additionally cover real loopback redirected POSTs and transport settings.
