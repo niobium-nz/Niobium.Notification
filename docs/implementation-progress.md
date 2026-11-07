@@ -2,7 +2,41 @@
 
 This repository is the downstream dependency for the supplied Niobium.Invoicing research plan. Preserve the original plan IDs and acceptance criteria. The owner's accepted recommendations are recorded in [Invoicing Q28](https://github.com/niobium-nz/Niobium.Invoicing/blob/50df240f8212af33a152a13bcce11c848d6b51a8/docs/decisions-and-risks.md#q28-business-decision-follow-up); that decision-only change completed production verification as PR #14. This milestone does not claim those business behaviors are implemented.
 
-## PR #2 shared redirect support follow-up: 2026-11-07
+## PR #2 published redirect support adopted: 2026-11-07
+
+The owner approved merging Niobium PR #2, waiting for publication and updating
+Notification's package reference. Framework merge
+`f5b1b46a4a8c83e8771d7a3e9ae9dcc7044b62f0` completed
+[Publish run 42358398851](https://github.com/niobium-nz/Niobium/actions/runs/42358398851),
+including 18 transport tests and publication of 19 affected packages. A clean
+NuGet.org restore then verified Niobium.Platform 4.2.70 was available; its package
+repository metadata matches the merge commit.
+
+The Server now pins Platform 4.2.70 and its published Abstractions/Helper 4.2.66
+dependencies. Explicit pins avoid NU1603 because Platform's 4.2.0 minimum versions
+do not exist on the feed. The dependency module uses `ConfigureAutoRedirect(false)`
+instead of creating an HttpClientHandler, and the composition test checks the
+factory's SocketsHttpHandler with redirects disabled and no HTTP resilience retries.
+The runtime graph contains no local candidate package. The Contracts project and
+existing Table/Blob adapter pins are unchanged.
+
+| Verification | Result |
+| --- | --- |
+| `dotnet restore Niobium.Notification.slnx --source https://api.nuget.org/v3/index.json --nologo` | Passed without warnings |
+| `dotnet build Niobium.Notification.slnx --configuration Release --no-restore --nologo --disable-build-servers -m:1` | Passed, zero warnings/errors |
+| Application tests with `--no-build --no-restore --report-trx --coverage --coverage-output-format cobertura` | 106 passed, zero failed/skipped |
+| `python scripts/check-coverage.py /workspace/scratch/notification-published-http-tests/coverage.cobertura.xml` | 98.17% overall; Contracts 100%, Core 98.99%, Server 96.92% |
+| Storage test project restore/build and its four loopback Table/Blob scenarios | Four passed, zero failed/skipped; zero build warnings/errors |
+
+The storage tests used the existing loopback fixture settings at ports 18492 and
+18490. Their owned tables/containers were cleaned up and both owned Azurite processes
+were stopped. [HTTP configuration](http-client-configuration.md) records the package
+source revisions, release evidence and adopted implementation. This supersedes the
+pending-release checkpoint below. Framework publication was authorized and completed;
+Notification remains open for review under its existing no-merge/no-deployment boundary.
+This feature update uses `[skip ci]` and does not claim deployed readiness.
+
+## Historical shared redirect support checkpoint: 2026-11-07
 
 The owner's [new transport comment](https://github.com/niobium-nz/Niobium.Notification/pull/2#discussion_r4500908254)
 requests framework-owned redirect configuration. [Niobium PR #2](https://github.com/niobium-nz/Niobium/pull/2)
@@ -27,10 +61,10 @@ packages had a prerelease version. Tests used `--no-build --no-restore --report-
 --coverage --coverage-output-format cobertura`; the standard coverage gate passed.
 No candidate package or source copy is used by this branch or a deployed service.
 
-Notification's source and pinned packages remain unchanged while the framework
-PR awaits approval and release. The new comment remains open and has a reply linking
-the tested framework change. This documentation update uses `[skip ci]` under the
-existing Notification boundary; it performs no merge, deployment or publication.
+At that checkpoint, Notification's source and pinned packages remained unchanged
+while the framework PR awaited approval and release. The comment had a reply linking
+the tested candidate, and the documentation update used `[skip ci]`. The published
+adoption above supersedes that dependency and retains Notification's review boundary.
 
 ## PR #2 review-policy documentation follow-up: 2026-11-07
 

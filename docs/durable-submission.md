@@ -92,10 +92,10 @@ definitive first-attempt 4xx fails. Malformed success responses remain uncertain
 and retryable. No raw provider response, recipient or credential is logged by
 this path.
 
-The owner requested shared framework redirect configuration. The
-[HTTP client adoption guide](http-client-configuration.md) records the prepared
-Niobium change, local candidate validation and the package-release dependency.
-The existing transport control remains until that released support is consumed.
+Redirect configuration uses `ConfigureAutoRedirect(false)` from the published
+Niobium.Platform 4.2.70 package, preserving the factory's existing transport. The
+[HTTP client guide](http-client-configuration.md) records the release, explicit
+dependency pins and validation against the published packages.
 
 Resend's [idempotency documentation](https://resend.com/docs/dashboard/emails/idempotency-keys)
 was checked on 2026-11-06: keys are retained for 24 hours, repeated identical

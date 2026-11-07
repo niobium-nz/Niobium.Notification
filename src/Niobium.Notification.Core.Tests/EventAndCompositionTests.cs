@@ -79,8 +79,8 @@ public sealed class EventAndCompositionTests
             Assert.IsFalse(wrapper.GetType().Name.Contains("Resilience", StringComparison.Ordinal), "The durable provider must not inherit hidden HTTP retries.");
             handler = wrapper.InnerHandler!;
         }
-        Assert.IsInstanceOfType<HttpClientHandler>(handler);
-        Assert.IsFalse(((HttpClientHandler)handler).AllowAutoRedirect);
+        Assert.IsInstanceOfType<SocketsHttpHandler>(handler);
+        Assert.IsFalse(((SocketsHttpHandler)handler).AllowAutoRedirect);
         Assert.IsTrue(builder.Services.Any(s => s.ServiceType == typeof(IEmailNotificationClient)));
         Assert.IsTrue(builder.Services.Any(s => s.ServiceType == typeof(IExternalEventAdaptor<,>)));
     }

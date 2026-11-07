@@ -5,6 +5,7 @@ using Microsoft.Extensions.Http.Resilience;
 using Niobium.Messaging.ServiceBus;
 using Niobium.Notification.Delivery;
 using Niobium.Notification.Server.Delivery;
+using Niobium.Platform;
 using Niobium.Platform.Blob;
 using Niobium.Platform.Captcha.ReCaptcha;
 using Niobium.Platform.ServiceBus;
@@ -53,7 +54,7 @@ namespace Niobium.Notification.Server
                         }
                     }
                 })
-                .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+                .ConfigureAutoRedirect(false);
 
             return builder;
         }

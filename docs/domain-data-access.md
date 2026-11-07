@@ -51,9 +51,13 @@ recorded in AGENTS.md for future changes.
 ## What the framework supports and what it does not
 
 The existing repository provides conditional create, ETag-checked update, replacement,
-and retrieval, so the feature needs no new backend API or package upgrade. The
-inspected abstraction and Table files match installed Abstractions 4.0.61 and Table
-4.0.60. See the [framework guide](https://github.com/niobium-nz/Niobium/blob/1e370fccd38635f7209c1c4b01ddafcbe10ea618/docs/domain-data-access.md)
+and retrieval, so the data-access design needs no new backend API. It was initially
+validated with Abstractions 4.0.61 and Table 4.0.60. The later shared HTTP configuration
+update pins Platform 4.2.70 and resolves runtime Abstractions/Helper 4.2.66; their
+abstraction/helper source files are unchanged from this inspection. The Table/Blob
+adapters remain 4.0.60, and their four local compatibility scenarios passed again.
+See [HTTP package adoption](http-client-configuration.md) for the runtime graph and
+the [framework guide](https://github.com/niobium-nz/Niobium/blob/1e370fccd38635f7209c1c4b01ddafcbe10ea618/docs/domain-data-access.md)
 for exact source commits and the adapter/domain boundary.
 
 The 4.0.60 mapper drops response ETags from returned write models. The domain verifies

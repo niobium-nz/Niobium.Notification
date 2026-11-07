@@ -9,7 +9,7 @@ a named result; do not hide actions inside conditions.
 Read [HTTP client configuration](docs/http-client-configuration.md) before provider
 transport changes. Use shared framework configuration when its released package is
 available, preserve the existing transport, and keep redirect and retry policies
-separate. The pending framework release is an explicit adoption dependency.
+separate. The Server pins Niobium.Platform 4.2.70 and uses its shared redirect support.
 
 Read this file and [delivery and operations](docs/delivery-and-operations.md) before changes. Record the current branch, SHA and working-tree state. Preserve other work, use feature branches from current `main`, and keep the Niobium framework and package versions unchanged unless explicitly authorized.
 
