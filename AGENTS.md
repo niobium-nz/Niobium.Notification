@@ -6,6 +6,11 @@ factories in framework adapters. Use enums for finite states/outcomes with expli
 storage compatibility. Execute I/O and mutation actions before an `if`, then test
 a named result; do not hide actions inside conditions.
 
+Read [HTTP client configuration](docs/http-client-configuration.md) before provider
+transport changes. Use shared framework configuration when its released package is
+available, preserve the existing transport, and keep redirect and retry policies
+separate. The pending framework release is an explicit adoption dependency.
+
 Read this file and [delivery and operations](docs/delivery-and-operations.md) before changes. Record the current branch, SHA and working-tree state. Preserve other work, use feature branches from current `main`, and keep the Niobium framework and package versions unchanged unless explicitly authorized.
 
 Notification is an independent shared service that renders and sends generic notifications. It must not depend on Invoicing configuration, biller IDs or invoice templates. Invoicing owns its invoice-specific end-to-end tests and maps its biller to the existing Notification `Tenant` contract at the caller boundary. Follow the owner's accepted Q28 milestone order: Notification delivery safeguards, B02 durable retry recovery, then B06 delivery confirmation and lifecycle. The [ledger](docs/implementation-progress.md) distinguishes implemented controls from requirements. Do not silently interpret enqueue acceptance as delivery.

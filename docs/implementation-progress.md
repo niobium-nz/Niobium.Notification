@@ -2,6 +2,36 @@
 
 This repository is the downstream dependency for the supplied Niobium.Invoicing research plan. Preserve the original plan IDs and acceptance criteria. The owner's accepted recommendations are recorded in [Invoicing Q28](https://github.com/niobium-nz/Niobium.Invoicing/blob/50df240f8212af33a152a13bcce11c848d6b51a8/docs/decisions-and-risks.md#q28-business-decision-follow-up); that decision-only change completed production verification as PR #14. This milestone does not claim those business behaviors are implemented.
 
+## PR #2 shared redirect support follow-up: 2026-11-07
+
+The owner's [new transport comment](https://github.com/niobium-nz/Niobium.Notification/pull/2#discussion_r4500908254)
+requests framework-owned redirect configuration. [Niobium PR #2](https://github.com/niobium-nz/Niobium/pull/2)
+adds `ConfigureAutoRedirect(bool)`, preserving the existing transport rather than
+replacing it. Framework head `d18564c7b4d5c1e915e94f41ba6e9968f6bdf277` passed its
+[PR build and tests](https://github.com/niobium-nz/Niobium/actions/runs/42356694355),
+including all 10 transport tests and 16 workflow script assertions. Publication was
+skipped for that PR event, as intended.
+
+An isolated copy of Notification head `49faf17589b7d2950197dc7cf9bf87dbdfa60a7d`
+was updated to use the extension and tested against local framework candidate
+packages. Release build passed with zero warnings/errors; all 106 application tests
+passed and coverage remained 98.17%. The composition test verified disabled redirects
+and absent resilience retries on the factory's `SocketsHttpHandler`. The
+[adoption guide](http-client-configuration.md) records the candidate versions,
+source changes and exact remaining release dependency.
+
+The candidate was restored from a scratch local feed plus NuGet.org, then validated
+with the ordinary application commands using
+`-p:BUILD_BUILDNUMBER=0.0.0-local.redirect.1` for its Release build so generated local
+packages had a prerelease version. Tests used `--no-build --no-restore --report-trx
+--coverage --coverage-output-format cobertura`; the standard coverage gate passed.
+No candidate package or source copy is used by this branch or a deployed service.
+
+Notification's source and pinned packages remain unchanged while the framework
+PR awaits approval and release. The new comment remains open and has a reply linking
+the tested framework change. This documentation update uses `[skip ci]` under the
+existing Notification boundary; it performs no merge, deployment or publication.
+
 ## PR #2 review-policy documentation follow-up: 2026-11-07
 
 The native review of `9132976ad6524edbf356341a99a870309d037918`
