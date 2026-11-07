@@ -2,6 +2,29 @@
 
 This repository is the downstream dependency for the supplied Niobium.Invoicing research plan. Preserve the original plan IDs and acceptance criteria. The owner's accepted recommendations are recorded in [Invoicing Q28](https://github.com/niobium-nz/Niobium.Invoicing/blob/50df240f8212af33a152a13bcce11c848d6b51a8/docs/decisions-and-risks.md#q28-business-decision-follow-up); that decision-only change completed production verification as PR #14. This milestone does not claim those business behaviors are implemented.
 
+## PR #2 test deployment and readiness requested: 2026-11-07
+
+The owner asked for the failed test-deployment and PR-readiness checks to reach
+success. This authorizes ordinary feature validation in the existing test
+environment and supersedes the earlier draft-only deployment restriction for that
+purpose. Durable submission remains disabled; queue-path activation still needs
+the cutover and verification described in [the protocol](durable-submission.md).
+
+The latest review head `c82caac96da9a0374a56feb9e4bb0056361e7930` has formal owner
+approval and completed automatic code/security reviews. Its
+[readiness run](https://github.com/niobium-nz/Niobium.Notification/actions/runs/42361430055)
+failed because `[skip ci]` prevented a feature deployment run. Repeating readiness
+alone cannot supply the missing authenticated deployment evidence. This follow-up
+uses a normal feature push to run build, tests, test deployment, candidate
+integration and the trusted main harness. The trusted controller must publish
+`Test deployment verified` from that actual successful run. A new commit also
+requires the ordinary current-head review check; no earlier result is substituted.
+
+Execution results belong in the PR and workflow artifacts. Do not interpret this
+request as authorization to enable the durable queue path or to bypass any merge
+gate. The earlier no-deployment checkpoints below are historical for feature
+validation.
+
 ## PR #2 package alignment and retry-policy review: 2026-11-07
 
 The owner requested upgrading existing Niobium references instead of adding

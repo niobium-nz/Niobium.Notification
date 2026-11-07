@@ -47,8 +47,10 @@ or approve the implementation.
 Verify an automatic receipt for each new head and read all findings. A reviewer
 assignment or a manual `@codex review` request does not prove automatic execution;
 a bot comment or reaction does not supply formal owner approval. Keep formal review
-separate from the implementation conversation. Notification remains subject to its
-current no-merge/no-deployment/no-publication task boundary while awaiting approval.
+separate from the implementation conversation. On 2026-11-07, the owner requested
+successful test deployment and PR readiness for B02. That request supersedes the
+earlier draft-only restriction for feature validation; use the ordinary test
+pipeline and verify its terminal result before reporting the PR ready.
 
 ## Required repository administration and installation
 
@@ -149,10 +151,12 @@ The workflow explicitly projects GitHub settings into runner `env`. `SetAppSetti
 
 The runner's `TEST_STORAGE_KEY` is used only for owned integration fixtures. Runtime Table/Blob access retains existing identity configuration; Resend uses existing runtime provider secrets. Do not publish credential values, mailbox values or provider responses in source, logs, reports or review comments.
 
-## B02 draft activation boundary
+## B02 validation and activation
 
 The [durable queued submission path](durable-submission.md) is disabled by default.
-Its draft does not activate resources or bypass the protected delivery sequence.
-The current task prohibits deployment and merging; review its concrete cutover
-and verification prerequisites before a separately authorized activation.
+The owner authorized test deployment and readiness verification on 2026-11-07.
+Feature validation uses the existing test environment and approved Notification
+fixtures, with durable delivery still disabled. Follow the delivery sequence and
+current-head approval requirements before merging. Enabling durable delivery
+requires its concrete cutover and queue/provider verification prerequisites.
 The existing deployed ContactUs harness does not certify the enabled queue path.
