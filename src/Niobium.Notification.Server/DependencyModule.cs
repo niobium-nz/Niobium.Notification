@@ -45,7 +45,8 @@ namespace Niobium.Notification.Server
             builder.Services.AddHttpClient<IIdempotentNotificationProvider, ResendSubmissionProvider>()
                 .ConfigureAdditionalHttpMessageHandlers((handlers, _) =>
                 {
-                    // Niobium's global HTTP defaults add retries. Durable submission owns them.
+                    // ConfigureAutoRedirect preserves resilience handlers. Durable submission owns retries.
+                    // RemoveAllResilienceHandlers is experimental in the pinned Microsoft package.
                     for (int index = handlers.Count - 1; index >= 0; index--)
                     {
                         if (handlers[index] is ResilienceHandler)

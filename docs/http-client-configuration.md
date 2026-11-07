@@ -26,27 +26,52 @@ repository metadata identifies that exact merge commit.
 
 ## Current package and client configuration
 
-The Server project pins these published packages:
+The owner's [package review](https://github.com/niobium-nz/Niobium.Notification/pull/2#discussion_r4501144615)
+clarifies that framework releases also update affected dependent libraries. Upgrade
+existing direct Niobium references across the solution together, using each
+package's actual latest compatible release. Do not add lower-level references only
+to force versions that upgraded integration packages already provide.
+The framework convention is documented in
+[Niobium PR #3](https://github.com/niobium-nz/Niobium/pull/3).
 
-| Package | Version | Reason |
+The three extra Server references to Platform, Abstractions and Helper are removed.
+The current direct references, checked against NuGet.org on 2026-11-07, are:
+
+| Project | Existing Niobium package references | Version |
 | --- | --- | --- |
-| Niobium.Platform | 4.2.70 | Shared `ConfigureAutoRedirect` API |
-| Niobium.Abstractions | 4.2.66 | Published version satisfying Platform's dependency |
-| Niobium.Helper | 4.2.66 | Published version satisfying Platform's dependency |
+| Contracts | Abstractions, Messaging | 4.2.66 |
+| Core | File, Messaging | 4.2.66 |
+| Core | Platform.Notification.Email | 4.2.70 |
+| Server | Platform.Functions, Platform.StorageTable, Platform.Blob, Platform.ServiceBus, Platform.Notification.Email.Resend, Platform.Captcha.ReCaptcha | 4.2.70 |
 
-Platform's package metadata specifies minimum 4.2.0 versions for Abstractions and
-Helper, but those exact versions were not published. NuGet resolves their existing
-4.2.66 releases and otherwise reports NU1603 approximate-version warnings. The Server
-pins these actual versions explicitly; no warning is suppressed. Both packages
-identify framework commit `5c527723a607c1d03c002d4aa70531c9a55a767e`, and their source
-files match the previously inspected abstraction/helper implementation. The runtime
-dependency graph resolves these versions while the Table/Blob adapters remain 4.0.60.
-The Contracts project's existing package dependencies are unchanged.
+Core's Email package depends on Platform 4.2.70. Server references Core and receives
+Platform transitively, alongside its other integration dependencies. The resolved
+runtime graph contains Abstractions/Helper, Database.StorageTable, File.Blob,
+Messaging.ServiceBus and Identity at 4.2.66. Those packages identify framework commit
+`5c527723a607c1d03c002d4aa70531c9a55a767e`; the 4.2.70 packages identify the release
+merge above. No local candidate package or additional lower-level pin is used.
+
+The 4.2.70 StorageTable, Blob and ServiceBus integration packages specify minimum
+4.2.0 versions for their adapters, but those exact versions were not published.
+NuGet resolves the available 4.2.66 adapters and emits three distinct NU1603 warnings
+in Server and the test project. The warnings remain visible. This framework
+release-metadata issue needs a packaging fix and release; it does not justify
+restoring redundant consumer references. Abstractions/Helper already resolve
+without warnings through the upgraded graph.
 
 The Server dependency module imports `Niobium.Platform` and calls
 `.ConfigureAutoRedirect(false)` after registering the durable provider's client.
 It preserves the factory's `SocketsHttpHandler` and separately removes resilience
-handlers so the durable flow owns all retries. The application no longer constructs
+handlers so the durable flow owns all retries. `ConfigureAutoRedirect` deliberately
+preserves delegating handlers; the framework's
+`RedirectPolicy_PreservesExistingResiliencePipeline` test verifies this. Removing
+the resilience-removal loop would restore hidden retries even with redirects off.
+
+The loop uses the stable `ConfigureAdditionalHttpMessageHandlers` hook.
+`RemoveAllResilienceHandlers()` in the installed Microsoft.Extensions.Http.Resilience
+10.9.0 is experimental and produces compiler diagnostic EXTEXP0001. Keep the existing
+loop without suppressing that diagnostic or changing shared redirect semantics.
+The application no longer constructs
 a replacement primary handler to configure redirects. The composition test verifies
 both disabled redirects and absent resilience handlers through the real registration.
 
@@ -54,14 +79,19 @@ Do not use unpublished placeholder versions or cross-repository ProjectReference
 for framework adoption. Verify publication, restore and the resulting runtime graph.
 Notification remains open for review, undeployed and disabled by default.
 
-## Published-package validation on 2026-11-07
+## Aligned-package validation on 2026-11-07
 
-The Release build passed with zero warnings/errors. All 106 application tests passed,
-with 98.17% coverage: Contracts 100%, Core 98.99% and Server 96.92%. Four actual
-Table/Blob adapter scenarios passed against disposable loopback Azurite with the
-new runtime dependency graph, including conditional writes, competing claims and
-restart recovery. The fixtures cleaned up their own resources and both emulators
-were stopped. This is local compatibility evidence, not a deployed provider test.
+The Release build passed with zero errors and the three NU1603 dependency warnings
+above, repeated across Server and tests (six warnings in the build summary). All
+106 application tests passed, with 98.18% coverage: Contracts 100%, Core 98.99% and
+Server 96.93%. The composition test confirms disabled redirects and no resilience
+handler after registering the complete host against the upgraded packages.
+
+Four real Table/Blob scenarios passed with the 4.2.66 adapters against disposable
+loopback Azurite. They cover conditional writes, competing claims and recovery
+with frozen payloads; fixtures were cleaned up and both emulators stopped. See
+[the ledger](implementation-progress.md) for commands and the remaining deployed
+verification boundary.
 
 ## Historical candidate validation on 2026-11-07
 

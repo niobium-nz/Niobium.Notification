@@ -52,15 +52,17 @@ recorded in AGENTS.md for future changes.
 
 The existing repository provides conditional create, ETag-checked update, replacement,
 and retrieval, so the data-access design needs no new backend API. It was initially
-validated with Abstractions 4.0.61 and Table 4.0.60. The later shared HTTP configuration
-update pins Platform 4.2.70 and resolves runtime Abstractions/Helper 4.2.66; their
-abstraction/helper source files are unchanged from this inspection. The Table/Blob
-adapters remain 4.0.60, and their four local compatibility scenarios passed again.
+validated with Abstractions 4.0.61 and Table 4.0.60. The current package alignment
+updates existing integration references to 4.2.70 and existing lower-level references
+to 4.2.66. Platform is resolved transitively at 4.2.70; runtime Abstractions/Helper
+and Table/Blob adapters resolve at 4.2.66. Package repository metadata identifies
+the latter release as `5c527723a607c1d03c002d4aa70531c9a55a767e`. Its Table/Blob and
+relevant abstraction/helper source files match the previously inspected behavior.
 See [HTTP package adoption](http-client-configuration.md) for the runtime graph and
 the [framework guide](https://github.com/niobium-nz/Niobium/blob/1e370fccd38635f7209c1c4b01ddafcbe10ea618/docs/domain-data-access.md)
 for exact source commits and the adapter/domain boundary.
 
-The 4.0.60 mapper drops response ETags from returned write models. The domain verifies
+The 4.2.66 mapper still drops response ETags from returned write models. The domain verifies
 a read-back using its unique `WriteID` and complete expected snapshot before accepting
 the new ETag. This prevents a concurrent writer's version from being used as a claim.
 A future framework fix should preserve write ETags centrally; it would remove the

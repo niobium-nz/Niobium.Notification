@@ -2,7 +2,62 @@
 
 This repository is the downstream dependency for the supplied Niobium.Invoicing research plan. Preserve the original plan IDs and acceptance criteria. The owner's accepted recommendations are recorded in [Invoicing Q28](https://github.com/niobium-nz/Niobium.Invoicing/blob/50df240f8212af33a152a13bcce11c848d6b51a8/docs/decisions-and-risks.md#q28-business-decision-follow-up); that decision-only change completed production verification as PR #14. This milestone does not claim those business behaviors are implemented.
 
-## PR #2 published redirect support adopted: 2026-11-07
+## PR #2 package alignment and retry-policy review: 2026-11-07
+
+The owner requested upgrading existing Niobium references instead of adding
+redundant Server references in
+[the package review](https://github.com/niobium-nz/Niobium.Notification/pull/2#discussion_r4501144615).
+The extra Server references to Platform, Abstractions and Helper are removed.
+Existing Platform integration references in Server/Core now use 4.2.70, and
+existing Abstractions/File/Messaging references in Contracts/Core use 4.2.66.
+These are each package's latest stable versions checked on NuGet.org at this date.
+Core's Email package brings Platform 4.2.70 transitively. Server's restored graph
+resolves Abstractions/Helper and the Table, Blob and ServiceBus adapters at 4.2.66.
+
+Package metadata ties the 4.2.70 libraries to framework release commit
+`f5b1b46a4a8c83e8771d7a3e9ae9dcc7044b62f0`, and the 4.2.66 libraries to
+`5c527723a607c1d03c002d4aa70531c9a55a767e`. The Table/Blob source is unchanged from
+the previously tested adapters. The ServiceBus update uses
+`AzureWebJobsServiceBus:clientId` instead of the storage identity key; the existing
+`infra/main.bicep` already supplies the corresponding ServiceBus setting.
+Live cloud-identity behavior remains a deployed verification item.
+
+The [handler-removal question](https://github.com/niobium-nz/Niobium.Notification/pull/2#discussion_r4501146414)
+was checked against the shared extension and its resilience-preservation test.
+`ConfigureAutoRedirect(false)` preserves resilience handlers, so the loop remains
+necessary for durable retry ownership. The alternative
+`RemoveAllResilienceHandlers()` is experimental in Microsoft.Extensions.Http.Resilience
+10.9.0 and produces EXTEXP0001. The current stable hook is retained with a clarifying
+comment; no diagnostic is suppressed. The package convention and this distinction
+are documented in [Niobium PR #3](https://github.com/niobium-nz/Niobium/pull/3), the
+[HTTP guide](http-client-configuration.md) and AGENTS.md.
+
+| Verification | Result |
+| --- | --- |
+| `dotnet restore Niobium.Notification.slnx --source https://api.nuget.org/v3/index.json --nologo` | Passed; three distinct NU1603 warnings described below |
+| `dotnet build Niobium.Notification.slnx --configuration Release --no-restore --nologo --disable-build-servers -m:1` | Passed; zero errors, six warnings because the three dependency warnings repeat in Server/tests |
+| Application tests with `--no-build --no-restore --report-trx --coverage --coverage-output-format cobertura` | 106 passed, zero failed/skipped; host composition verifies no resilience handler and disabled redirects |
+| `python scripts/check-coverage.py /workspace/scratch/notification-review-package-tests/coverage.cobertura.xml` | 98.18% overall; Contracts 100%, Core 98.99%, Server 96.93% |
+| Storage test project restore/build and its four real loopback Table/Blob scenarios | Four passed, zero failed/skipped; zero build errors, the same six NU1603 warnings |
+
+The three published 4.2.70 integration packages request Database.StorageTable,
+File.Blob and Messaging.ServiceBus at minimum version 4.2.0, which was not published.
+NuGet selects the available 4.2.66 adapters and reports NU1603. The framework's
+version-generation script explains that metadata; a packaging correction needs a
+separate framework change and release. The warnings remain visible, and no extra
+lower-level reference is introduced to hide them.
+
+Storage validation used the existing loopback fixture settings at ports 18492 and
+18490. Owned fixtures were cleaned up and both owned emulators stopped. No provider
+request or cloud resource was used. This update uses `[skip ci]` under the existing
+Notification no-merge/no-deployment/no-publication boundary. Local compatibility
+results do not satisfy deployed readiness. This section supersedes the earlier
+explicit-Server-pin approach below.
+
+## Historical initial published redirect adoption: 2026-11-07
+
+The package-reference approach in this checkpoint is superseded by the subsequent
+package-alignment review follow-up. Its results apply to that earlier graph only.
 
 The owner approved merging Niobium PR #2, waiting for publication and updating
 Notification's package reference. Framework merge
@@ -12,7 +67,7 @@ including 18 transport tests and publication of 19 affected packages. A clean
 NuGet.org restore then verified Niobium.Platform 4.2.70 was available; its package
 repository metadata matches the merge commit.
 
-The Server now pins Platform 4.2.70 and its published Abstractions/Helper 4.2.66
+At this checkpoint, the Server pinned Platform 4.2.70 and its published Abstractions/Helper 4.2.66
 dependencies. Explicit pins avoid NU1603 because Platform's 4.2.0 minimum versions
 do not exist on the feed. The dependency module uses `ConfigureAutoRedirect(false)`
 instead of creating an HttpClientHandler, and the composition test checks the

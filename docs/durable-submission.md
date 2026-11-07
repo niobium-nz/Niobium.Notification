@@ -83,7 +83,9 @@ created. Provider/network timeouts remain uncertain; a subsequent rejection does
 not erase the uncertainty from a prior attempt.
 
 The new HttpClient removes Niobium's globally installed resilience handler using
-the stable handler-configuration extension point. It does not follow redirects or
+the stable handler-configuration extension point. This separate removal remains
+necessary because `ConfigureAutoRedirect` preserves resilience handlers. The client
+does not follow redirects or
 perform hidden HTTP retries. HTTP 408/429/5xx and the provider's concurrent-key
 409 are retryable. A 409 retries only when its JSON object positively identifies
 `concurrent_idempotent_requests`. Other conflict responses, malformed/empty bodies
@@ -94,8 +96,8 @@ this path.
 
 Redirect configuration uses `ConfigureAutoRedirect(false)` from the published
 Niobium.Platform 4.2.70 package, preserving the factory's existing transport. The
-[HTTP client guide](http-client-configuration.md) records the release, explicit
-dependency pins and validation against the published packages.
+[HTTP client guide](http-client-configuration.md) records the release, upgraded
+integration references, transitive dependencies and published-package validation.
 
 Resend's [idempotency documentation](https://resend.com/docs/dashboard/emails/idempotency-keys)
 was checked on 2026-11-06: keys are retained for 24 hours, repeated identical
