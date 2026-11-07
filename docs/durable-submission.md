@@ -85,9 +85,12 @@ not erase the uncertainty from a prior attempt.
 The new HttpClient removes Niobium's globally installed resilience handler using
 the stable handler-configuration extension point. It does not follow redirects or
 perform hidden HTTP retries. HTTP 408/429/5xx and the provider's concurrent-key
-409 are retryable. A payload-conflict 409 holds; a definitive first-attempt 4xx
-fails. Malformed success responses remain uncertain. No raw provider response,
-recipient or credential is logged by this path.
+409 are retryable. A 409 retries only when its JSON object positively identifies
+`concurrent_idempotent_requests`. Other conflict responses, malformed/empty bodies
+and failures reading a known 409 body hold the operation for investigation. A
+definitive first-attempt 4xx fails. Malformed success responses remain uncertain
+and retryable. No raw provider response, recipient or credential is logged by
+this path.
 
 Resend's [idempotency documentation](https://resend.com/docs/dashboard/emails/idempotency-keys)
 was checked on 2026-11-06: keys are retained for 24 hours, repeated identical

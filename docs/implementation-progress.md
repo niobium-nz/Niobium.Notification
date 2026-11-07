@@ -2,6 +2,33 @@
 
 This repository is the downstream dependency for the supplied Niobium.Invoicing research plan. Preserve the original plan IDs and acceptance criteria. The owner's accepted recommendations are recorded in [Invoicing Q28](https://github.com/niobium-nz/Niobium.Invoicing/blob/50df240f8212af33a152a13bcce11c848d6b51a8/docs/decisions-and-risks.md#q28-business-decision-follow-up); that decision-only change completed production verification as PR #14. This milestone does not claim those business behaviors are implemented.
 
+## PR #2 malformed-conflict review follow-up: 2026-11-07
+
+The native review of `3933e1c7693cd7d563e370004482e3c69e1baf43`
+[identified malformed HTTP 409 responses being retried](https://github.com/niobium-nz/Niobium.Notification/pull/2#discussion_r4500181826).
+The provider now retains the received status across response-body failures. A
+known conflict is held unless its body positively identifies the provider's
+concurrent-request code. Empty, truncated, non-object and non-JSON conflict bodies,
+body-read timeouts, HTTP errors and I/O errors all hold. Failures before a response
+and malformed success bodies remain uncertain/retryable. Caller cancellation
+continues to propagate for queue recovery.
+
+Regression cases exercise these outcomes through HttpClient, including faulting
+response streams. This is an HTTP classification correction; storage and domain
+transitions are unchanged. The earlier Table/Blob scenarios were not repeated.
+After sourcing `/workspace/.niobium-tools/env.sh`:
+
+| Exact command | Result |
+| --- | --- |
+| `dotnet build Niobium.Notification.slnx --configuration Release --no-restore --nologo --disable-build-servers -m:1` | Passed, zero warnings/errors |
+| `dotnet test --project src/Niobium.Notification.Core.Tests/Niobium.Notification.Core.Tests.csproj --configuration Release --no-build --no-restore --report-trx --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml --results-directory /workspace/scratch/notification-conflict-tests-final` | 106 passed, zero failed/skipped |
+| `python scripts/check-coverage.py /workspace/scratch/notification-conflict-tests-final/coverage.cobertura.xml` | 537/547 lines, 98.17%; Contracts 100%, Core 98.99%, Server 96.92%; all thresholds passed |
+| `git diff --check` | Passed |
+
+Notification remains open for owner review and undeployed, with the durable option
+disabled. The infrastructure validation limits and table-input checks below still
+apply. Earlier dated sections record their own source revisions and evidence.
+
 ## PR #2 table-input review follow-up: 2026-11-07
 
 The owner's [new review comment](https://github.com/niobium-nz/Niobium.Notification/pull/2#discussion_r4500079992)

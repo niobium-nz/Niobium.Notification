@@ -15,6 +15,12 @@ public sealed class ResendSubmissionTests
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token) => send(request, token);
     }
 
+    private sealed class UnreadableStream(Exception failure) : MemoryStream("{"u8.ToArray())
+    {
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+            => ValueTask.FromException<int>(failure);
+    }
+
     private static TemplateDomain.Deliverable Content() => new()
     {
         From = "sender@example.invalid", FromName = "Sender", To = "recipient@example.invalid", ToName = "Recipient", Subject = "Subject", Body = "<p>Frozen</p>",
@@ -56,9 +62,16 @@ public sealed class ResendSubmissionTests
     [DataRow(200, "{}", SubmissionOutcome.Retry)]
     [DataRow(200, "{\"id\":12}", SubmissionOutcome.Retry)]
     [DataRow(200, "invalid json", SubmissionOutcome.Retry)]
+    [DataRow(200, "null", SubmissionOutcome.Retry)]
+    [DataRow(200, "[]", SubmissionOutcome.Retry)]
     [DataRow(409, "{\"name\":\"concurrent_idempotent_requests\"}", SubmissionOutcome.Retry)]
     [DataRow(409, "{\"name\":\"invalid_idempotent_request\"}", SubmissionOutcome.Hold)]
     [DataRow(409, "{}", SubmissionOutcome.Hold)]
+    [DataRow(409, "", SubmissionOutcome.Hold)]
+    [DataRow(409, "{", SubmissionOutcome.Hold)]
+    [DataRow(409, "<html>upstream conflict</html>", SubmissionOutcome.Hold)]
+    [DataRow(409, "null", SubmissionOutcome.Hold)]
+    [DataRow(409, "[]", SubmissionOutcome.Hold)]
     [DataRow(429, "", SubmissionOutcome.Retry)]
     [DataRow(408, "", SubmissionOutcome.Retry)]
     [DataRow(503, "", SubmissionOutcome.Retry)]
@@ -102,6 +115,23 @@ public sealed class ResendSubmissionTests
         using HttpClient client = new(new Handler((_, _) => timeout ? throw new TaskCanceledException() : throw new HttpRequestException()));
         ResendSubmissionProvider provider = new(client, Options.Create(Config()), clock);
         Assert.AreEqual(SubmissionOutcome.Retry, (await provider.SubmitAsync(provider.Freeze(Content()), "key", clock.Now.AddDays(1), default)).Outcome);
+    }
+
+    [TestMethod]
+    [DataRow(typeof(TaskCanceledException))]
+    [DataRow(typeof(HttpRequestException))]
+    [DataRow(typeof(IOException))]
+    public async Task UnreadableConflictBody_IsHeld(Type failureType)
+    {
+        DurableNotificationTests.Clock clock = new();
+        Exception failure = (Exception)Activator.CreateInstance(failureType)!;
+        using HttpClient client = new(new Handler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.Conflict)
+        {
+            Content = new StreamContent(new UnreadableStream(failure)),
+        })));
+        ResendSubmissionProvider provider = new(client, Options.Create(Config()), clock);
+        Assert.AreEqual(SubmissionOutcome.Hold,
+            (await provider.SubmitAsync(provider.Freeze(Content()), "key", clock.Now.AddDays(1), default)).Outcome);
     }
 
     [TestMethod]
