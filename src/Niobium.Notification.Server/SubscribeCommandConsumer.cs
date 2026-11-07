@@ -16,7 +16,8 @@ namespace Niobium.Notification.Server
             ServiceBusReceivedMessage message,
             CancellationToken cancellationToken)
         {
-            if (!message.TryParse(out SubscribeCommand? evt, out var rawBody))
+            bool parsed = message.TryParse(out SubscribeCommand? evt, out var rawBody);
+            if (!parsed || evt == null)
             {
                 logger.LogError($"Failed to parse message {message.MessageId}: {rawBody}");
                 return;

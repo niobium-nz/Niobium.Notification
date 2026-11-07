@@ -20,6 +20,9 @@ param customDomainName string = ''
 @description('Name of the Queues, separated by comma.')
 param serviceBusQueueNames string = ''
 
+@description('Names of storage tables, separated by comma.')
+param storageTableNames string = ''
+
 @description('Id of the user identity to be used for testing and debugging. This is not required in production. Leave empty if not needed. Can optionally use deployer().objectId if manually deployed')
 param userIdentityPrincipalId string = ''
 
@@ -83,6 +86,7 @@ module dataStorageAccount 'br/public:avm/res/storage/storage-account:0.32.0' = {
       ]
     }
     tableServices: {
+      tables: [for tableName in (empty(storageTableNames) ? [] : split(storageTableNames, ',')): { name: tableName }]
       corsRules: [
         {
           allowedOrigins: ['*']

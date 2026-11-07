@@ -2,6 +2,8 @@ using System.Text.Json;
 using Azure.Messaging.ServiceBus;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Niobium.Notification.Delivery;
 using Niobium.Messaging.ServiceBus;
 using Niobium.Platform.ServiceBus;
 
@@ -9,7 +11,9 @@ namespace Niobium.Notification.Server
 {
     public class NotifyCommandConsumer(
         NotificationFlow flow,
-        ILogger<NotifyCommandConsumer> logger)
+        ILogger<NotifyCommandConsumer> logger,
+        DurableNotificationFlow? durable = null,
+        IOptions<NotificationOptions>? options = null)
     {
         [Function(nameof(NotifyCommandConsumer))]
         public async Task Run(
@@ -17,9 +21,10 @@ namespace Niobium.Notification.Server
             ServiceBusReceivedMessage message,
             CancellationToken cancellationToken)
         {
-            if (!message.TryParse(out NotifyCommand? evt, out var rawBody))
+            bool parsed = message.TryParse(out NotifyCommand? evt, out var rawBody);
+            if (!parsed || evt == null)
             {
-                logger.LogError($"Failed to parse message {message.MessageId}: {rawBody}");
+                logger.LogError("Notification message could not be parsed.");
                 return;
             }
 
@@ -27,11 +32,26 @@ namespace Niobium.Notification.Server
             _ = evt.TryValidate(out var validationState);
             if (!validationState.IsValid)
             {
-                logger.LogError($"Validation failed for order evt: {JsonMarshaller.Marshall(validationState.ToDictionary())}");
+                logger.LogError("Notification command failed validation.");
                 return;
             }
 
-            await flow.RunAsync(evt, cancellationToken);
+            if (options?.Value.EnableDurableSubmission == true)
+            {
+                // The queue envelope supplies stable identity even for legacy producers whose
+                // body omits DomainEvent.ID. Never generate a new ID on redelivery.
+                if (String.IsNullOrWhiteSpace(message.MessageId))
+                {
+                    throw new ApplicationException(InternalError.BadRequest, "A stable message ID is required.");
+                }
+                evt.ID = message.MessageId;
+                await (durable ?? throw new InvalidOperationException("Durable notification services are unavailable."))
+                    .RunAsync(evt, cancellationToken);
+            }
+            else
+            {
+                await flow.RunAsync(evt, cancellationToken);
+            }
         }
 
         private static void Transform(NotifyCommand evt)
