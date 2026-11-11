@@ -33,7 +33,7 @@ verification and an exact uncertain-send inventory remain separate dependencies.
 | Application tests with TRX and Cobertura | 128 passed, zero failed/skipped; includes 22 focused telemetry scenarios |
 | Authored coverage gate | 595/605 lines, 98.35%; Contracts 100%, Core 99.12%, Server 97.12% |
 | Real pinned Table/Blob adapters against loopback Azurite | Four passed, zero failed/skipped; owned emulators stopped |
-| Python deployment/tooling tests | 42 passed; metadata mismatch, ingestion timeout, output sanitization and cleanup without resending covered |
+| Python deployment/tooling tests | 43 passed; classic/regional hostnames, metadata mismatch, ingestion timeout, output sanitization and cleanup without resending covered |
 | Node delivery-policy tests | 20 passed |
 
 Commands are the README's local verification sequence, plus the explicit storage
@@ -43,6 +43,14 @@ PowerShell 7 must be on PATH for the tooling tests; the initial local attempt wi
 it failed before the existing hook tests ran, then all 42 passed with the installed
 runtime. The framework remains on published Platform integrations 4.2.70 and
 Abstractions/File/Messaging adapters 4.2.66 with the provenance recorded below.
+
+The first feature run [43025781050](https://github.com/niobium-nz/Niobium.Notification/actions/runs/43025781050)
+passed build/local tests and deployed the correct commit, then failed telemetry
+configuration before any fixture write or provider send. The new hostname matcher
+had assumed a regional/hash segment; the existing app uses Azure's classic
+`app.azurewebsites.net` hostname. The matcher now accepts both supported forms
+while retaining an exact ARM hostname check. A regression test covers both forms
+and rejects a mismatch. This failed run does not count as deployed verification.
 
 At this local checkpoint, deployed telemetry and native review evidence are still
 pending. Push normally, verify both candidate and trusted-main suites, then create

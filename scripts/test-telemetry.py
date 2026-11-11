@@ -21,7 +21,7 @@ class ProviderMetrics:
         base = environ.get("TEST_API_URL", "")
         if (environ.get("AZURE_ENV_NAME") != "test" or environ.get("TEST_ENVIRONMENT") != "test"
                 or not self.group or not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", build)
-                or not re.fullmatch(r"https://niobiumnotify-func-test\.[a-z0-9.-]+\.azurewebsites\.net", base)):
+                or not re.fullmatch(r"https://niobiumnotify-func-test(?:\.[a-z0-9-]+)*\.azurewebsites\.net", base)):
             raise Failure("test_telemetry_configuration_required")
         self.version = build + "-prerelease"
         self.service = "Niobium.Notification.Server.Test"

@@ -38,6 +38,15 @@ class Clock:
 
 
 class TelemetryTests(unittest.TestCase):
+    def test_classic_and_regional_test_hostnames_require_an_exact_arm_match(self):
+        for host in ["niobiumnotify-func-test.azurewebsites.net", HOST,
+                     "niobiumnotify-func-test.synthetic.australiaeast-01.azurewebsites.net"]:
+            azure = runner([host, *METADATA[1:]])
+            with self.subTest(host=host):
+                telemetry.ProviderMetrics(dict(ENV, TEST_API_URL="https://" + host), azure)
+                with self.assertRaisesRegex(telemetry.Failure, "^test_telemetry_host_mismatch$"):
+                    telemetry.ProviderMetrics(dict(ENV, TEST_API_URL="https://" + host), runner(["different-test.azurewebsites.net"]))
+
     def test_current_test_destination_is_checked_before_read_only_ingestion_polling(self):
         azure = runner(METADATA + ["0", "1", "2"])
         clock = Clock()
