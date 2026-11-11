@@ -85,7 +85,7 @@ public sealed class DurableNotificationTests
             => new GenericDomainRepository<NotificationSubmissionDomain, NotificationSubmission>(Domain, new Lazy<IRepository<NotificationSubmission>>(() => Repository.Object));
     }
 
-    private sealed class Scenario
+    internal sealed class Scenario
     {
         public readonly Clock Clock = new();
         public readonly MemoryStore Store = new();

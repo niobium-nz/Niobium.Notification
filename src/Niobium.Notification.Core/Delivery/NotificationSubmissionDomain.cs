@@ -58,22 +58,22 @@ namespace Niobium.Notification.Delivery
             SubmissionState state = (SubmissionState)entry.StateCode;
             if (state is SubmissionState.Accepted or SubmissionState.Failed or SubmissionState.Held)
             {
-                return new(SubmissionAction.Suppress);
+                return new(SubmissionAction.Suppress, Status(entry));
             }
 
             DateTimeOffset deadline = (entry.FirstSubmission ?? now) + NotificationRetryPolicy.ProviderWindow;
             if (now + NotificationRetryPolicy.SendMargin >= deadline || entry.Attempts >= NotificationRetryPolicy.MaximumAttempts)
             {
-                await this.SaveVerifiedAsync(entry with
+                NotificationSubmission held = await this.SaveVerifiedAsync(entry with
                 {
                     StateCode = (int)SubmissionState.Held,
                     OutcomeCode = (int)SubmissionOutcome.RetryWindowExhausted, NextAttempt = null,
                 }, isNew: false, cancellationToken);
-                return new(SubmissionAction.Suppress);
+                return new(SubmissionAction.Suppress, Status(held));
             }
             if (entry.NextAttempt > now)
             {
-                return new(SubmissionAction.Wait, entry.NextAttempt);
+                return new(SubmissionAction.Wait, Status(entry), entry.NextAttempt);
             }
 
             using Stream content = await files.GetAsync(PayloadContainer, entry.PayloadName, createIfNotExist: false, cancellationToken: cancellationToken)
@@ -87,10 +87,10 @@ namespace Niobium.Notification.Delivery
                 NextAttempt = now + retryPolicy.Delay(entry.Attempts + 1),
                 OutcomeCode = (int)SubmissionOutcome.SubmissionUnknown,
             }, isNew: false, cancellationToken);
-            return new(SubmissionAction.Submit, claim.NextAttempt, deadline, payload, claim);
+            return new(SubmissionAction.Submit, Status(claim), claim.NextAttempt, deadline, payload, claim);
         }
 
-        public async Task RecordOutcomeAsync(SubmissionAttempt attempt, SubmissionResult result, CancellationToken cancellationToken = default)
+        public async Task<SubmissionStatus> RecordOutcomeAsync(SubmissionAttempt attempt, SubmissionResult result, CancellationToken cancellationToken = default)
         {
             this.CheckInitialized();
             NotificationSubmission claim = attempt.Claim ?? throw new InvalidOperationException("A claimed attempt is required.");
@@ -111,12 +111,16 @@ namespace Niobium.Notification.Delivery
             {
                 outcome = SubmissionOutcome.SubmissionUnknown;
             }
-            await this.SaveVerifiedAsync(claim with
+            NotificationSubmission saved = await this.SaveVerifiedAsync(claim with
             {
                 StateCode = (int)state, OutcomeCode = (int)outcome, ProviderID = result.ProviderID,
                 NextAttempt = state == SubmissionState.Pending ? claim.NextAttempt : null,
             }, isNew: false, cancellationToken);
+            return Status(saved);
         }
+
+        private static SubmissionStatus Status(NotificationSubmission entry)
+            => new((SubmissionState)entry.StateCode, (SubmissionOutcome)entry.OutcomeCode);
 
         private async Task<NotificationSubmission> SaveVerifiedAsync(NotificationSubmission next, bool isNew, CancellationToken cancellationToken)
         {

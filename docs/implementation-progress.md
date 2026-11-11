@@ -2,6 +2,87 @@
 
 This repository is the downstream dependency for the supplied Niobium.Invoicing research plan. Preserve the original plan IDs and acceptance criteria. The owner's accepted recommendations are recorded in [Invoicing Q28](https://github.com/niobium-nz/Niobium.Invoicing/blob/50df240f8212af33a152a13bcce11c848d6b51a8/docs/decisions-and-risks.md#q28-business-decision-follow-up); that decision-only change completed production verification as PR #14. This milestone does not claim those business behaviors are implemented.
 
+## Formal approval handoff corrected: 2026-11-12
+
+The owner corrected the implementation agent for stopping after native review and
+GitHub reviewer assignment without invoking the agreed separate approval agent.
+The agent had incorrectly marked the goal blocked. The required `pr_approver`
+handoff is now [versioned in this repository](pr-approval-handoff.md), required by
+AGENTS.md, and mirrored in Store and Invoicing. It does not depend on a workspace
+instruction file surviving a resumed goal. Genuine independent approval remains
+separate from self-approval or a delegated rubber stamp; native reviews remain
+required. Pending review is active work until findings, formal approval, merge
+and production verification have been handled. The independent reviewer is active;
+final-head verification and recorded decisions belong in PR #3.
+
+## B07 submission and recovery measurements: 2026-11-12 (Pacific/Auckland)
+
+Work started from clean Notification main `adb9e59dd4428e1c8bf496fc40a42699bd003ba0`
+in the isolated `codex/notification-submission-observability` worktree. The original
+Invoicing report remains unchanged at `docs/invoicing-plan.md`, SHA-256
+`1321b7712c4c9e10b477d03b230e12fce5485fbde3375d94c374fc96290313eb`.
+This implements the Notification portion of Q28 #13's initial B07 measurements.
+It does not finish B07 or enable the B02 durable path. Invoicing's queue measurements
+are tracked separately in [PR #18](https://github.com/niobium-nz/Niobium.Invoicing/pull/18).
+
+The [instrument guide](submission-observability.md) defines provider-adapter
+invocation count/duration and domain-verified durable decisions/outcomes. The
+domain returns an immutable status after its existing validation/persistence;
+the flow does not reconstruct transition rules. Storage and public wire contracts,
+retry policy, activation flag and packages remain unchanged. The host restores
+configured service identity after the installed Functions detector so the existing
+Azure Monitor exporter can identify the current deployment.
+
+The candidate deployed harness requires the two active legacy provider instruments
+from the current test version/window. It uses the existing approved send, verifies
+the exporter destination and performs only bounded read polling. It does not add a
+send or create resources. Query failures fail the check without retrying provider
+submission, and owned fixture cleanup remains mandatory. Durable-path cloud
+verification and an exact uncertain-send inventory remain separate dependencies.
+
+| Local verification | Result |
+| --- | --- |
+| Release restore/build of `Niobium.Notification.slnx` | Passed, zero errors; the same six NU1603 warnings (three distinct published-package constraints) as clean main |
+| Application tests with TRX and Cobertura | 128 passed, zero failed/skipped; includes 22 focused telemetry scenarios |
+| Authored coverage gate | 595/605 lines, 98.35%; Contracts 100%, Core 99.12%, Server 97.12% |
+| Real pinned Table/Blob adapters against loopback Azurite | Four passed, zero failed/skipped; owned emulators stopped |
+| Python deployment/tooling tests | 46 passed; classic/regional hostnames, metadata mismatch, bounded query retries, permission failures, output sanitization and cleanup without resending covered |
+| Node delivery-policy tests | 20 passed |
+
+Commands are the README's local verification sequence, plus the explicit storage
+suite with `NIOBIUM_NOTIFICATION_TEST_TABLE_ENDPOINT=http://127.0.0.1:18492/devstoreaccount1`
+and `NIOBIUM_NOTIFICATION_TEST_BLOB_ENDPOINT=http://127.0.0.1:18490/devstoreaccount1`.
+PowerShell 7 must be on PATH for the tooling tests; the initial local attempt without
+it failed before the existing hook tests ran, then all 42 passed with the installed
+runtime. The framework remains on published Platform integrations 4.2.70 and
+Abstractions/File/Messaging adapters 4.2.66 with the provenance recorded below.
+
+The first feature run [43025781050](https://github.com/niobium-nz/Niobium.Notification/actions/runs/43025781050)
+passed build/local tests and deployed the correct commit, then failed telemetry
+configuration before any fixture write or provider send. The new hostname matcher
+had assumed a regional/hash segment; the existing app uses Azure's classic
+`app.azurewebsites.net` hostname. The matcher now accepts both supported forms
+while retaining an exact ARM hostname check. A regression test covers both forms
+and rejects a mismatch. This failed run does not count as deployed verification.
+
+Run [43026798576](https://github.com/niobium-nz/Niobium.Notification/actions/runs/43026798576)
+then passed metadata/destination checks, the approved provider submission and owned
+fixture cleanup, but its first metrics query failed. That generic diagnostic did
+not establish the cause. Query errors now expose only allowlisted error classes;
+authorization and invalid queries fail immediately, while first-ingestion table
+absence and transient read failures can retry within the existing six-minute bound.
+The send is never retried and successful export remains mandatory. The next run
+must establish the actual query/export result; this run is not a passing gate.
+
+At this local checkpoint, deployed telemetry and native review evidence are still
+pending. Push normally, verify both candidate and trusted-main suites, then create
+the ready PR, request `5he11`, follow native review and fix findings. The owner has
+confirmed automatic review is enabled for all PRs/every push and authorized ordinary
+PR/test-deployment work; no renewed approval for those actions is needed. A formal
+current-head approval and all protections remain required before merging. Later
+execution evidence belongs in the PR/workflow artifacts so it does not invalidate a
+tested head merely to record its successful run.
+
 ## PR #2 test deployment and readiness requested: 2026-11-07
 
 The owner asked for the failed test-deployment and PR-readiness checks to reach

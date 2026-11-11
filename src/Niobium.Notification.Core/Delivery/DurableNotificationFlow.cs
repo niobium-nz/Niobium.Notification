@@ -30,6 +30,7 @@ namespace Niobium.Notification.Delivery
             }
 
             SubmissionAttempt attempt = await submission.PrepareAttemptAsync(fingerprint, clock.GetUtcNow(), retryPolicy, cancellationToken);
+            NotificationTelemetry.RecordDecision(attempt);
             if (attempt.Action == SubmissionAction.Suppress)
             {
                 return;
@@ -40,8 +41,10 @@ namespace Niobium.Notification.Delivery
                 return;
             }
             // The recovery wake must be accepted before an irreversible provider submission.
-            SubmissionResult result = await provider.SubmitAsync(attempt.Payload!, $"notification-v1/{partition}/{id}", attempt.Deadline!.Value, cancellationToken);
-            await submission.RecordOutcomeAsync(attempt, result, cancellationToken);
+            SubmissionResult result = await NotificationTelemetry.MeasureDurableAsync(
+                () => provider.SubmitAsync(attempt.Payload!, $"notification-v1/{partition}/{id}", attempt.Deadline!.Value, cancellationToken), cancellationToken);
+            SubmissionStatus outcome = await submission.RecordOutcomeAsync(attempt, result, cancellationToken);
+            NotificationTelemetry.RecordOutcome(outcome);
         }
     }
 }

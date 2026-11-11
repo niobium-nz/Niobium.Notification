@@ -36,17 +36,19 @@ namespace Niobium.Notification.Delivery
 
     public sealed record FrozenNotification(string Json, string SenderDomain, string CredentialFingerprint);
     public sealed record SubmissionResult(SubmissionOutcome Outcome, string? ProviderID = null);
+    public readonly record struct SubmissionStatus(SubmissionState State, SubmissionOutcome Outcome);
     public enum SubmissionAction { Suppress, Wait, Submit }
 
     public sealed record SubmissionAttempt
     {
-        internal SubmissionAttempt(SubmissionAction action, DateTimeOffset? due = null,
+        internal SubmissionAttempt(SubmissionAction action, SubmissionStatus status, DateTimeOffset? due = null,
             DateTimeOffset? deadline = null, FrozenNotification? payload = null, NotificationSubmission? claim = null)
         {
-            Action = action; Due = due; Deadline = deadline; Payload = payload; Claim = claim;
+            Action = action; Status = status; Due = due; Deadline = deadline; Payload = payload; Claim = claim;
         }
 
         public SubmissionAction Action { get; }
+        public SubmissionStatus Status { get; }
         public DateTimeOffset? Due { get; }
         public DateTimeOffset? Deadline { get; }
         public FrozenNotification? Payload { get; }

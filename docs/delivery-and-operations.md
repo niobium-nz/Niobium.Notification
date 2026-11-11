@@ -8,7 +8,7 @@ The owner approved applying Niobium.Invoicing's delivery safeguards to this depe
 2. `Azure Deployment` runs Release build, application tests, coverage, Node policy tests and Python tooling tests. Coverage must be at least 90% combined and 80% per authored application module. Preserve package versions unless their upgrade is authorized.
 3. Deploy the exact feature SHA to the existing `test` environment and run the candidate harness. On a fresh runner, resolve immutable current main, check out only that commit and run its deployed harness against the same feature SHA. The workflow-wide test concurrency group protects both suites from another feature deployment; `queue: max` and `cancel-in-progress: false` preserve pending work.
 4. Verify the terminal result and artifacts for this head. A prior green commit, skipped suite or running job is not success. The trusted main listener authenticates pipeline Git blobs and the exact main-harness step before publishing `Test deployment verified`; feature code cannot publish that status or create PRs.
-5. After success the branch author creates/reuses the PR and requests the designated reviewer. Codex uses `niobium-nz` for implementation and requests `5he11`. On 2026-11-06 (Pacific/Auckland), the owner approved native automatic review, superseding the earlier manual-only choice. Verify its external configuration and current-head execution separately, resolve feedback and obtain a valid formal approval of the current head. The implementation agent must not submit its own reviewer decision or delegate approval as a substitute. This choice does not change Invoicing's standing `pr_approver` handoff.
+5. After success the branch author creates/reuses the PR and requests the designated reviewer. Codex uses `niobium-nz` for implementation and requests `5he11`. On 2026-11-06 (Pacific/Auckland), the owner approved native automatic review, superseding the earlier manual-only choice. Verify its external configuration and current-head execution separately, resolve feedback and obtain a valid formal approval of the current head. The implementation agent must explicitly invoke the independent `pr_approver` agent using [the formal handoff](pr-approval-handoff.md), verify its recorded current-head decision, and continue through fixes and delivery. It must not submit its own verdict or direct a rubber stamp. A reviewer request or completed native review is not a reason to stop the goal.
 6. With all rules satisfied and main up to date, verify the proposed squash tree equals the tested tree, then merge through the GitHub connector with the expected head SHA. No direct pushes to main or bypasses.
 7. The merged-PR event immediately deploys the actual merge SHA to production and runs read-only verification. There is no independent production gate. Stay active until production and package workflows finish; investigate any failure immediately and fix through the same process.
 
@@ -37,6 +37,11 @@ These settings belong to [Codex Code review settings](https://chatgpt.com/settin
 not a repository workflow. The connector cannot inspect/change the settings, and
 saving repository documentation does not enable the native service.
 
+The owner has since confirmed that automatic review is enabled on all PRs and
+every push. Continue the authorized PR/test deployment process without requesting
+that configuration again. A completed receipt for each actual head is still
+required evidence, and formal current-head approval remains a separate merge rule.
+
 On 2026-11-07, PR #2's native summary recorded completed code and security reviews
 for `eea196e` after the draft was marked ready, and for `3933e1c` and `9132976` after
 new commits. The [review of 9132976](https://github.com/niobium-nz/Niobium.Notification/pull/2#pullrequestreview-5810246112)
@@ -46,8 +51,9 @@ or approve the implementation.
 
 Verify an automatic receipt for each new head and read all findings. A reviewer
 assignment or a manual `@codex review` request does not prove automatic execution;
-a bot comment or reaction does not supply formal owner approval. Keep formal review
-separate from the implementation conversation. On 2026-11-07, the owner requested
+a bot comment or reaction does not supply formal GitHub approval. Invoke the separate
+`pr_approver` agent under [the versioned handoff](pr-approval-handoff.md); it makes
+its own formal decision while the implementation agent retains delivery ownership. On 2026-11-07, the owner requested
 successful test deployment and PR readiness for B02. That request supersedes the
 earlier draft-only restriction for feature validation; use the ordinary test
 pipeline and verify its terminal result before reporting the PR ready.
@@ -160,3 +166,21 @@ fixtures, with durable delivery still disabled. Follow the delivery sequence and
 current-head approval requirements before merging. Enabling durable delivery
 requires its concrete cutover and queue/provider verification prerequisites.
 The existing deployed ContactUs harness does not certify the enabled queue path.
+
+## Submission measurements
+
+See [the instrument definitions and interpretation limits](submission-observability.md).
+The candidate harness verifies the existing test Function App, its current workflow
+service version and its configured Application Insights destination, then requires
+the active legacy adapter's counter and duration to appear in Azure Monitor.
+It observes the existing approved ContactUs send and polls only read operations
+for up to six minutes. It never resends a notification to obtain telemetry.
+An export or query failure fails the deployment check and still runs ownership-
+checked fixture cleanup. The immutable main harness remains independently required.
+
+This uses the current workflow identity and existing resources/settings. No new
+secret, telemetry resource, durable-path activation or production fixture is added.
+The Functions detector's other resource metadata is retained while explicit
+`SERVICE_NAME` and `SERVICE_VERSION` values are reapplied after it. All OpenTelemetry
+signals using that resource now use the configured service identity; update queries
+that previously relied on the detector's fallback name/version.

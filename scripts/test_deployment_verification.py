@@ -151,7 +151,7 @@ class DeployedTests(unittest.TestCase):
         storage.assert_not_called()
         self.assertEqual("FAIL approved_test_recipient_required\n", output.getvalue())
 
-    def run_fixture(self, storage, statuses=(500, 201, 400)):
+    def run_fixture(self, storage, statuses=(500, 201, 400), metrics=None):
         posted = []
         checks = []
         iterator = iter(statuses)
@@ -161,7 +161,7 @@ class DeployedTests(unittest.TestCase):
             posted.append(dict(body))
             return next(iterator)
 
-        with patch.object(deployed, "Storage", return_value=storage), patch.object(deployed.readonly, "verify", return_value={"success": True}), patch.object(deployed, "post", side_effect=post):
+        with patch.object(deployed, "Storage", return_value=storage), patch.object(deployed.readonly, "verify", return_value={"success": True}), patch.object(deployed, "post", side_effect=post), patch.object(deployed.telemetry, "ProviderMetrics", return_value=metrics or Mock()):
             deployed.run(ENV, checks.append)
         return posted, checks
 
@@ -188,7 +188,7 @@ class DeployedTests(unittest.TestCase):
         self.assertEqual([storage.owned["PartitionKey"]] * 3, [p["Tenant"] for p in posted])
         self.assertNotEqual(posted[0]["ID"], posted[1]["ID"])
         self.assertEqual("", posted[2]["Message"])
-        self.assertEqual(["deployed_commit", "real_template_blob_failure", "real_provider_submission", "template_unchanged", "invalid_request_rejected", "owned_fixture_cleanup"], checks)
+        self.assertEqual(["deployed_commit", "test_telemetry_destination", "real_template_blob_failure", "real_provider_submission", "template_unchanged", "invalid_request_rejected", "provider_metrics_exported", "owned_fixture_cleanup"], checks)
         deletions = [c for c in storage.calls if c[1] == "delete"]
         self.assertEqual(2, len(deletions))
         self.assertTrue(all("--if-match" in c for c in deletions))
@@ -233,6 +233,25 @@ class DeployedTests(unittest.TestCase):
         with self.assertRaisesRegex(deployed.Failure, "real_provider_send_failed"):
             self.run_fixture(storage, (500, 502))
         self.assertEqual(2, len([c for c in storage.calls if c[1] == "delete"]))
+
+    def test_metrics_failure_cleans_up_without_another_send(self):
+        storage = FixtureStorage()
+        statuses = Mock(side_effect=[500, 201, 400])
+        metrics = Mock()
+        metrics.verify.side_effect = deployed.telemetry.Failure("test_telemetry_read_failed")
+        with patch.object(deployed, "Storage", return_value=storage), patch.object(deployed.readonly, "verify"), patch.object(deployed, "post", statuses), patch.object(deployed.telemetry, "ProviderMetrics", return_value=metrics):
+            with self.assertRaisesRegex(deployed.telemetry.Failure, "^test_telemetry_read_failed$"):
+                deployed.run(ENV, Mock())
+        self.assertEqual(3, statuses.call_count)
+        self.assertEqual(2, len([c for c in storage.calls if c[1] == "delete"]))
+        metrics.verify.assert_called_once()
+
+    def test_metrics_destination_failure_precedes_fixture_writes_and_sends(self):
+        with patch.object(deployed.readonly, "verify"), patch.object(deployed, "Storage") as storage, patch.object(deployed, "post") as post, patch.object(deployed.telemetry, "ProviderMetrics", side_effect=deployed.telemetry.Failure("test_telemetry_destination_mismatch")):
+            with self.assertRaises(deployed.telemetry.Failure):
+                deployed.run(ENV, Mock())
+        storage.assert_not_called()
+        post.assert_not_called()
 
     def test_missing_blob_success_does_not_count_as_provider_evidence(self):
         storage = FixtureStorage()

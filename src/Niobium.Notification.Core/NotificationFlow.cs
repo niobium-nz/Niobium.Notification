@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Niobium.Platform.Notification.Email;
+using Niobium.Notification.Delivery;
 
 namespace Niobium.Notification
 {
@@ -38,12 +39,12 @@ namespace Niobium.Notification
                 return;
             }
 
-            bool success = await sender.SendAsync(
+            bool success = await NotificationTelemetry.MeasureLegacyAsync(() => sender.SendAsync(
                 new EmailAddress { Address = deliverable.From, DisplayName = deliverable.FromName },
                 [new EmailAddress { Address = deliverable.To, DisplayName = deliverable.ToName }],
                 deliverable.Subject!,
                 deliverable.Body,
-                cancellationToken);
+                cancellationToken), cancellationToken);
             if (!success)
             {
                 string error = $"Failed sending email to {deliverable.To} for {request.Channel} by {request.Channel}.";
