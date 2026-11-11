@@ -24,10 +24,16 @@ Notification is an independent shared service that renders and sends generic not
 
 ## Delivery and review
 
+Read [PR approval handoff](docs/pr-approval-handoff.md) before submitting a PR or
+reporting an approval blocker. Explicitly invoke the independent `pr_approver`
+agent for a missing formal current-head decision after native findings; assigning
+a GitHub reviewer is not that invocation. Pending review is active work through fixes, merge and
+production verification, not a reason to stop the goal.
+
 - Push feature work, verify terminal CI/CD on its exact SHA, then author-create or reuse one PR to `main`. Neither feature jobs nor the trusted readiness controller creates PRs.
 - Request `niobium-nz` as reviewer, or the owner-authorized `5he11` when `niobium-nz` is the author. Verify identities and the recorded request.
 - The owner approved native automatic review on 2026-11-06 (Pacific/Auckland), superseding the earlier manual-only choice, and subsequently confirmed it is enabled on all PRs and every push. Use the recorded code/security settings and verify an automatic receipt for the current head. Do not request configuration approval again or confuse a missing receipt with missing authorization. The connector cannot inspect or change these settings; see the delivery guide.
-- Request `5he11` and keep implementation (`niobium-nz`) and approval (`5he11`) roles separate. The implementation agent must not submit its own reviewer decision or delegate an approval as a substitute. Native comments/reactions are not formal approval. This choice does not change Invoicing's standing `pr_approver` handoff.
+- Request `5he11` and keep implementation (`niobium-nz`) and formal approval in separate sessions. The implementation agent must not submit its own reviewer decision or direct a rubber stamp. It must invoke the independent `pr_approver` agent, which verifies the authorized reviewer connection and current-head evidence before making and recording its own GitHub decision. Native comments/reactions are not formal approval and do not replace this handoff. This makes the same standing process explicit in Notification, Store and Invoicing.
 - Address actionable review feedback, rerun deployment/tests for changed heads and obtain one valid formal current-head approval from any approver GitHub permits. Do not invent an additional author exclusion. Check all comments/threads and verify native review results separately.
 - Require up-to-date main, resolved threads, successful test deployment and the trusted custom status. Verify the proposed merge tree equals the tested tree. Squash merge through the connector with an expected-head SHA, without a second permission request once the rules are satisfied.
 - Monitor the resulting production deployment, read-only tests and package workflow to terminal success. A failure requires immediate investigation and a fix through the same feature/review process. Never direct-push main, weaken protections or fabricate status.

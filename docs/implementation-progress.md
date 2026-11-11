@@ -2,6 +2,19 @@
 
 This repository is the downstream dependency for the supplied Niobium.Invoicing research plan. Preserve the original plan IDs and acceptance criteria. The owner's accepted recommendations are recorded in [Invoicing Q28](https://github.com/niobium-nz/Niobium.Invoicing/blob/50df240f8212af33a152a13bcce11c848d6b51a8/docs/decisions-and-risks.md#q28-business-decision-follow-up); that decision-only change completed production verification as PR #14. This milestone does not claim those business behaviors are implemented.
 
+## Formal approval handoff corrected: 2026-11-12
+
+The owner corrected the implementation agent for stopping after native review and
+GitHub reviewer assignment without invoking the agreed separate approval agent.
+The agent had incorrectly marked the goal blocked. The required `pr_approver`
+handoff is now [versioned in this repository](pr-approval-handoff.md), required by
+AGENTS.md, and mirrored in Store and Invoicing. It does not depend on a workspace
+instruction file surviving a resumed goal. Genuine independent approval remains
+separate from self-approval or a delegated rubber stamp; native reviews remain
+required. Pending review is active work until findings, formal approval, merge
+and production verification have been handled. The independent reviewer is active;
+final-head verification and recorded decisions belong in PR #3.
+
 ## B07 submission and recovery measurements: 2026-11-12 (Pacific/Auckland)
 
 Work started from clean Notification main `adb9e59dd4428e1c8bf496fc40a42699bd003ba0`
