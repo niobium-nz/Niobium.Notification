@@ -5,6 +5,12 @@ submission is distinct from recipient delivery. B06 callbacks, cancellation and
 recipient mail-server confirmation are not implemented here. Direct HTTP and
 subscription-triggered calls to `NotificationFlow` keep their existing behavior.
 
+The [submission instruments](submission-observability.md) observe adapter calls,
+domain decisions and verified saved outcomes. They do not change this protocol or
+provide an exact inventory of held operations. `SubmissionStatus` is an in-memory
+read-only result of the domain's existing validation/persistence, not a new stored
+field or a second implementation of transition rules in the flow.
+
 ## Identity and persistence
 
 `NotificationOptions:EnableDurableSubmission` defaults to false. When enabled, the queue
@@ -108,7 +114,9 @@ clock jumps, an indefinitely suspended worker, queue loss or out-of-band sends.
 
 ## Activation and remaining dependencies
 
-This branch does not enable the option, deploy, publish or migrate existing data.
+The implementation was merged in PR #2. Ordinary feature deployment and review
+follow the authorized [delivery process](delivery-and-operations.md). The option
+remains disabled, and merging instrumentation does not enable it or migrate data.
 Before activation, review the concrete internal schema and failure policy and:
 
 - Quiesce old queue consumers. They can send without consulting this inbox.
@@ -123,7 +131,8 @@ Before activation, review the concrete internal schema and failure policy and:
   [resource-name configuration](delivery-and-operations.md#resource-name-configuration).
   The generic repository does not create tables. Verify the app identity can use it, create/read the private
   payload container through `IFileService`, and schedule to the existing queue.
-  No new Azure stack is required; this draft has not deployed the declaration.
+  No new Azure stack is required. Verify the current deployed resources and access
+  at activation; a source declaration alone is not evidence of working queue recovery.
 - Verify configured provider keys belong to the intended account and preserve
   their selection across retries. Do not infer key/account continuity on rotation.
 - Exercise the enabled consumer, actual scheduled queue redelivery, provider

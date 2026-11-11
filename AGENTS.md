@@ -6,6 +6,10 @@ factories in framework adapters. Use enums for finite states/outcomes with expli
 storage compatibility. Execute I/O and mutation actions before an `if`, then test
 a named result; do not hide actions inside conditions.
 
+Read [submission measurements](docs/submission-observability.md) before changing
+telemetry. Report domain-verified status and provider-adapter results separately.
+Keep metric labels bounded and free of tenant, operation, recipient and provider IDs.
+
 Read [HTTP client configuration](docs/http-client-configuration.md) before provider
 transport changes. Use shared framework configuration when its released package is
 available, preserve the existing transport, and keep redirect and retry policies
@@ -22,7 +26,7 @@ Notification is an independent shared service that renders and sends generic not
 
 - Push feature work, verify terminal CI/CD on its exact SHA, then author-create or reuse one PR to `main`. Neither feature jobs nor the trusted readiness controller creates PRs.
 - Request `niobium-nz` as reviewer, or the owner-authorized `5he11` when `niobium-nz` is the author. Verify identities and the recorded request.
-- The owner approved native automatic review on 2026-11-06 (Pacific/Auckland), superseding the earlier manual-only choice. Use Invoicing's recorded settings: code review for All PRs On every push, and security review for All PRs Whenever code review runs. This is authorization, not evidence that the external settings have been saved; verify configuration and an automatic receipt for the current head separately. The connector cannot inspect or change these settings. See the delivery guide for the activation checkpoint.
+- The owner approved native automatic review on 2026-11-06 (Pacific/Auckland), superseding the earlier manual-only choice, and subsequently confirmed it is enabled on all PRs and every push. Use the recorded code/security settings and verify an automatic receipt for the current head. Do not request configuration approval again or confuse a missing receipt with missing authorization. The connector cannot inspect or change these settings; see the delivery guide.
 - Request `5he11` and keep implementation (`niobium-nz`) and approval (`5he11`) roles separate. The implementation agent must not submit its own reviewer decision or delegate an approval as a substitute. Native comments/reactions are not formal approval. This choice does not change Invoicing's standing `pr_approver` handoff.
 - Address actionable review feedback, rerun deployment/tests for changed heads and obtain one valid formal current-head approval from any approver GitHub permits. Do not invent an additional author exclusion. Check all comments/threads and verify native review results separately.
 - Require up-to-date main, resolved threads, successful test deployment and the trusted custom status. Verify the proposed merge tree equals the tested tree. Squash merge through the connector with an expected-head SHA, without a second permission request once the rules are satisfied.

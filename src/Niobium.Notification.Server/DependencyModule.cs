@@ -39,6 +39,7 @@ namespace Niobium.Notification.Server
 
             loaded = true;
 
+            builder.Services.AddNotificationTelemetry(builder.Configuration);
             builder.Services.Configure<NotificationOptions>(o => options?.Invoke(o));
             builder.Services.AddSingleton(TimeProvider.System);
             builder.Services.AddSingleton<NotificationRetryPolicy>();

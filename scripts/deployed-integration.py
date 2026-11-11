@@ -1,5 +1,6 @@
 """Mandatory real test-service checks. Never runs with production or unscoped recipients."""
 import argparse
+from datetime import datetime, timezone
 import importlib.util
 import json
 import os
@@ -13,14 +14,15 @@ from urllib.request import Request, build_opener
 import uuid
 
 
-def load_read_only():
-    spec = importlib.util.spec_from_file_location("read_only_deployment", Path(__file__).with_name("read-only-deployment.py"))
+def load(name):
+    spec = importlib.util.spec_from_file_location(name.replace("-", "_"), Path(__file__).with_name(name + ".py"))
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
 
-readonly = load_read_only()
+readonly = load("read-only-deployment")
+telemetry = load("test-telemetry")
 Failure = readonly.VerificationFailure
 
 
@@ -102,6 +104,8 @@ def run(environ, reporter):
     config = configuration(environ)
     health = readonly.verify(config["base"], environ.get("TEST_EXPECTED_COMMIT", ""))
     reporter("deployed_commit")
+    metrics = telemetry.ProviderMetrics(environ)
+    reporter("test_telemetry_destination")
     storage = Storage(config)
     fixture_tenant = str(uuid.uuid4())
     blob = fixture_tenant + "/delivery-verification.html"
@@ -134,6 +138,7 @@ def run(environ, reporter):
             storage.call("blob", "upload", "--container-name", "templates", "--name", blob, "--file", str(body),
                          "--overwrite", "false", "--metadata", "verificationrun=" + fixture_tenant)
         request["ID"] = str(uuid.uuid4())
+        started = datetime.now(timezone.utc)
         if post(config["base"], request) != 201:
             raise Failure("real_provider_send_failed")
         reporter("real_provider_submission")
@@ -144,6 +149,8 @@ def run(environ, reporter):
         if post(config["base"], request) != 400:
             raise Failure("invalid_request_not_rejected")
         reporter("invalid_request_rejected")
+        metrics.verify(started)
+        reporter("provider_metrics_exported")
         return health
     finally:
         # Delete only this run's unique records, never existing templates or shared containers/tables.
@@ -192,7 +199,7 @@ def main():
     try:
         run(os.environ, passed)
         report["success"] = True
-    except Failure as error:
+    except (Failure, telemetry.Failure) as error:
         report["error"] = str(error)
         print("FAIL " + str(error), flush=True)
     except Exception:

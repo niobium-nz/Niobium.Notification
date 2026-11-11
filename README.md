@@ -11,6 +11,10 @@ The [durable queue submission path](docs/durable-submission.md) adds an opt-in i
 frozen provider requests and recovery scheduling for B02. It remains disabled
 until its legacy-message cutover and live verification prerequisites are met.
 
+[Submission measurements](docs/submission-observability.md) distinguish provider
+adapter results and latency from verified durable decisions and saved outcomes.
+The deployed test checks Azure Monitor export using its existing approved send.
+
 ## Local verification
 
 Use the pinned SDK and packages in `global.json` and the project files. Python 3, Node.js 22 and PowerShell 7 are needed for deployment-tooling tests. These commands do not contact deployed services:

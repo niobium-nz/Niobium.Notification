@@ -37,6 +37,11 @@ These settings belong to [Codex Code review settings](https://chatgpt.com/settin
 not a repository workflow. The connector cannot inspect/change the settings, and
 saving repository documentation does not enable the native service.
 
+The owner has since confirmed that automatic review is enabled on all PRs and
+every push. Continue the authorized PR/test deployment process without requesting
+that configuration again. A completed receipt for each actual head is still
+required evidence, and formal current-head approval remains a separate merge rule.
+
 On 2026-11-07, PR #2's native summary recorded completed code and security reviews
 for `eea196e` after the draft was marked ready, and for `3933e1c` and `9132976` after
 new commits. The [review of 9132976](https://github.com/niobium-nz/Niobium.Notification/pull/2#pullrequestreview-5810246112)
@@ -160,3 +165,21 @@ fixtures, with durable delivery still disabled. Follow the delivery sequence and
 current-head approval requirements before merging. Enabling durable delivery
 requires its concrete cutover and queue/provider verification prerequisites.
 The existing deployed ContactUs harness does not certify the enabled queue path.
+
+## Submission measurements
+
+See [the instrument definitions and interpretation limits](submission-observability.md).
+The candidate harness verifies the existing test Function App, its current workflow
+service version and its configured Application Insights destination, then requires
+the active legacy adapter's counter and duration to appear in Azure Monitor.
+It observes the existing approved ContactUs send and polls only read operations
+for up to six minutes. It never resends a notification to obtain telemetry.
+An export or query failure fails the deployment check and still runs ownership-
+checked fixture cleanup. The immutable main harness remains independently required.
+
+This uses the current workflow identity and existing resources/settings. No new
+secret, telemetry resource, durable-path activation or production fixture is added.
+The Functions detector's other resource metadata is retained while explicit
+`SERVICE_NAME` and `SERVICE_VERSION` values are reapplied after it. All OpenTelemetry
+signals using that resource now use the configured service identity; update queries
+that previously relied on the detector's fallback name/version.
