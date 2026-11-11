@@ -126,6 +126,37 @@ class TelemetryTests(unittest.TestCase):
         with self.assertRaisesRegex(telemetry.Failure, "^test_telemetry_read_failed$"):
             metrics.verify(STARTED)
 
+    def test_first_ingestion_and_transient_query_errors_retry_reads_within_the_deadline(self):
+        for message in ["BadArgumentError SemanticError Failed to resolve table or column expression named 'customMetrics' sensitive",
+                        "TooManyRequests sensitive", "ServiceUnavailable sensitive"]:
+            azure = runner(METADATA)
+            clock = Clock()
+            metrics = telemetry.ProviderMetrics(ENV, azure, clock, clock.sleep)
+            azure.side_effect = [subprocess.CompletedProcess([], 1, "sensitive", message),
+                                 subprocess.CompletedProcess([], 0, "2", "")]
+            metrics.verify(STARTED)
+            self.assertEqual(10, clock.elapsed)
+
+    def test_permission_errors_and_other_semantic_errors_fail_immediately_with_fixed_diagnostics(self):
+        for message, code in [("Forbidden sensitive", "forbidden"), ("InsufficientAccessError sensitive", "insufficientaccesserror"),
+                              ("BadArgumentError SemanticError invalid syntax sensitive", "semanticerror")]:
+            azure = runner(METADATA)
+            sleeper = Mock()
+            metrics = telemetry.ProviderMetrics(ENV, azure, sleeper=sleeper)
+            azure.side_effect = [subprocess.CompletedProcess([], 1, "sensitive", message)]
+            with self.assertRaisesRegex(telemetry.Failure, "^test_telemetry_read_failed_" + code + "$"):
+                metrics.verify(STARTED)
+            sleeper.assert_not_called()
+
+    def test_continued_query_unavailability_still_fails_after_six_minutes(self):
+        azure = runner(METADATA)
+        clock = Clock()
+        metrics = telemetry.ProviderMetrics(ENV, azure, clock, clock.sleep)
+        azure.side_effect = [subprocess.CompletedProcess([], 1, "sensitive", "ServiceUnavailable sensitive")] * 36
+        with self.assertRaisesRegex(telemetry.Failure, "^test_telemetry_read_failed_serviceunavailable_after_six_minutes$"):
+            metrics.verify(STARTED)
+        self.assertEqual(360, clock.elapsed)
+
 
 if __name__ == "__main__":
     unittest.main()

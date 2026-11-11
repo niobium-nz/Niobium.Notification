@@ -8,7 +8,9 @@ import uuid
 
 
 class Failure(RuntimeError):
-    pass
+    def __init__(self, message, retryable=False):
+        super().__init__(message)
+        self.retryable = retryable
 
 
 class ProviderMetrics:
@@ -67,13 +69,25 @@ class ProviderMetrics:
         raise Failure("test_telemetry_identifier_invalid")
 
     def azure(self, *args, timeout=60):
+        query = args[0] == "rest"
         try:
             result = self.runner(["az", *args, "--only-show-errors", "--output", "tsv"],
                                  text=True, capture_output=True, check=False, timeout=timeout)
         except (OSError, subprocess.TimeoutExpired):
-            raise Failure("test_telemetry_read_failed") from None
+            raise Failure("test_telemetry_read_failed", retryable=query) from None
         if result.returncode:
-            raise Failure("test_telemetry_read_failed")
+            # Only allowlisted error classes leave this process. Never include raw
+            # CLI output, request URLs, tokens, query responses or application data.
+            detail = (result.stderr or "").lower()
+            codes = ("insufficientaccesserror", "authorizationfailed", "forbidden", "unauthorized",
+                     "semanticerror", "badargumenterror", "pathnotfounderror", "throttled", "toomanyrequests",
+                     "serviceunavailable", "gatewaytimeout", "internalservererror")
+            code = next((code for code in codes if code in detail), None)
+            missing_table = code == "semanticerror" and re.search(
+                r"failed to resolve [^\r\n]{0,80} named ['\"]custommetrics['\"]", detail)
+            transient = code in ("throttled", "toomanyrequests", "serviceunavailable", "gatewaytimeout", "internalservererror")
+            message = "test_telemetry_read_failed" + ("_" + code if query and code else "")
+            raise Failure(message, retryable=query and (missing_table or transient))
         return result.stdout.strip()
 
     def verify(self, started):
@@ -90,12 +104,23 @@ class ProviderMetrics:
 | count'''
         url = "https://api.applicationinsights.io/v1/apps/" + self.application + "/query?query=" + quote(query, safe="")
         deadline = self.clock() + 360
+        last_failure = None
         while (remaining := deadline - self.clock()) > 0:
-            observed = self.azure("rest", "--method", "get", "--resource", "https://api.applicationinsights.io",
-                                  "--url", url, "--query", "tables[0].rows[0][0]", timeout=min(60, remaining))
+            try:
+                observed = self.azure("rest", "--method", "get", "--resource", "https://api.applicationinsights.io",
+                                      "--url", url, "--query", "tables[0].rows[0][0]", timeout=min(60, remaining))
+                last_failure = None
+            except Failure as error:
+                if not error.retryable:
+                    raise
+                last_failure = error
+                self.sleeper(max(0, min(10, deadline - self.clock())))
+                continue
             if observed not in ("0", "1", "2"):
                 raise Failure("test_telemetry_count_invalid")
             if observed == "2":
                 return
             self.sleeper(max(0, min(10, deadline - self.clock())))
+        if last_failure:
+            raise Failure(str(last_failure) + "_after_six_minutes")
         raise Failure("test_provider_metrics_not_exported_within_six_minutes")

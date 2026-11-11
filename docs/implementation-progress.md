@@ -33,7 +33,7 @@ verification and an exact uncertain-send inventory remain separate dependencies.
 | Application tests with TRX and Cobertura | 128 passed, zero failed/skipped; includes 22 focused telemetry scenarios |
 | Authored coverage gate | 595/605 lines, 98.35%; Contracts 100%, Core 99.12%, Server 97.12% |
 | Real pinned Table/Blob adapters against loopback Azurite | Four passed, zero failed/skipped; owned emulators stopped |
-| Python deployment/tooling tests | 43 passed; classic/regional hostnames, metadata mismatch, ingestion timeout, output sanitization and cleanup without resending covered |
+| Python deployment/tooling tests | 46 passed; classic/regional hostnames, metadata mismatch, bounded query retries, permission failures, output sanitization and cleanup without resending covered |
 | Node delivery-policy tests | 20 passed |
 
 Commands are the README's local verification sequence, plus the explicit storage
@@ -51,6 +51,15 @@ had assumed a regional/hash segment; the existing app uses Azure's classic
 `app.azurewebsites.net` hostname. The matcher now accepts both supported forms
 while retaining an exact ARM hostname check. A regression test covers both forms
 and rejects a mismatch. This failed run does not count as deployed verification.
+
+Run [43026798576](https://github.com/niobium-nz/Niobium.Notification/actions/runs/43026798576)
+then passed metadata/destination checks, the approved provider submission and owned
+fixture cleanup, but its first metrics query failed. That generic diagnostic did
+not establish the cause. Query errors now expose only allowlisted error classes;
+authorization and invalid queries fail immediately, while first-ingestion table
+absence and transient read failures can retry within the existing six-minute bound.
+The send is never retried and successful export remains mandatory. The next run
+must establish the actual query/export result; this run is not a passing gate.
 
 At this local checkpoint, deployed telemetry and native review evidence are still
 pending. Push normally, verify both candidate and trusted-main suites, then create

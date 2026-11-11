@@ -103,7 +103,10 @@ current workflow version and exact exporter destination. It uses its existing
 approved ContactUs submission, then queries only the two legacy provider
 instruments from that version and test window. Polling is bounded to six minutes,
 returns only a count of instruments and never retries the send. Metadata/query
-failures are sanitized. Fixture cleanup still checks ownership and ETags.
+failures are sanitized. Read-only polling tolerates first-ingestion table absence,
+transient service errors and transport timeouts within the same six-minute limit;
+permission errors fail immediately with a fixed error class. Fixture cleanup still
+checks ownership and ETags.
 
 This proves aggregate export for the current deployment and window, not attribution
 of a metric to a specific email. Durable decision/outcome instruments are locally
