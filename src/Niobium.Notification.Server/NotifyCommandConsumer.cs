@@ -28,6 +28,12 @@ namespace Niobium.Notification.Server
                 return;
             }
 
+            if (evt.Tenant == Guid.Empty)
+            {
+                logger.LogError("Notification command requires a tenant.");
+                return;
+            }
+
             Transform(evt);
             _ = evt.TryValidate(out var validationState);
             if (!validationState.IsValid)

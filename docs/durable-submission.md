@@ -132,6 +132,9 @@ These are illustrative IDs, not approved activation targets.
 The raw string is validated in full before routing. GUID array binding can silently
 discard invalid entries; an invalid entry must never broaden a configured cohort.
 Whitespace around GUIDs is accepted, but empty entries and the empty GUID are not.
+The consumer rejects an empty command tenant before either route, independently
+of the enable switch or filter. DataAnnotations on a non-nullable GUID alone do
+not establish a valid tenant.
 Filtering does not establish that a tenant or its operation IDs are new, grant
 queue access, or supply historical suppression evidence.
 

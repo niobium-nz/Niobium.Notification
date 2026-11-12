@@ -45,18 +45,27 @@ Local verification used .NET SDK 10.0.403:
 ```sh
 dotnet restore Niobium.Notification.slnx --nologo
 dotnet build Niobium.Notification.slnx --configuration Release --no-restore --nologo --disable-build-servers -m:1
-dotnet test --project src/Niobium.Notification.Core.Tests/Niobium.Notification.Core.Tests.csproj --configuration Release --no-build --no-restore --report-trx --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml --results-directory /workspace/scratch/notification-cohorts-tests
-python scripts/check-coverage.py /workspace/scratch/notification-cohorts-tests/coverage.cobertura.xml
+dotnet test --project src/Niobium.Notification.Core.Tests/Niobium.Notification.Core.Tests.csproj --configuration Release --no-build --no-restore --report-trx --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml --results-directory /workspace/scratch/notification-cohorts-review-tests
+python scripts/check-coverage.py /workspace/scratch/notification-cohorts-review-tests/coverage.cobertura.xml
 git -c core.whitespace=cr-at-eol diff --check
 ```
 
 Restore and Release build succeeded with zero errors and the same six baseline
-NU1603 warnings. All 138 application tests passed, with no failures or skips.
-Authored line coverage is 98.38% combined (606/616), with Contracts 100%, Core
-99.14% and Server 97.12%; the unchanged coverage thresholds pass. Whitespace and
+NU1603 warnings. All 142 application tests passed, with no failures or skips.
+Authored line coverage is 98.38% combined (609/619), with Contracts 100%, Core
+99.14% and Server 97.15%; the unchanged coverage thresholds pass. Whitespace and
 relative Markdown link checks passed. These local results do not establish enabled
 cloud queue/provider behavior; exact-head CI and subsequent delivery remain
 separate evidence recorded on the PR.
+
+[Native review on PR #4](https://github.com/niobium-nz/Niobium.Notification/pull/4#discussion_r4547027227)
+identified that an empty command tenant could fall through to the legacy sender
+with a filter, because DataAnnotations does not reject an empty non-nullable GUID.
+The separate approver independently confirmed the issue. Four regression cases
+first failed across enabled/disabled and filtered/unfiltered modes. The consumer
+now rejects an empty tenant immediately after parsing, before transformation or
+either route. All four cases pass with no provider, inbox, payload-file or queue
+interaction. Existing valid-command routing remains unchanged.
 
 This repository is the downstream dependency for the supplied Niobium.Invoicing research plan. Preserve the original plan IDs and acceptance criteria. The owner's accepted recommendations are recorded in [Invoicing Q28](https://github.com/niobium-nz/Niobium.Invoicing/blob/50df240f8212af33a152a13bcce11c848d6b51a8/docs/decisions-and-risks.md#q28-business-decision-follow-up); that decision-only change completed production verification as PR #14. This milestone does not claim those business behaviors are implemented.
 

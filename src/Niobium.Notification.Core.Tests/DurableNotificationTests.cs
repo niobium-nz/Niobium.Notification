@@ -345,6 +345,30 @@ public sealed class DurableNotificationTests
     }
 
     [TestMethod]
+    [DataRow(false, false)]
+    [DataRow(false, true)]
+    [DataRow(true, false)]
+    [DataRow(true, true)]
+    public async Task EmptyTenantConsumer_NeverSends(bool enabled, bool filtered)
+    {
+        Scenario s = new();
+        s.Request.Tenant = Guid.Empty;
+        NotificationOptions options = new()
+        {
+            SelfHostName = "example.invalid", TemplateFolder = "templates", EnableDurableSubmission = enabled,
+            DurableSubmissionTenants = filtered ? Guid.NewGuid().ToString() : null,
+        };
+        NotifyCommandConsumer consumer = new(s.Renderer, NullLogger<NotifyCommandConsumer>.Instance, s.Flow(), Options.Create(options));
+        ServiceBusReceivedMessage message = ServiceBusModelFactory.ServiceBusReceivedMessage(body: new BinaryData(JsonMarshaller.Marshall(s.Request)), contentType: "application/json", messageId: "envelope-identity");
+        await consumer.Run(message, default);
+        Assert.AreEqual(0, s.Provider.Invocations.Count);
+        Assert.AreEqual(0, s.Legacy.Invocations.Count);
+        Assert.AreEqual(0, s.Store.Repository.Invocations.Count);
+        Assert.AreEqual(0, s.Store.Files.Invocations.Count);
+        Assert.HasCount(0, s.Scheduled);
+    }
+
+    [TestMethod]
     [DataRow("")]
     [DataRow("not-a-tenant")]
     [DataRow("00000000-0000-0000-0000-000000000000")]
