@@ -13,7 +13,7 @@ field or a second implementation of transition rules in the flow.
 
 ## Identity and persistence
 
-`NotificationOptions:EnableDurableSubmission` defaults to false. When enabled, the queue
+`NotificationOptions:EnableDurableSubmission` defaults to false. When enabled for a sender, the queue
 consumer uses the Service Bus `MessageId` as the operation ID, including for old
 producers that omit the body ID. Scheduled retries carry the same ID in both
 places. Invoicing already supplies its full invoice identity in both places.
@@ -112,6 +112,44 @@ requests may be retried. This implementation relies on that provider contract;
 it does not claim exactly-once recipient delivery or protection against arbitrary
 clock jumps, an indefinitely suspended worker, queue loss or out-of-band sends.
 
+## Sender-tenant rollout filter
+
+`NotificationOptions:DurableSubmissionTenants` optionally narrows the existing
+enable switch to explicitly selected sender tenants. It is one comma-separated
+string of nonempty GUIDs, not an indexed configuration array. For example, the
+generic settings path accepts
+`APPSETTING_NOTIFICATIONOPTIONS__DURABLESUBMISSIONTENANTS` with a value such as
+`11111111-1111-4111-8111-111111111111,22222222-2222-4222-8222-222222222222`.
+These are illustrative IDs, not approved activation targets.
+
+| Configuration | Queue consumer behavior |
+| --- | --- |
+| Enable switch false | Existing legacy path, regardless of the filter |
+| Enable switch true; filter absent | Existing all-tenant durable behavior |
+| Enable switch true; valid filter | Durable path for listed sender tenants; existing legacy path for other tenants |
+| Enable switch true; empty or malformed filter | Fail before either provider or the inbox is called |
+
+The raw string is validated in full before routing. GUID array binding can silently
+discard invalid entries; an invalid entry must never broaden a configured cohort.
+Whitespace around GUIDs is accepted, but empty entries and the empty GUID are not.
+The consumer rejects an empty command tenant before either route, independently
+of the enable switch or filter. DataAnnotations on a non-nullable GUID alone do
+not establish a valid tenant.
+Filtering does not establish that a tenant or its operation IDs are new, grant
+queue access, or supply historical suppression evidence.
+
+Keep a selected tenant enrolled while any of its operations can be replayed,
+including scheduled wakes and accepted operations. Removing that tenant or
+disabling the switch can route an old operation through the legacy sender and
+bypass its inbox evidence. Clearing the filter entirely broadens activation to
+all tenants. These are cutover changes requiring quiescence and reconciliation,
+not safe rollback actions. A whole-tenant filter cannot separate old and new
+operation IDs within one existing tenant.
+
+This change supplies routing and local verification only. It does not choose a
+production cohort or enable the queue path in an environment. The enabled real
+queue/provider checks and operational decisions below remain required.
+
 ## Activation and remaining dependencies
 
 The implementation was merged in PR #2. Ordinary feature deployment and review
@@ -124,6 +162,8 @@ Before activation, review the concrete internal schema and failure policy and:
   or explicitly delimit an approved new-operation cohort. A recent queue enqueue
   time alone cannot prove an old logical operation has never sent. Do not replay
   historical invoices to populate the new store.
+  The optional sender-tenant filter can delimit newly established tenants; it
+  cannot make an existing tenant's earlier operation IDs safe by itself.
 - Provision `NotificationSubmission` through the generic `storageTableNames` input
   to `infra/main.bicep` in the existing data account before enabling the option.
   `main.bicepparam` reads `STORAGE_TABLE_NAMES` and includes the existing

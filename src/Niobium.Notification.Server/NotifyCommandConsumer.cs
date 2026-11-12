@@ -28,6 +28,12 @@ namespace Niobium.Notification.Server
                 return;
             }
 
+            if (evt.Tenant == Guid.Empty)
+            {
+                logger.LogError("Notification command requires a tenant.");
+                return;
+            }
+
             Transform(evt);
             _ = evt.TryValidate(out var validationState);
             if (!validationState.IsValid)
@@ -36,7 +42,7 @@ namespace Niobium.Notification.Server
                 return;
             }
 
-            if (options?.Value.EnableDurableSubmission == true)
+            if (options?.Value.UsesDurableSubmission(evt.Tenant) == true)
             {
                 // The queue envelope supplies stable identity even for legacy producers whose
                 // body omits DomainEvent.ID. Never generate a new ID on redelivery.

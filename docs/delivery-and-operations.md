@@ -160,6 +160,11 @@ The runner's `TEST_STORAGE_KEY` is used only for owned integration fixtures. Run
 ## B02 validation and activation
 
 The [durable queued submission path](durable-submission.md) is disabled by default.
+Its optional [sender-tenant filter](durable-submission.md#sender-tenant-rollout-filter)
+supports a selected rollout without changing other senders' routing. A selected
+tenant still needs verified new-operation/suppression evidence; keep it enrolled
+while its operations can be replayed. No environment activation is part of adding
+the filter.
 The owner authorized test deployment and readiness verification on 2026-11-07.
 Feature validation uses the existing test environment and approved Notification
 fixtures, with durable delivery still disabled. Follow the delivery sequence and

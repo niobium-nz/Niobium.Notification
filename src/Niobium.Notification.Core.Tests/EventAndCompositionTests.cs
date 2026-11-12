@@ -1,4 +1,5 @@
 using System.Reflection;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -73,6 +74,7 @@ public sealed class EventAndCompositionTests
         Assert.AreEqual("templates", options.TemplateFolder);
         Assert.IsNotNull(services.GetRequiredService<DurableNotificationFlow>());
         Assert.IsFalse(services.GetRequiredService<IOptions<NotificationOptions>>().Value.EnableDurableSubmission);
+        Assert.IsNull(options.DurableSubmissionTenants);
         HttpMessageHandler handler = services.GetRequiredService<IHttpMessageHandlerFactory>().CreateHandler(nameof(IIdempotentNotificationProvider));
         while (handler is DelegatingHandler wrapper)
         {
@@ -83,5 +85,39 @@ public sealed class EventAndCompositionTests
         Assert.IsFalse(((SocketsHttpHandler)handler).AllowAutoRedirect);
         Assert.IsTrue(builder.Services.Any(s => s.ServiceType == typeof(IEmailNotificationClient)));
         Assert.IsTrue(builder.Services.Any(s => s.ServiceType == typeof(IExternalEventAdaptor<,>)));
+    }
+
+    [TestMethod]
+    public void DurableCohortConfiguration_BindsTenantFilterWithoutConversion()
+    {
+        Guid first = Guid.NewGuid();
+        Guid second = Guid.NewGuid();
+        IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["NotificationOptions:SelfHostName"] = "example.invalid",
+            ["NotificationOptions:TemplateFolder"] = "templates",
+            ["NotificationOptions:EnableDurableSubmission"] = "true",
+            ["NotificationOptions:DurableSubmissionTenants"] = $"{first}, {second:N}",
+        }).Build();
+        NotificationOptions options = configuration.GetSection(nameof(NotificationOptions)).Get<NotificationOptions>()!;
+        Assert.AreEqual($"{first}, {second:N}", options.DurableSubmissionTenants);
+        Assert.IsTrue(options.UsesDurableSubmission(first));
+        Assert.IsTrue(options.UsesDurableSubmission(second));
+        Assert.IsFalse(options.UsesDurableSubmission(Guid.NewGuid()));
+    }
+
+    [TestMethod]
+    [DataRow("not-a-tenant")]
+    [DataRow("")]
+    [DataRow(" ")]
+    public void DurableCohortConfiguration_RejectsMalformedOrEmptyFilter(string filter)
+    {
+        IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["NotificationOptions:EnableDurableSubmission"] = "true",
+            ["NotificationOptions:DurableSubmissionTenants"] = filter,
+        }).Build();
+        NotificationOptions options = configuration.GetSection(nameof(NotificationOptions)).Get<NotificationOptions>()!;
+        Assert.ThrowsExactly<InvalidOperationException>(() => options.UsesDurableSubmission(Guid.NewGuid()));
     }
 }
