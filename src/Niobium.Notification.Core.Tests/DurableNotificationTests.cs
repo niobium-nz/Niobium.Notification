@@ -304,15 +304,65 @@ public sealed class DurableNotificationTests
     }
 
     [TestMethod]
-    public async Task EnabledConsumer_UsesEnvelopeIdentityAndDurableProvider()
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task EnabledConsumer_UsesEnvelopeIdentityAndDurableProvider(bool selectTenant)
     {
         Scenario s = new();
-        NotifyCommandConsumer consumer = new(s.Renderer, NullLogger<NotifyCommandConsumer>.Instance, s.Flow(), Options.Create(new NotificationOptions { SelfHostName = "example.invalid", TemplateFolder = "templates", EnableDurableSubmission = true }));
+        NotificationOptions options = new()
+        {
+            SelfHostName = "example.invalid", TemplateFolder = "templates", EnableDurableSubmission = true,
+            DurableSubmissionTenants = selectTenant ? $"{Guid.NewGuid()},{s.Request.Tenant}" : null,
+        };
+        NotifyCommandConsumer consumer = new(s.Renderer, NullLogger<NotifyCommandConsumer>.Instance, s.Flow(), Options.Create(options));
         ServiceBusReceivedMessage message = ServiceBusModelFactory.ServiceBusReceivedMessage(body: new BinaryData(JsonMarshaller.Marshall(s.Request)), contentType: "application/json", messageId: "envelope-identity");
         await consumer.Run(message, default); await consumer.Run(message, default);
         Assert.AreEqual(NotificationFingerprint.Hash("envelope-identity"), s.Store.Entry!.RowKey);
         Assert.AreEqual(1, s.Sends);
         Assert.AreEqual(0, s.Legacy.Invocations.Count);
+    }
+
+    [TestMethod]
+    [DataRow(false, true)]
+    [DataRow(true, false)]
+    public async Task UnselectedConsumer_UsesLegacyWithoutTouchingInbox(bool enabled, bool selectTenant)
+    {
+        Scenario s = new();
+        NotificationOptions options = new()
+        {
+            SelfHostName = "example.invalid", TemplateFolder = "templates", EnableDurableSubmission = enabled,
+            DurableSubmissionTenants = (selectTenant ? s.Request.Tenant : Guid.NewGuid()).ToString(),
+        };
+        NotifyCommandConsumer consumer = new(s.Renderer, NullLogger<NotifyCommandConsumer>.Instance, s.Flow(), Options.Create(options));
+        ServiceBusReceivedMessage message = ServiceBusModelFactory.ServiceBusReceivedMessage(body: new BinaryData(JsonMarshaller.Marshall(s.Request)), contentType: "application/json", messageId: "envelope-identity");
+        await consumer.Run(message, default);
+        await consumer.Run(message, default);
+        s.Legacy.Verify(p => p.SendAsync(It.IsAny<EmailAddress>(), It.IsAny<IEnumerable<EmailAddress>>(),
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+        Assert.AreEqual(0, s.Provider.Invocations.Count);
+        Assert.AreEqual(0, s.Store.Repository.Invocations.Count);
+        Assert.HasCount(0, s.Scheduled);
+    }
+
+    [TestMethod]
+    [DataRow("")]
+    [DataRow("not-a-tenant")]
+    [DataRow("00000000-0000-0000-0000-000000000000")]
+    public async Task InvalidCohortEntry_AfterMatchingTenant_NeverSends(string invalid)
+    {
+        Scenario s = new();
+        NotificationOptions options = new()
+        {
+            SelfHostName = "example.invalid", TemplateFolder = "templates", EnableDurableSubmission = true,
+            DurableSubmissionTenants = $"{s.Request.Tenant},{invalid}",
+        };
+        NotifyCommandConsumer consumer = new(s.Renderer, NullLogger<NotifyCommandConsumer>.Instance, s.Flow(), Options.Create(options));
+        ServiceBusReceivedMessage message = ServiceBusModelFactory.ServiceBusReceivedMessage(body: new BinaryData(JsonMarshaller.Marshall(s.Request)), contentType: "application/json", messageId: "envelope-identity");
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => consumer.Run(message, default));
+        Assert.AreEqual(0, s.Provider.Invocations.Count);
+        Assert.AreEqual(0, s.Legacy.Invocations.Count);
+        Assert.AreEqual(0, s.Store.Repository.Invocations.Count);
+        Assert.HasCount(0, s.Scheduled);
     }
 
     [TestMethod]

@@ -1,5 +1,63 @@
 # Notification reliability implementation ledger
 
+## B02 sender-tenant rollout filter: 2026-11-12
+
+This continuation starts from clean main
+`9857b67d1199713017dcc97cf64dc1bee985be21`, isolated in
+`/workspace/Niobium.Notification-durable-cohorts` on
+`codex/notification-durable-cohorts`. The parent Invoicing baseline is
+`36020f1dfa725dd7505b5fb961add8e5083fb585`; its complete original report remains
+available with SHA-256
+`1321b7712c4c9e10b477d03b230e12fce5485fbde3375d94c374fc96290313eb`.
+
+B02's current switch enables every sender. The optional
+`NotificationOptions:DurableSubmissionTenants` filter prepares selective
+activation using an explicitly chosen sender-tenant cohort. The consumer delegates
+selected commands to the existing durable flow/domain and preserves the legacy
+path for other tenants. An absent filter preserves the existing global switch;
+an empty or malformed configured filter fails before sending when enabled.
+The full filter is validated even if an earlier entry matches the command.
+See [rollout semantics and limits](durable-submission.md#sender-tenant-rollout-filter).
+
+The first regression test demonstrated that the default .NET GUID-array binder
+silently discarded an invalid entry. The final setting therefore binds one raw
+comma-separated string and validates every GUID before routing. This avoids
+interpreting a malformed selection as all tenants. Runtime tests cover actual
+consumer dispatch, envelope identity, accepted replay suppression, untouched inbox
+and provider behavior outside the cohort, and malformed configuration before sends.
+
+| Acceptance item | Result and remaining boundary |
+| --- | --- |
+| B02 / Q28 #1: controlled activation | Optional sender-tenant routing is implemented; no cohort is configured or enabled by this source change. |
+| B02 identity and suppression | Selected consumers reuse the existing envelope-derived operation key, frozen payload, domain state machine and scheduling. |
+| Compatibility | The false default and absent-filter global behavior are preserved. Direct HTTP/subscription paths, wire/storage formats, retry policy and packages are unchanged. |
+| Live activation | Still requires an approved new-operation cohort or verified historical suppression, quiesced old consumers, provider/queue verification and an owner for held/dead-lettered outcomes. The owner has been asked for the cohort and operational owner; no answer is inferred. |
+
+Package references remain Niobium integrations 4.2.70 and lower-level references
+4.2.66. The existing options binding and rich-domain/repository boundaries were
+checked against the application source and the package-matched framework guides.
+The clean baseline Release build had zero errors and the six previously recorded
+NU1603 warnings; all 128 baseline application tests passed. Final verification and
+exact-head delivery evidence are recorded below and on the author-created PR.
+
+Local verification used .NET SDK 10.0.403:
+
+```sh
+dotnet restore Niobium.Notification.slnx --nologo
+dotnet build Niobium.Notification.slnx --configuration Release --no-restore --nologo --disable-build-servers -m:1
+dotnet test --project src/Niobium.Notification.Core.Tests/Niobium.Notification.Core.Tests.csproj --configuration Release --no-build --no-restore --report-trx --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml --results-directory /workspace/scratch/notification-cohorts-tests
+python scripts/check-coverage.py /workspace/scratch/notification-cohorts-tests/coverage.cobertura.xml
+git -c core.whitespace=cr-at-eol diff --check
+```
+
+Restore and Release build succeeded with zero errors and the same six baseline
+NU1603 warnings. All 138 application tests passed, with no failures or skips.
+Authored line coverage is 98.38% combined (606/616), with Contracts 100%, Core
+99.14% and Server 97.12%; the unchanged coverage thresholds pass. Whitespace and
+relative Markdown link checks passed. These local results do not establish enabled
+cloud queue/provider behavior; exact-head CI and subsequent delivery remain
+separate evidence recorded on the PR.
+
 This repository is the downstream dependency for the supplied Niobium.Invoicing research plan. Preserve the original plan IDs and acceptance criteria. The owner's accepted recommendations are recorded in [Invoicing Q28](https://github.com/niobium-nz/Niobium.Invoicing/blob/50df240f8212af33a152a13bcce11c848d6b51a8/docs/decisions-and-risks.md#q28-business-decision-follow-up); that decision-only change completed production verification as PR #14. This milestone does not claim those business behaviors are implemented.
 
 ## Formal approval handoff corrected: 2026-11-12
