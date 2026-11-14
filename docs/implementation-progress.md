@@ -20,7 +20,9 @@ Local verification passes 193 application/fixture cases with no skips or failure
 and 98.58% authored application line coverage.
 Eighteen additional cases cover correlated restoration, malformed metadata, version
 changes and lost correlation at fault readback or later recovery. The build succeeds
-with the existing NU1603 dependency-resolution warnings. Exact-head feature/storage
+with the existing NU1603 dependency-resolution warnings. All 60 Python wrapper/tooling
+cases pass, including exact allowlisting of the four new fixed verifier diagnostics
+and continued suppression of arbitrary appended receipt details. Exact-head feature/storage
 runs, candidate/trusted reports, native review, independent approval and terminal
 production/package evidence belong on this increment's PR before it is delivered.
 Provider receipt endpoints/configuration, authenticated live confirmation and the
