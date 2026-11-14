@@ -1,5 +1,33 @@
 # Notification reliability implementation ledger
 
+## Trusted recovery compatibility for receipt metadata (14 November 2026)
+
+Notification [PR #9](https://github.com/niobium-nz/Niobium.Notification/pull/9)
+completed the live B02 recovery verification below. Its merge
+`d34bffbc49b980d6c1c372f90a57c21846eccad4` passed production run 43592105122 and
+GET-only verification. The downloaded production ZIP matched SHA-256
+`885a69f58365bea432853c41a60bbefc69c638820cbacbb279a20e6bc1269e40`;
+package run 43592105110 succeeded and correctly skipped unchanged Contracts.
+
+This follow-up prepares the installed trusted recovery harness for the version-3
+provider receipt representation. It independently validates versions 2/3, requires
+owned operation/channel and stable opaque proof on version 3, forbids correlation
+on version 2, and rejects changed versions/proofs across fault setup and recovery.
+All raw columns and the conditional write protocol remain preserved. The production
+application, Contracts and pipeline definitions are unchanged by this increment.
+
+Local verification passes 193 application/fixture cases with no skips or failures
+and 98.58% authored application line coverage.
+Eighteen additional cases cover correlated restoration, malformed metadata, version
+changes and lost correlation at fault readback or later recovery. The build succeeds
+with the existing NU1603 dependency-resolution warnings. All 60 Python wrapper/tooling
+cases pass, including exact allowlisting of the four new fixed verifier diagnostics
+and continued suppression of arbitrary appended receipt details. Exact-head feature/storage
+runs, candidate/trusted reports, native review, independent approval and terminal
+production/package evidence belong on this increment's PR before it is delivered.
+Provider receipt endpoints/configuration, authenticated live confirmation and the
+remaining Invoicing roadmap are separate outstanding work.
+
 ## Live B02 recovery verification in progress (14 November 2026)
 
 The separately invoked deployment executable now exercises the actual test queue,
