@@ -206,6 +206,17 @@ missing payloads and durable flow recovery after a lost completion-write respons
 both before and after that write commits. Reconstructed domains/providers reuse the
 persisted key, payload and window; accepted operations stay suppressed after two days.
 
+`ConcurrentRecoveryTests` adds real-adapter concurrency evidence. A barrier lets two
+independent domains read the same ETag before their actual Table claims compete;
+only the winner schedules and submits. Four late-response cases pause an original
+provider call, advance the injected clock to its wake, and let a reconstructed flow
+persist acceptance. The original call then returns acceptance, rejection, retry or
+hold. Each stale result receives Table HTTP 412 and leaves the winner's complete
+record, ETag and provider evidence unchanged. Calls use identical provider keys and
+frozen bytes; a later replay after the provider window neither sends nor schedules.
+The clock, queue and HTTP responses are controlled locally. This proves the pinned
+storage/domain boundary, not real Service Bus timing or provider deduplication.
+
 Set both `NIOBIUM_NOTIFICATION_TEST_TABLE_ENDPOINT` and
 `NIOBIUM_NOTIFICATION_TEST_BLOB_ENDPOINT` to disposable loopback Azurite endpoints.
 Every case creates and deletes only its uniquely named emulator table/container.

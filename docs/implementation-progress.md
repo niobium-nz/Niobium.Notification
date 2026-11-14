@@ -1,5 +1,68 @@
 # Notification reliability implementation ledger
 
+## B02 / B07 concurrent recovery integration: 2026-11-14
+
+Baseline: Notification main `708b9c27774d6895a61e187c20ed75f60f985376`,
+isolated on `codex/notification-concurrent-recovery` in
+`/workspace/Niobium.Notification-concurrent-recovery`. Parent Invoicing main is
+`bbc978acdbc29583115638c270df6df9027fdbf3`. Its complete original research report
+is readable and unchanged, SHA-256
+`1321b7712c4c9e10b477d03b230e12fce5485fbde3375d94c374fc96290313eb`.
+
+The existing raw repository race and lost-completion cases did not exercise two
+complete durable flows competing for the same stored claim or a late provider
+result after recovery. Five new `ConcurrentRecoveryTests` cases close that local
+B02/B07 evidence gap using the actual rich domain, Resend adapter and pinned Table
+and Blob adapters against disposable loopback Azurite:
+
+- Two consumers read one persisted ETag before the test releases their competing
+  claims. The losing write receives HTTP 412; exactly one wake and provider call
+  occur and the stored record becomes Accepted.
+- An original provider call remains pending while a reconstructed flow claims the
+  due wake and records acceptance. Four original responses (Accepted, Rejected,
+  Retry and Hold) all fail their stale conditional result write with HTTP 412.
+  The complete accepted record, including ETag, provider ID and first-submission
+  boundary, stays unchanged.
+- Both attempts retain identical provider keys and frozen JSON. Replaying the
+  accepted operation after two days neither submits nor creates another wake.
+
+The barrier controls timing only: it forwards reads and writes to the real pinned
+repository with ETag checks enabled. The injected clock and simulated queue/HTTP
+responses do not establish cloud scheduling, live provider idempotency or recipient
+delivery. Existing activation dependencies remain unchanged. No runtime code,
+package, schema, pipeline definition or environment setting changes in this step.
+
+The resolved Niobium Table/Blob/Abstractions versions remain 4.2.66, matched to
+framework `5c527723a607c1d03c002d4aa70531c9a55a767e`; integrations remain 4.2.70
+at `f5b1b46a4a8c83e8771d7a3e9ae9dcc7044b62f0`. The corresponding conditional
+repository writes and domain save/read-back behavior were inspected without
+modifying the framework. The same six NU1603 minimum-version warnings occur in
+the baseline and final builds; zero build errors.
+
+Verification used .NET SDK 10.0.403 after sourcing the existing workspace tool
+environment. Owned Azurite Table/Blob processes used loopback ports 18494/18493,
+in-memory persistence, disabled telemetry and API-version-check compatibility;
+both processes were stopped after the suite. Every test cleans its unique table
+and private payload container.
+
+```sh
+dotnet restore src/Niobium.Notification.Storage.Tests/Niobium.Notification.Storage.Tests.csproj --nologo
+dotnet build src/Niobium.Notification.Storage.Tests/Niobium.Notification.Storage.Tests.csproj --configuration Release --no-restore --nologo --disable-build-servers -m:1
+NIOBIUM_NOTIFICATION_TEST_TABLE_ENDPOINT=http://127.0.0.1:18494/devstoreaccount1 NIOBIUM_NOTIFICATION_TEST_BLOB_ENDPOINT=http://127.0.0.1:18493/devstoreaccount1 dotnet test --project src/Niobium.Notification.Storage.Tests/Niobium.Notification.Storage.Tests.csproj --configuration Release --no-build --no-restore --report-trx --results-directory /workspace/scratch/notification-concurrent-storage/results
+dotnet restore Niobium.Notification.slnx --nologo
+dotnet build Niobium.Notification.slnx --configuration Release --no-restore --nologo --disable-build-servers -m:1
+dotnet test --project src/Niobium.Notification.Core.Tests/Niobium.Notification.Core.Tests.csproj --configuration Release --no-build --no-restore --report-trx --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml --results-directory /workspace/scratch/notification-concurrent-unit
+python scripts/check-coverage.py /workspace/scratch/notification-concurrent-unit/coverage.cobertura.xml
+git diff --check
+```
+
+All nine storage cases and 142 application cases passed, zero failures/skips.
+Application coverage remains 98.38% (609/619), with Contracts 100%, Core 99.14% and
+Server 97.15%. The opt-in storage project remains outside the automatic pipeline;
+its local evidence does not replace mandatory exact-head feature deployment,
+candidate/trusted checks or native and independent review. Those results and the
+eventual merge/production evidence belong on the author-created PR.
+
 ## B02 sender-tenant rollout filter: 2026-11-12
 
 This continuation starts from clean main
