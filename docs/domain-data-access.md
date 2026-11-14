@@ -1,5 +1,9 @@
 # Rich domains and data access in Notification
 
+Read [model names and contract ownership](model-contracts.md) for the required
+business-key naming and private representation boundary. Models own identity,
+encoding and file/wire formats; rich domains own business decisions and mutations.
+
 This guide addresses the owner's five review threads on
 [PR #2](https://github.com/niobium-nz/Niobium.Notification/pull/2), reviewed from head
 `46e93c85f79322eb5b765295c0e323eb60f8fdb0`. The references inspected were Store

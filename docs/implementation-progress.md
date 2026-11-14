@@ -1,5 +1,48 @@
 # Notification reliability implementation ledger
 
+## Model naming and contract ownership (14 November 2026)
+
+Baseline: `a8bc0e45b32f56cc3044c9b75b41dff974c1e930`. The owner requested business
+names on Table models and private ownership of identity, fingerprint and payload
+representation. The owner selected Notification's implementation now and a
+separate compatible rollout for older public contracts in other projects.
+See [the model contract guide](model-contracts.md) and the shared framework guide.
+
+`NotificationSubmission.Tenant` and `ID` map to the same physical key columns and
+values. Its factory owns ID/fingerprint derivation, payload references and provider
+key formatting; `FrozenNotification` owns JSON and credential comparison.
+Registration, ownership, conditional writes, claim/retry eligibility and outcomes
+remain on the domain. No package, schema version, enabled cohort, stored key,
+provider key, payload layout or notification policy changes.
+
+Local verification used the installed .NET 10 SDK and pinned framework packages:
+
+```sh
+dotnet restore Niobium.Notification.slnx --nologo
+dotnet build Niobium.Notification.slnx --configuration Release --no-restore --nologo --disable-build-servers -m:1
+dotnet test --project src/Niobium.Notification.Core.Tests/Niobium.Notification.Core.Tests.csproj --configuration Release --no-build --no-restore --report-trx --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml --results-directory artifacts/unit
+python scripts/check-coverage.py artifacts/unit/coverage.cobertura.xml
+dotnet restore src/Niobium.Notification.Storage.Tests/Niobium.Notification.Storage.Tests.csproj --nologo
+dotnet build src/Niobium.Notification.Storage.Tests/Niobium.Notification.Storage.Tests.csproj --configuration Release --no-restore --nologo --disable-build-servers -m:1
+python scripts/run-storage-integration.py
+node --test scripts/delivery-policy.test.cjs
+python -m unittest discover -s scripts -p 'test_*.py'
+```
+
+The 146 application, 10 real-adapter storage, 20 Node and 46 Python cases passed,
+with zero failed/skipped cases. Authored coverage is 98.42% combined (Contracts
+100%, Core 99.18%, Server 97.15%). Full solution/storage builds have zero errors
+and the same six existing NU1603 warnings; the Core-only build has zero warnings.
+The storage runner was also invoked with an explicit scratch results directory.
+Fixed vectors from the previous implementation and raw legacy Table/Blob data
+verify key/JSON compatibility, private-setter materialization, conditional update,
+no extra key columns, restart recovery and the existing concurrency protections.
+
+These are local results. Exact-head feature runs, native review, separate formal
+approval, merge and terminal production/package evidence belong on the delivery
+PR before claiming delivery complete. No local check establishes live B02 queue
+activation, provider deduplication or recipient mail-server acceptance.
+
 ## B07 automatic storage recovery verification: 2026-11-14
 
 Baseline: Notification main `72f100bfc5a742de42a4aa860e5e5e41585ff06f`, on

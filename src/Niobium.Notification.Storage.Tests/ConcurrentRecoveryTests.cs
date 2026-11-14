@@ -182,10 +182,11 @@ public sealed class ConcurrentRecoveryTests
         };
         public ConcurrentQueue<(string Key, string Json)> Calls { get; } = new();
         public ConcurrentQueue<MessagingEntry<NotifyCommand>> Wakes { get; } = new();
-        private string Partition => Request.Tenant.ToString("N");
-        private string ID => NotificationFingerprint.Hash(Request.ID);
+        private NotificationSubmission Identity => NotificationSubmission.Create(Request);
+        private string Partition => Identity.Tenant;
+        private string ID => Identity.ID;
 
-        public Task RegisterAsync() => storage.Domain(Partition, ID).RegisterAsync(NotificationFingerprint.Of(Request),
+        public Task RegisterAsync() => storage.Domain(Partition, ID).RegisterAsync(Identity,
             provider.Freeze(new TemplateDomain.Deliverable
             {
                 From = "sender@example.invalid", To = Request.Destination!, Subject = "Frozen subject", Body = "<p>Frozen content</p>",
