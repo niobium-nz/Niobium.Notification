@@ -37,12 +37,29 @@ def execute(arguments, environ, timeout, failure, runner):
 def prepare(environ, failure, runner=subprocess.run):
     if environ.get("AZURE_ENV_NAME") != "test" or environ.get("TEST_ENVIRONMENT") != "test":
         raise failure("live_test_environment_required")
-    if not environ.get("TEST_SERVICEBUS_CONNECTION"):
-        raise failure("live_test_queue_credential_required")
+    group = environ.get("AZURE_RESOURCE_GROUP", "")
+    if not group or "\n" in group or "\r" in group:
+        raise failure("live_test_resource_group_required")
     result = execute(["dotnet", "build", str(PROJECT), "--configuration", "Release", "--nologo"],
                      environ, 240, failure, runner)
     if result.returncode:
         raise failure("live_recovery_build_failed_output_suppressed")
+    child_environment = dict(environ)
+    for permission, setting in (("2", "TEST_RECOVERY_SEND_CONNECTION"), ("8", "TEST_RECOVERY_LISTEN_CONNECTION")):
+        # The fixture reads existing queue-scoped keys through the test runner's
+        # identity. No root key, rotation, runtime setting or GITHUB_ENV export.
+        result = execute(["az", "servicebus", "queue", "authorization-rule", "keys", "list",
+                          "--resource-group", group, "--namespace-name", "niobiumnotify-sb-test",
+                          "--queue-name", "notifycommand", "--name", "notifycommand-" + permission,
+                          "--query", "primaryConnectionString", "--only-show-errors", "--output", "tsv"],
+                         environ, 60, failure, runner)
+        connection = result.stdout.strip()
+        if result.returncode or not connection or "\n" in connection or "\r" in connection:
+            raise failure("live_test_queue_credential_lookup_failed")
+        # Child output is captured and never logged. Credentials stay in memory
+        # and this process environment; reports contain only fixed diagnostics.
+        child_environment[setting] = connection
+    return child_environment
 
 
 def verify(environ, tenant, reporter, failure, runner=subprocess.run, report_path=None):

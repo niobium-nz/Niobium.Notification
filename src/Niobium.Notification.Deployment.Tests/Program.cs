@@ -48,7 +48,7 @@ internal static class Program
             fixtureTenant, operation, failureStage = failure == null ? null : stage,
             // Durable evidence must survive late wakes and repeated envelopes.
             // Template fixtures are cleaned by the parent harness; inbox evidence is retained.
-            durableEvidenceRetained = operation != null,
+            durableEvidencePolicy = "retain_if_created",
         }, new JsonSerializerOptions { WriteIndented = true }));
         return failure == null ? 0 : 1;
     }
@@ -63,9 +63,8 @@ internal static class Program
             && origin.AbsolutePath == "/" && origin.Query == "" && origin.Fragment == ""
             && origin.Host.StartsWith("niobiumnotify-func-test.", StringComparison.Ordinal)
             && origin.Host.EndsWith(".azurewebsites.net", StringComparison.Ordinal), "live_test_host_required");
-        string connection = Env("TEST_SERVICEBUS_CONNECTION");
-        ServiceBusConnectionStringProperties busSettings = ServiceBusConnectionStringProperties.Parse(connection);
-        Require(busSettings.FullyQualifiedNamespace == BusHost && String.IsNullOrEmpty(busSettings.EntityPath), "live_test_queue_required");
+        string sendConnection = QueueConnection("TEST_RECOVERY_SEND_CONNECTION");
+        string listenConnection = QueueConnection("TEST_RECOVERY_LISTEN_CONNECTION");
         string recipient = Env("TEST_NOTIFICATION_RECIPIENT");
         Require(new MailAddress(recipient).Address == recipient && recipient.Length <= 50, "live_test_recipient_required");
         Guid tenant = Guid.Parse(Env("TEST_NOTIFICATION_TENANT"));
@@ -91,13 +90,15 @@ internal static class Program
             && template.GetString("From") == Env("TEST_NOTIFICATION_SENDER"), "live_template_ownership_required");
         NullableResponse<TableEntity> existing = await inbox.GetEntityIfExistsAsync<TableEntity>(identity.Tenant, identity.ID, cancellationToken: cancellationToken);
         Require(!existing.HasValue, "live_operation_must_be_new");
-        await using ServiceBusClient bus = new(connection, new ServiceBusClientOptions
+        ServiceBusClientOptions busOptions = new()
         {
             TransportType = ServiceBusTransportType.AmqpWebSockets,
             RetryOptions = new() { MaxRetries = 0 },
-        });
-        await using ServiceBusSender sender = bus.CreateSender("notifycommand");
-        await using ServiceBusReceiver reader = bus.CreateReceiver("notifycommand");
+        };
+        await using ServiceBusClient outgoing = new(sendConnection, busOptions);
+        await using ServiceBusClient incoming = new(listenConnection, busOptions);
+        await using ServiceBusSender sender = outgoing.CreateSender("notifycommand");
+        await using ServiceBusReceiver reader = incoming.CreateReceiver("notifycommand");
         // No receive, complete, abandon, purge or cancellation on the shared queue.
         stage = "queue_send";
         await sender.SendMessageAsync(new ServiceBusMessage(JsonSerializer.Serialize(command))
@@ -187,6 +188,14 @@ internal static class Program
             next = messages[^1].SequenceNumber + 1;
         }
         throw new VerificationFailure("live_scheduled_recovery_missing");
+    }
+
+    private static string QueueConnection(string setting)
+    {
+        string connection = Env(setting);
+        ServiceBusConnectionStringProperties settings = ServiceBusConnectionStringProperties.Parse(connection);
+        Require(settings.FullyQualifiedNamespace == BusHost && settings.EntityPath == "notifycommand", "live_test_queue_required");
+        return connection;
     }
 
     private static string Env(string key) => Environment.GetEnvironmentVariable(key) ?? String.Empty;

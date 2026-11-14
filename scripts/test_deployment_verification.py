@@ -138,7 +138,9 @@ class DeployedTests(unittest.TestCase):
     def setUp(self):
         for name in ("prepare", "verify"):
             patcher = patch.object(deployed.live, name)
-            patcher.start()
+            mocked = patcher.start()
+            if name == "prepare":
+                mocked.return_value = ENV
             self.addCleanup(patcher.stop)
 
     def test_preflight_requires_no_resource_credentials_or_network(self):
@@ -323,9 +325,9 @@ class ResourceTests(unittest.TestCase):
     def test_resource_lookup_masks_key_and_validates_arm_hostname(self):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory) / "env"
-            with patch.dict(os.environ, AZURE_ENV_NAME="test", APP_SHORT_NAME="niobiumnotify", GITHUB_SHA=SHA, AZURE_RESOURCE_GROUP="test-group", GITHUB_ENV=str(target)), patch.object(resources, "azure", side_effect=[HOST.removeprefix("https://"), "synthetic-key", "synthetic-bus-connection"]) as azure, contextlib.redirect_stdout(io.StringIO()) as output:
+            with patch.dict(os.environ, AZURE_ENV_NAME="test", APP_SHORT_NAME="niobiumnotify", GITHUB_SHA=SHA, AZURE_RESOURCE_GROUP="test-group", GITHUB_ENV=str(target)), patch.object(resources, "azure", side_effect=[HOST.removeprefix("https://"), "synthetic-key"]) as azure, contextlib.redirect_stdout(io.StringIO()) as output:
                 resources.main()
-            self.assertEqual("::add-mask::synthetic-key\n::add-mask::synthetic-bus-connection\n", output.getvalue())
+            self.assertEqual("::add-mask::synthetic-key\n", output.getvalue())
             values = dict(line.split("=", 1) for line in target.read_text().splitlines())
             self.assertEqual(HOST, values["TEST_API_URL"])
             self.assertEqual(SHA, values["TEST_EXPECTED_COMMIT"])

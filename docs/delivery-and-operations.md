@@ -117,9 +117,12 @@ It runs only in test, through `scripts/deployed-integration.py`, while that run'
 owned generic template exists. The current immutable-main harness remains the
 readiness authority; new candidate checks become trusted only after reviewed merge.
 
-The resource helper additionally reads the existing test Service Bus namespace's
-authorization key, masks it and exports `TEST_SERVICEBUS_CONNECTION` to the runner.
-It creates or rotates no key and changes no runtime setting. The executable checks
+The live fixture preparation uses the existing test runner identity to read the
+queue-scoped `notifycommand-2` (Send) and `notifycommand-8` (Listen) keys. It keeps
+them only in the child environment, captures all child/CLI output and never logs
+credential responses. It does not use a namespace root key, create/rotate keys,
+export to `GITHUB_ENV` or change runtime settings. The protected credential-bootstrap
+helper and pipeline definition remain unchanged. The executable checks
 the exact test account, namespace, host, expected commit and template ownership
 before enqueueing. It sends only to `TEST_NOTIFICATION_RECIPIENT`. Provider
 credentials and production resources never enter this fixture.

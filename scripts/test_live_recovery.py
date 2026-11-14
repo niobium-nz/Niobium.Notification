@@ -11,12 +11,12 @@ spec = importlib.util.spec_from_file_location("live_recovery", Path(__file__).wi
 live = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(live)
 ENV = {"AZURE_ENV_NAME": "test", "TEST_ENVIRONMENT": "test", "TEST_EXPECTED_COMMIT": "a" * 40,
-       "TEST_SERVICEBUS_CONNECTION": "sensitive-queue-credential", "TEST_NOTIFICATION_RECIPIENT": "approved@example.invalid"}
+       "AZURE_RESOURCE_GROUP": "test-group", "TEST_NOTIFICATION_RECIPIENT": "approved@example.invalid"}
 
 
 class LiveRecoveryTests(unittest.TestCase):
     def test_missing_or_production_settings_never_start_child(self):
-        for changes in ({"AZURE_ENV_NAME": "prod"}, {"TEST_ENVIRONMENT": "prod"}, {"TEST_SERVICEBUS_CONNECTION": ""}):
+        for changes in ({"AZURE_ENV_NAME": "prod"}, {"TEST_ENVIRONMENT": "prod"}, {"AZURE_RESOURCE_GROUP": ""}):
             runner = Mock()
             with self.subTest(changes=changes), self.assertRaises(RuntimeError):
                 live.prepare(dict(ENV, **changes), RuntimeError, runner)
@@ -26,11 +26,34 @@ class LiveRecoveryTests(unittest.TestCase):
         runner = Mock(return_value=subprocess.CompletedProcess([], 1, "private stdout", "private stderr"))
         with self.assertRaisesRegex(RuntimeError, "^live_recovery_build_failed_output_suppressed$"):
             live.prepare(ENV, RuntimeError, runner)
-        self.assertNotIn(ENV["TEST_SERVICEBUS_CONNECTION"], runner.call_args.args[0])
+        self.assertNotIn(ENV["TEST_NOTIFICATION_RECIPIENT"], runner.call_args.args[0])
         self.assertTrue(runner.call_args.kwargs["capture_output"])
         runner.side_effect = subprocess.TimeoutExpired("private command", 1, output="private response")
         with self.assertRaisesRegex(RuntimeError, "^live_recovery_process_failed_output_suppressed$"):
             live.prepare(ENV, RuntimeError, runner)
+
+    def test_only_existing_queue_scoped_keys_enter_child_environment(self):
+        runner = Mock(side_effect=[subprocess.CompletedProcess([], 0, "", ""),
+                                  subprocess.CompletedProcess([], 0, "sensitive-send\n", ""),
+                                  subprocess.CompletedProcess([], 0, "sensitive-listen\n", "")])
+        child = live.prepare(ENV, RuntimeError, runner)
+        self.assertEqual("sensitive-send", child["TEST_RECOVERY_SEND_CONNECTION"])
+        self.assertEqual("sensitive-listen", child["TEST_RECOVERY_LISTEN_CONNECTION"])
+        self.assertNotIn("TEST_RECOVERY_SEND_CONNECTION", ENV)
+        for call, rule in zip(runner.call_args_list[1:], ("notifycommand-2", "notifycommand-8")):
+            arguments = call.args[0]
+            self.assertIn(rule, arguments)
+            self.assertIn("notifycommand", arguments)
+            self.assertIn("niobiumnotify-sb-test", arguments)
+            self.assertNotIn("RootManageSharedAccessKey", arguments)
+            self.assertTrue(call.kwargs["capture_output"])
+
+    def test_key_lookup_failure_and_multiline_value_are_sanitized(self):
+        for code, value in ((1, "private response"), (0, "private\nOTHER=value"), (0, "")):
+            runner = Mock(side_effect=[subprocess.CompletedProcess([], 0, "", ""),
+                                      subprocess.CompletedProcess([], code, value, "private stderr")])
+            with self.subTest(code=code, value=value), self.assertRaisesRegex(RuntimeError, "^live_test_queue_credential_lookup_failed$"):
+                live.prepare(ENV, RuntimeError, runner)
 
     def verify_report(self, evidence, code=0):
         checks = []
