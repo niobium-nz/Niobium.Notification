@@ -43,8 +43,8 @@ public sealed class ConcurrentRecoveryTests
             });
 
         Exception?[] outcomes = await Task.WhenAll(
-            Capture(() => scenario.Flow(barrier.Object).RunAsync(scenario.Request)),
-            Capture(() => scenario.Flow(barrier.Object).RunAsync(scenario.Request)));
+            Capture(() => scenario.Flow(barrier.Object).RunAsync(scenario.Request, isFirstDelivery: false)),
+            Capture(() => scenario.Flow(barrier.Object).RunAsync(scenario.Request, isFirstDelivery: false)));
 
         Assert.AreEqual(2, claims);
         Assert.AreEqual(1, claimVersions.Distinct().Count(), "Both consumers must compete for the same ETag.");
@@ -84,14 +84,14 @@ public sealed class ConcurrentRecoveryTests
         });
         await scenario.RegisterAsync();
         DateTimeOffset first = scenario.Clock.Now;
-        Task<Exception?> original = Capture(() => scenario.Flow().RunAsync(scenario.Request));
+        Task<Exception?> original = Capture(() => scenario.Flow().RunAsync(scenario.Request, isFirstDelivery: true));
         NotificationSubmission recovered;
         try
         {
             await firstSubmitting.Task.WaitAsync(TimeSpan.FromSeconds(15));
             MessagingEntry<NotifyCommand> wake = scenario.Wakes.Single();
             scenario.Clock.Now = wake.Schedule!.Value;
-            await scenario.Flow().RunAsync(wake.Value);
+            await scenario.Flow().RunAsync(wake.Value, isFirstDelivery: true);
             recovered = await scenario.StoredAsync();
             Assert.AreEqual((int)SubmissionState.Accepted, recovered.StateCode);
             Assert.AreEqual(2, recovered.Attempts);
@@ -202,7 +202,7 @@ public sealed class ConcurrentRecoveryTests
         {
             Clock.Now = Clock.Now.AddDays(2);
             int wakes = Wakes.Count;
-            await Flow().RunAsync(Request);
+            await Flow().RunAsync(Request, isFirstDelivery: true);
             Assert.AreEqual(expectedCalls, Calls.Count);
             Assert.AreEqual(wakes, Wakes.Count);
         }

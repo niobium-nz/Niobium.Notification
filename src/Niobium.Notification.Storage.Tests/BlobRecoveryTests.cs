@@ -102,12 +102,12 @@ public sealed class BlobRecoveryTests
                 if (commitBeforeFailure) await repository.UpdateAsync(entries, cancellationToken: token);
                 throw new IOException("Synthetic lost result-write response.");
             });
-        await Assert.ThrowsExactlyAsync<IOException>(() => Flow(uncertain.Object).RunAsync(request));
+        await Assert.ThrowsExactlyAsync<IOException>(() => Flow(uncertain.Object).RunAsync(request, isFirstDelivery: false));
         Assert.AreEqual(1, submissions.Count);
         Assert.AreEqual(request.ID, scheduled.Single().ID);
         DateTimeOffset first = clock.Now;
         clock.Now = scheduled.Single().Schedule!.Value;
-        await Flow().RunAsync(scheduled[0].Value);
+        await Flow().RunAsync(scheduled[0].Value, isFirstDelivery: true);
         Assert.AreEqual(commitBeforeFailure ? 1 : 2, submissions.Count);
         Assert.IsTrue(submissions.All(call => call.Key == submissions[0].Key && call.Json == frozen.Json));
         NotificationSubmission accepted = (await storage.Repository().RetrieveAsync(partition, id))!;
@@ -116,7 +116,7 @@ public sealed class BlobRecoveryTests
         Assert.AreEqual(first, accepted.FirstSubmission);
         Assert.IsNull(accepted.NextAttempt);
         clock.Now = first.AddDays(2);
-        await Flow().RunAsync(request);
+        await Flow().RunAsync(request, isFirstDelivery: false);
         Assert.AreEqual(commitBeforeFailure ? 1 : 2, submissions.Count);
     }
 }

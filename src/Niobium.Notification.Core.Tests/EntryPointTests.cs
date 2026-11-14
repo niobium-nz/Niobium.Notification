@@ -26,7 +26,7 @@ public sealed class EntryPointTests
     }
 
     private static ServiceBusReceivedMessage Message(object body)
-        => ServiceBusModelFactory.ServiceBusReceivedMessage(body: new BinaryData(JsonMarshaller.Marshall(body)), contentType: "application/json", messageId: "synthetic-message");
+        => ServiceBusModelFactory.ServiceBusReceivedMessage(body: new BinaryData(JsonMarshaller.Marshall(body)), contentType: "application/json", deliveryCount: 1, messageId: "synthetic-message");
 
     private static Mock<IVisitorRiskAssessor> Assessor()
     {

@@ -13,11 +13,24 @@ consumer requires `DurableNotificationFlow`, always uses the envelope's stable
 message ID, and cannot fall back to a legacy send on missing services or failed
 storage. Empty tenants are rejected before I/O; valid commands without envelope
 identity fail before registration. Stale settings cannot disable this policy.
-Existing model keys, payload formats, lifecycle rules and package versions remain
+Existing model keys, payload formats, state/outcome codes and package versions remain
 compatible. Direct HTTP/subscription entry points keep their separate behavior.
 
-Local verification used the repository's documented Release/coverage commands,
-the pinned packages and the owned loopback storage runner:
+PR8 review identified an untracked legacy redelivery after provider success and
+lost settlement. The domain now holds missing-row redeliveries as verified
+Held/SubmissionUnknown without preparing content or sending. Conditional inserts
+preserve either winner of a race with fresh registration. A modern registration
+failure that left no row is also held conservatively. First delivery of a new
+broker envelope cannot establish the historical outcome of a republished logical
+operation; [continuity limits](durable-submission.md#operational-continuity-and-verification)
+cover automatic producer republishing and the reconciliation requirement.
+
+The initial head `441826a141a72741476a8b5598e1eb111cc142f3` passed the following
+local verification with the pinned packages and owned loopback storage runner.
+The subsequent review correction adds seven application cases and three storage
+cases for unknown redelivery, failed registration, verified holds, telemetry and
+both conditional race winners. Its exact-head CI and review evidence must be
+recorded on [PR8](https://github.com/niobium-nz/Niobium.Notification/pull/8):
 
 - 140 application cases passed, with zero failures/skips. Tests cover arbitrary
   tenants, body/envelope identity differences, missing body IDs, invalid envelope

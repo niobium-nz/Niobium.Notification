@@ -114,7 +114,7 @@ public sealed class DurableNotificationTests
         }
 
         public DurableNotificationFlow Flow() => new(Renderer, Store.Domains(), Provider.Object, Queue.Object, Clock, new FixedRetry());
-        public Task Run() => Flow().RunAsync(Request);
+        public Task Run() => Flow().RunAsync(Request, isFirstDelivery: true);
         public int Sends => Provider.Invocations.Count(i => i.Method.Name == nameof(IIdempotentNotificationProvider.SubmitAsync));
         public void Advance() => Clock.Now = Store.Entry!.NextAttempt!.Value;
         public void Outcome(SubmissionOutcome outcome) => Provider.Setup(p => p.SubmitAsync(It.IsAny<FrozenNotification>(), It.IsAny<string>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
@@ -313,7 +313,7 @@ public sealed class DurableNotificationTests
     {
         Scenario s = new(tenant: Guid.Parse(tenant));
         NotifyCommandConsumer consumer = new(s.Flow(), NullLogger<NotifyCommandConsumer>.Instance);
-        ServiceBusReceivedMessage message = ServiceBusModelFactory.ServiceBusReceivedMessage(body: new BinaryData(JsonMarshaller.Marshall(s.Request)), contentType: "application/json", messageId: "envelope-identity");
+        ServiceBusReceivedMessage message = ServiceBusModelFactory.ServiceBusReceivedMessage(body: new BinaryData(JsonMarshaller.Marshall(s.Request)), contentType: "application/json", deliveryCount: 1, messageId: "envelope-identity");
         await consumer.Run(message, default); await consumer.Run(message, default);
         Assert.AreEqual("68F554E657E9EEF383AF38E021EA7CD46AF887AE13EAF84F3F924FEB12CACAA3", s.Store.Entry!.ID);
         Assert.AreEqual(s.Request.Tenant.ToString("N"), s.Store.Entry.Tenant);
@@ -331,7 +331,7 @@ public sealed class DurableNotificationTests
         {
             s.Request.Tenant, s.Request.Channel, s.Request.Destination, s.Request.Parameters,
         };
-        ServiceBusReceivedMessage message = ServiceBusModelFactory.ServiceBusReceivedMessage(body: new BinaryData(JsonMarshaller.Marshall(command)), contentType: "application/json", messageId: "stable-envelope");
+        ServiceBusReceivedMessage message = ServiceBusModelFactory.ServiceBusReceivedMessage(body: new BinaryData(JsonMarshaller.Marshall(command)), contentType: "application/json", deliveryCount: 1, messageId: "stable-envelope");
         await new NotifyCommandConsumer(s.Flow(), NullLogger<NotifyCommandConsumer>.Instance).Run(message, default);
         string identity = s.Store.Entry!.ID;
         s.Clock.Now += TimeSpan.FromDays(30);
@@ -349,7 +349,7 @@ public sealed class DurableNotificationTests
         Scenario s = new();
         s.Request.Tenant = Guid.Empty;
         NotifyCommandConsumer consumer = new(s.Flow(), NullLogger<NotifyCommandConsumer>.Instance);
-        ServiceBusReceivedMessage message = ServiceBusModelFactory.ServiceBusReceivedMessage(body: new BinaryData(JsonMarshaller.Marshall(s.Request)), contentType: "application/json", messageId: "envelope-identity");
+        ServiceBusReceivedMessage message = ServiceBusModelFactory.ServiceBusReceivedMessage(body: new BinaryData(JsonMarshaller.Marshall(s.Request)), contentType: "application/json", deliveryCount: 1, messageId: "envelope-identity");
         await consumer.Run(message, default);
         Assert.AreEqual(0, s.Provider.Invocations.Count);
         Assert.AreEqual(0, s.Legacy.Invocations.Count);
@@ -366,7 +366,7 @@ public sealed class DurableNotificationTests
     {
         Scenario s = new();
         NotifyCommandConsumer consumer = new(s.Flow(), NullLogger<NotifyCommandConsumer>.Instance);
-        ServiceBusReceivedMessage message = ServiceBusModelFactory.ServiceBusReceivedMessage(body: new BinaryData(JsonMarshaller.Marshall(s.Request)), contentType: "application/json", messageId: identity);
+        ServiceBusReceivedMessage message = ServiceBusModelFactory.ServiceBusReceivedMessage(body: new BinaryData(JsonMarshaller.Marshall(s.Request)), contentType: "application/json", deliveryCount: 1, messageId: identity);
         await Assert.ThrowsExactlyAsync<Niobium.ApplicationException>(() => consumer.Run(message, default));
         Assert.AreEqual(0, s.Provider.Invocations.Count);
         Assert.AreEqual(0, s.Legacy.Invocations.Count);
@@ -382,11 +382,95 @@ public sealed class DurableNotificationTests
         s.Store.Repository.Setup(r => r.RetrieveAsync(It.IsAny<string>(), It.IsAny<string>(), null, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new IOException("synthetic storage failure"));
         NotifyCommandConsumer consumer = new(s.Flow(), NullLogger<NotifyCommandConsumer>.Instance);
-        ServiceBusReceivedMessage message = ServiceBusModelFactory.ServiceBusReceivedMessage(body: new BinaryData(JsonMarshaller.Marshall(s.Request)), contentType: "application/json", messageId: "envelope-identity");
+        ServiceBusReceivedMessage message = ServiceBusModelFactory.ServiceBusReceivedMessage(body: new BinaryData(JsonMarshaller.Marshall(s.Request)), contentType: "application/json", deliveryCount: 1, messageId: "envelope-identity");
         await Assert.ThrowsExactlyAsync<IOException>(() => consumer.Run(message, default));
         Assert.AreEqual(0, s.Provider.Invocations.Count);
         Assert.AreEqual(0, s.Legacy.Invocations.Count);
         Assert.HasCount(0, s.Scheduled);
+    }
+
+    [TestMethod]
+    [DataRow(0)]
+    [DataRow(2)]
+    [DataRow(10)]
+    public async Task UntrackedRedelivery_HoldsUnknownOutcomeWithoutRenderingOrSending(int deliveryCount)
+    {
+        Scenario s = new();
+        ServiceBusReceivedMessage message = ServiceBusModelFactory.ServiceBusReceivedMessage(
+            body: new BinaryData(JsonMarshaller.Marshall(s.Request)), contentType: "application/json",
+            deliveryCount: deliveryCount, messageId: s.Request.ID);
+        await new NotifyCommandConsumer(s.Flow(), NullLogger<NotifyCommandConsumer>.Instance).Run(message, default);
+        Assert.AreEqual((int)SubmissionState.Held, s.Store.Entry!.StateCode);
+        Assert.AreEqual((int)SubmissionOutcome.SubmissionUnknown, s.Store.Entry.OutcomeCode);
+        Assert.AreEqual(0, s.Store.Entry.Attempts);
+        Assert.IsNull(s.Store.Entry.FirstSubmission);
+        Assert.IsNull(s.Store.Entry.NextAttempt);
+        Assert.IsNull(s.Store.Entry.ProviderID);
+        s.Clock.Now += TimeSpan.FromDays(30);
+        await s.Run(); // Even a reset envelope cannot bypass the persisted hold.
+        Assert.AreEqual(1, s.Store.Creates);
+        Assert.AreEqual(0, s.Provider.Invocations.Count);
+        Assert.AreEqual(0, s.Legacy.Invocations.Count);
+        Assert.AreEqual(0, s.Templates.Invocations.Count);
+        Assert.AreEqual(0, s.Store.Files.Invocations.Count);
+        Assert.HasCount(0, s.Scheduled);
+    }
+
+    [TestMethod]
+    public async Task FirstRegistrationFailure_WithoutRow_HoldsOnBrokerRedelivery()
+    {
+        Scenario s = new();
+        s.Store.MissingAfterCreate = true;
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(s.Run);
+        Assert.IsNull(s.Store.Entry);
+        Assert.AreEqual(0, s.Sends);
+        int rendered = s.Templates.Invocations.Count;
+        int blobs = s.Store.Payloads.Count;
+        s.Store.MissingAfterCreate = false;
+        await s.Flow().RunAsync(s.Request, isFirstDelivery: false);
+        Assert.AreEqual((int)SubmissionState.Held, s.Store.Entry!.StateCode);
+        Assert.AreEqual((int)SubmissionOutcome.SubmissionUnknown, s.Store.Entry.OutcomeCode);
+        Assert.AreEqual(0, s.Store.Entry.Attempts);
+        Assert.AreEqual(rendered, s.Templates.Invocations.Count);
+        Assert.AreEqual(blobs, s.Store.Payloads.Count);
+        Assert.AreEqual(0, s.Sends);
+        Assert.HasCount(0, s.Scheduled);
+    }
+
+    [TestMethod]
+    public async Task UntrackedRedelivery_RequiresVerifiedHoldBeforeCompletion()
+    {
+        Scenario s = new();
+        s.Store.MissingAfterCreate = true;
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => s.Flow().RunAsync(s.Request, isFirstDelivery: false));
+        Assert.IsNull(s.Store.Entry);
+        s.Store.MissingAfterCreate = false;
+        await s.Flow().RunAsync(s.Request, isFirstDelivery: false);
+        Assert.AreEqual((int)SubmissionState.Held, s.Store.Entry!.StateCode);
+        Assert.AreEqual(0, s.Provider.Invocations.Count);
+        Assert.AreEqual(0, s.Templates.Invocations.Count);
+        Assert.AreEqual(0, s.Store.Files.Invocations.Count);
+        Assert.HasCount(0, s.Scheduled);
+    }
+
+    [TestMethod]
+    public async Task RegisteredPendingRedelivery_ContinuesUsingDurableEvidence()
+    {
+        Scenario s = new();
+        NotificationSubmission identity = NotificationSubmission.Create(s.Request);
+        NotificationSubmissionDomain domain = await s.Store.Domains().GetAsync(identity.Tenant, identity.ID);
+        await domain.RegisterAsync(identity, new FrozenNotification("already-frozen", "example.invalid", "synthetic-digest"));
+        ServiceBusReceivedMessage message = ServiceBusModelFactory.ServiceBusReceivedMessage(
+            body: new BinaryData(JsonMarshaller.Marshall(s.Request)), contentType: "application/json",
+            deliveryCount: 2, messageId: s.Request.ID);
+        await new NotifyCommandConsumer(s.Flow(), NullLogger<NotifyCommandConsumer>.Instance).Run(message, default);
+        Assert.AreEqual((int)SubmissionState.Accepted, s.Store.Entry!.StateCode);
+        Assert.AreEqual(1, s.Store.Entry.Attempts);
+        Assert.AreEqual(1, s.Sends);
+        Assert.AreEqual(0, s.Templates.Invocations.Count);
+        var submitted = s.Provider.Invocations.Single(i => i.Method.Name == nameof(IIdempotentNotificationProvider.SubmitAsync));
+        Assert.AreEqual("already-frozen", ((FrozenNotification)submitted.Arguments[0]).Json);
+        Assert.HasCount(1, s.Scheduled);
     }
 
     [TestMethod]

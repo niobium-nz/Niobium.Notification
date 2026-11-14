@@ -57,8 +57,12 @@ the same access controls as other private notification data.
 
 ## Submission and recovery
 
-1. Load or conditionally register the operation and its frozen content. A missing
-   template creates an explicit Failed/TemplateMissing outcome without sending.
+1. Ask the domain whether registration is required. Existing durable evidence
+   always wins. Without a row, an envelope whose broker `DeliveryCount` is not 1
+   gets a verified, create-only Held/SubmissionUnknown record with zero attempts.
+   No rendering, Blob write, scheduling or provider call occurs for that hold.
+   A first envelope delivery can register frozen content; a missing template
+   creates an explicit Failed/TemplateMissing outcome without sending.
 2. Suppress Accepted, Failed and Held records. Accepted submissions remain
    suppressed after the provider's 24-hour window; no expiry is configured.
 3. Check the persisted first-submission boundary and due time. Early redelivery
@@ -136,6 +140,8 @@ calls are separate entry points, not an alternate route for queued commands.
 Existing durable operations retain their keys, payloads, version and suppression
 evidence. Changing a tenant setting can no longer send an accepted/held operation
 through a legacy fallback. New tenants automatically follow the same contract.
+The consumer maps broker delivery history; the domain owns the registration/hold
+decision. The flow renders only when the domain says fresh registration is needed.
 
 ## Operational continuity and verification
 
@@ -145,10 +151,29 @@ Use the current consumer version consistently; an older binary can still send
 without consulting the durable inbox. Reverting to that binary is not a safe
 way to retry an operation with existing durable evidence.
 
-Mandatory routing does not reconstruct submissions made by older legacy consumers.
-A new inbox row or a recent queue enqueue time cannot prove that a historical
-logical operation was never sent. Reconcile historical operations before any
-manual replay or suppression backfill; do not replay notifications to populate
+An old consumer can succeed at the provider and lose Service Bus settlement
+without writing a durable row. Such an untracked broker redelivery is held as
+SubmissionUnknown rather than submitted again. The hold is a conditional insert:
+it cannot overwrite a racing registration, and a failed/unverified write propagates
+without sending. A racing fresh registration can leave an orphan candidate blob
+if the hold wins, but cannot claim or submit over that hold. Existing registered
+operations continue normal recovery regardless of broker delivery count.
+
+This is deliberately conservative. A modern first delivery that fails before any
+row is committed will also be held on redelivery, even if it never called the
+provider. The row has zero attempts, no first-submission time and no scheduled
+retry. Operators must reconcile it before an explicit resend decision; do not
+delete a hold or reset its identity to force automatic recovery. Suppression is
+observable as `state=held`, `outcome=submissionunknown`, `action=suppress`.
+
+Broker `DeliveryCount == 1` proves only first delivery of that envelope. Manual
+or automatic producer republishing can create a new envelope for a historical
+operation. For example, an enqueue followed by a failed producer state update
+can cause automatic republishing. Without an existing durable row, Notification
+cannot infer that an older legacy consumer already sent that logical operation.
+This fence does not certify complete historical suppression or a reconciled
+legacy backlog. Retain durable records and stable operation IDs; reconcile legacy
+producer retries before replay/backfill. Do not replay notifications to populate
 the store. This change performs no migration, backlog replay or production queue
 operation.
 

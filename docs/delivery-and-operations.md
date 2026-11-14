@@ -190,7 +190,7 @@ execution to three minutes and emulator startup to twenty seconds per process;
 the workflow has a fifteen-minute total limit. These real-adapter checks use the
 pinned Niobium packages and synthetic local data. Queue timing and provider HTTP
 responses remain controlled in the suite, so passing it does not establish live
-live broker recovery, provider deduplication or recipient delivery.
+broker recovery, provider deduplication or recipient delivery.
 
 ## B02 mandatory routing and validation
 
@@ -202,8 +202,11 @@ requirements for this code change, without a separate enrollment/configuration s
 
 Feature validation uses the existing test environment and approved Notification
 fixtures. Component tests cover every tenant, envelope identity, missing identities,
-failed storage without fallback, and redelivery. Real Table/Blob tests verify
-tenant isolation and suppression across recreated consumers/repositories.
+failed storage without fallback, and redelivery. Untracked redeliveries get a
+verified Held/SubmissionUnknown record without another send; a first-registration
+failure that left no row is also held conservatively. Real Table/Blob tests verify
+tenant isolation, held/replay suppression across recreated consumers/repositories,
+and both winners of the conditional hold-versus-registration race.
 The deployed ContactUs harness remains a separate synchronous-provider check;
 it does not certify real broker scheduling or provider replay. Record those limits
 alongside actual results. The [continuity notes](durable-submission.md#operational-continuity-and-verification)

@@ -46,7 +46,10 @@ namespace Niobium.Notification.Server
                 throw new ApplicationException(InternalError.BadRequest, "A stable message ID is required.");
             }
             evt.ID = message.MessageId;
-            await flow.RunAsync(evt, cancellationToken);
+            // Delivery count describes this broker envelope, not the history of a
+            // republished logical operation. Existing durable rows remain authoritative.
+            bool isFirstDelivery = message.DeliveryCount == 1;
+            await flow.RunAsync(evt, isFirstDelivery, cancellationToken);
         }
 
         private static void Transform(NotifyCommand evt)

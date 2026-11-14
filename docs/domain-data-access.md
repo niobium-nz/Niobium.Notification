@@ -47,6 +47,10 @@ Queued submission is mandatory for every tenant. `NotifyCommandConsumer` require
 `NotificationOptions` contains the existing host/template settings; provider-specific
 Resend configuration remains in its established class. Removed enable/filter keys
 cannot disable durability, even if stale values remain in application settings.
+The consumer supplies whether this is the broker envelope's first delivery.
+`NotificationSubmissionDomain.PrepareRegistrationAsync` validates existing
+evidence or conditionally holds an untracked redelivery as SubmissionUnknown.
+It owns that business decision; the flow only prepares content when requested.
 
 Across Notification, execute I/O and state-changing operations outside `if`
 conditions, name their results and then branch. Queue parsing was made explicit
