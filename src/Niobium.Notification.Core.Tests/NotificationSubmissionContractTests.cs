@@ -28,6 +28,8 @@ public sealed class NotificationSubmissionContractTests
         Assert.AreEqual(Tenant, first.Tenant);
         Assert.AreEqual(ID, first.ID);
         Assert.AreEqual(Fingerprint, first.Fingerprint);
+        Assert.AreEqual(3, first.Version);
+        Assert.IsTrue(first.HasSupportedVersion());
         Assert.AreEqual("notification-v1/aaaaaaaabbbbccccddddeeeeeeeeeeee/187F0349DD12B6DC73D76D86F421CD454FACCCC36EF9A2BA6956B37ABBB31102",
             first.GetProviderIdempotencyKey());
         Assert.IsTrue(first.MatchesRequest(replay));

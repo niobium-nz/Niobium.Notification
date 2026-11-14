@@ -50,8 +50,16 @@ perform the mapped Table I/O. The receipt flow neither mutates a submission nor
 defines either model's key/hash representation. An early verified callback can
 correlate through the frozen proof before the provider outcome write completes.
 
-Existing submission key values, version 2 rows, provider idempotency keys,
-fingerprints and frozen payload bytes remain compatible. Legacy rows/payloads
+New receipt-bearing submission rows use version 3. The previous version-2 domain
+rejects them before any replace-mode write, protecting Operation, Channel and
+ReceiptProof during mixed-worker deployment or rollback. This is a deliberate
+version fence: old workers cannot process new rows, and rollback must preserve
+those rows and their queued wakes until compatible workers resume. Never downgrade
+rows, delete suppression evidence or replay them as new operations.
+
+Existing version-2 rows remain version 2 during reads/retries. Their key values,
+provider idempotency keys, fingerprints and frozen payload bytes remain compatible.
+They are not upgraded or assigned newly invented correlation. Legacy rows/payloads
 without correlation stay unchanged. Their receipts are retained as Uncorrelated;
 they do not become confirmed deliveries by matching an address, subject or guessed
 operation. Missing/mismatched submissions or proofs and contradictory known provider
@@ -109,7 +117,10 @@ modules remain environment agnostic.
 
 This change also projects a new setting in the protected deployment workflow.
 The current main readiness controller intentionally rejects a different workflow
-blob until reviewed activation on main. Local/candidate success cannot substitute
+blob until reviewed activation on main. Its old live fixture also expects version-2
+new rows; the new version-3 fixture must be included in that reviewed installation.
+An old trusted-fixture failure is not a successful compatibility check or a skipped
+requirement. Local/candidate success cannot substitute
 for that status. Follow [the installation procedure](delivery-and-operations.md#required-repository-administration-and-installation)
 with concrete diff, test and independent-review evidence; do not fabricate readiness,
 direct-push main or infer an exception from an earlier installation.
@@ -121,7 +132,11 @@ boundaries, key rotation, request limits, capture privacy, duplicate/conflicting
 events, early correlation, failed/lost publication, conditional-write conflicts and
 malformed queue envelopes. Real loopback Table/Blob tests verify private-init mapping,
 persisted frozen tags, restart recovery, out-of-order immutable receipts and actual
-stale ETags. These are not evidence of a configured provider webhook.
+stale ETags. A pinned copy of the prior production model/domain executes through
+the real adapters: the version-2 control reproduces metadata loss, while version-3
+rows reject the old writer and preserve their ETag/correlation. The existing legacy
+fixture still retries a real version-2 row without upgrading it. These are not
+evidence of a configured provider webhook.
 
 The deployed candidate fixture observes the already-owned live send and requires
 its real Delivered receipt to reach Published with matching provider ID and stored

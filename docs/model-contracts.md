@@ -42,8 +42,11 @@ even though a model has factory and representation methods.
 
 ## Compatibility and verification
 
-Key values, version 2, Table column names, payload container/path convention,
-provider idempotency keys and frozen JSON names remain unchanged. Existing
+Key values, existing version-2 rows, Table column names, payload container/path
+convention, provider idempotency keys and frozen JSON names remain unchanged. New
+receipt-bearing rows use version 3 to reject older replace-mode writers before
+they can erase correlation. Read/retry support keeps existing rows at version 2;
+see [the rollout boundary](provider-delivery-receipts.md#model-ownership-and-compatibility). Existing
 payload references are read from the row, not regenerated on replay. Private
 ownership does not authorize changing a persisted algorithm without a rollout:
 an incompatible ID can bypass suppression and cause a duplicate external effect.

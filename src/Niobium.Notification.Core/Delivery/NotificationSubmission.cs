@@ -16,7 +16,10 @@ namespace Niobium.Notification.Delivery
     // decisions; the mapper translates the business key names into Table columns.
     public sealed record NotificationSubmission
     {
-        public const int CurrentVersion = 2;
+        // Version 3 protects receipt metadata from older replace-mode writers.
+        // Version 2 remains readable/retryable without being upgraded in place.
+        public const int CurrentVersion = 3;
+        private const int LegacyVersion = 2;
         public const string PayloadContainer = "notification-submissions";
 
         [EntityKey(EntityKeyKind.PartitionKey)]
@@ -77,6 +80,8 @@ namespace Niobium.Notification.Delivery
 
         public bool MatchesRequest(NotificationSubmission request)
             => this.Tenant == request.Tenant && this.ID == request.ID && this.Fingerprint == request.Fingerprint;
+
+        public bool HasSupportedVersion() => this.Version is LegacyVersion or CurrentVersion;
 
         // Methods, rather than computed public properties, keep derived values out
         // of the framework's public-property Table mapping.

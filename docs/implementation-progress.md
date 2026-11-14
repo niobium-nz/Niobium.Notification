@@ -20,6 +20,23 @@ Release builds have zero errors and only the existing NU1603 package warnings.
 Workflow YAML, both explicit secret projections and whitespace checks passed.
 These results do not establish deployed webhook configuration or delivery.
 
+The first feature head `23dd2d8d29dc90acc581a4d9831867bfb4cadb5e` passed hosted
+build/local checks and [Storage 43595754845](https://github.com/niobium-nz/Niobium.Notification/actions/runs/43595754845).
+[Azure Deployment 43595754853](https://github.com/niobium-nz/Niobium.Notification/actions/runs/43595754853)
+stopped before provisioning with `provider_webhook_signing_configuration_required`.
+No deployed report existed; the following artifact-upload failure was consequential,
+not evidence of an upload-service outage. Trusted/production jobs were skipped.
+The owner configuration request is pending; no retry is justified without a change.
+
+The independent reviewer found that old version-2 replace-mode writers could erase
+new receipt metadata. The correction gives new rows version 3 while retaining
+version-2 retry support, with a pinned-prior-writer/real-adapter regression. It also
+makes the trusted fixture's version expectation an explicit installation dependency.
+The correction passed 249 application/fixture cases and 20 real storage cases,
+including both old-writer controls and the unchanged version-2 replay fixture.
+Authored coverage remains 97.96%. Exact-head CI and independent follow-up remain
+required; no formal approval or PR has been claimed.
+
 ## PR9 delivered checkpoint (14 November 2026)
 
 The earlier B02 entry below is now historical. PR9 feature

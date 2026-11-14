@@ -76,6 +76,9 @@ internal sealed class LocalStorageFixture : IAsyncDisposable
     public IRepository<NotificationSubmission> Repository()
         => new CloudTableRepository<NotificationSubmission>(tableFactory.Object, NullLogger<CloudTableRepository<NotificationSubmission>>.Instance);
 
+    public IRepository<LegacyV2.NotificationSubmission> LegacyRepository()
+        => new CloudTableRepository<LegacyV2.NotificationSubmission>(tableFactory.Object, NullLogger<CloudTableRepository<LegacyV2.NotificationSubmission>>.Instance);
+
     public IRepository<NotificationReceipt> ReceiptRepository()
         => new CloudTableRepository<NotificationReceipt>(tableFactory.Object, NullLogger<CloudTableRepository<NotificationReceipt>>.Instance);
 
