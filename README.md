@@ -7,9 +7,10 @@ Read [rich domains and data access](docs/domain-data-access.md) before business 
 
 Read [agent instructions](AGENTS.md), [delivery and operations](docs/delivery-and-operations.md), and the [implementation ledger](docs/implementation-progress.md) before changing delivery or recovery behavior.
 
-The [durable queue submission path](docs/durable-submission.md) adds an opt-in inbox,
-frozen provider requests and recovery scheduling for B02. It remains disabled
-until its legacy-message cutover and live verification prerequisites are met.
+The [durable queue submission path](docs/durable-submission.md) uses an inbox,
+frozen provider requests and recovery scheduling for every tenant. Queued commands
+always use this path; there is no enrollment switch or tenant list. The guide
+records historical-operation and live-verification limits separately.
 
 [Submission measurements](docs/submission-observability.md) distinguish provider
 adapter results and latency from verified durable decisions and saved outcomes.

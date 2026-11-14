@@ -2,7 +2,6 @@ using System.Text.Json;
 using Azure.Messaging.ServiceBus;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Niobium.Notification.Delivery;
 using Niobium.Messaging.ServiceBus;
 using Niobium.Platform.ServiceBus;
@@ -10,10 +9,8 @@ using Niobium.Platform.ServiceBus;
 namespace Niobium.Notification.Server
 {
     public class NotifyCommandConsumer(
-        NotificationFlow flow,
-        ILogger<NotifyCommandConsumer> logger,
-        DurableNotificationFlow? durable = null,
-        IOptions<NotificationOptions>? options = null)
+        DurableNotificationFlow flow,
+        ILogger<NotifyCommandConsumer> logger)
     {
         [Function(nameof(NotifyCommandConsumer))]
         public async Task Run(
@@ -21,7 +18,7 @@ namespace Niobium.Notification.Server
             ServiceBusReceivedMessage message,
             CancellationToken cancellationToken)
         {
-            bool parsed = message.TryParse(out NotifyCommand? evt, out var rawBody);
+            bool parsed = message.TryParse(out NotifyCommand? evt, out _);
             if (!parsed || evt == null)
             {
                 logger.LogError("Notification message could not be parsed.");
@@ -42,22 +39,17 @@ namespace Niobium.Notification.Server
                 return;
             }
 
-            if (options?.Value.UsesDurableSubmission(evt.Tenant) == true)
+            // Every tenant uses the durable inbox. The envelope supplies stable identity
+            // even when a producer omits the body ID; never generate one on redelivery.
+            if (String.IsNullOrWhiteSpace(message.MessageId))
             {
-                // The queue envelope supplies stable identity even for legacy producers whose
-                // body omits DomainEvent.ID. Never generate a new ID on redelivery.
-                if (String.IsNullOrWhiteSpace(message.MessageId))
-                {
-                    throw new ApplicationException(InternalError.BadRequest, "A stable message ID is required.");
-                }
-                evt.ID = message.MessageId;
-                await (durable ?? throw new InvalidOperationException("Durable notification services are unavailable."))
-                    .RunAsync(evt, cancellationToken);
+                throw new ApplicationException(InternalError.BadRequest, "A stable message ID is required.");
             }
-            else
-            {
-                await flow.RunAsync(evt, cancellationToken);
-            }
+            evt.ID = message.MessageId;
+            // Delivery count describes this broker envelope, not the history of a
+            // republished logical operation. Existing durable rows remain authoritative.
+            bool isFirstDelivery = message.DeliveryCount == 1;
+            await flow.RunAsync(evt, isFirstDelivery, cancellationToken);
         }
 
         private static void Transform(NotifyCommand evt)

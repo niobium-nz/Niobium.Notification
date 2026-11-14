@@ -3,8 +3,9 @@
 This is the Notification portion of B07 / Q28 #13's initial reliability
 measurements. The plan ID and acceptance criteria remain unchanged. Invoicing
 owns queue-age and queue-processing measurements; Notification owns submission
-adapter results and durable recovery observations. B02 activation and B06
-recipient mail-server confirmation remain separate requirements.
+adapter results and durable recovery observations. Every queued `NotifyCommand`
+now uses the durable path. B02 live recovery evidence and B06 recipient mail-server
+confirmation remain distinct from the routing policy.
 
 ## Instruments
 
@@ -21,6 +22,8 @@ Niobium OpenTelemetry provider/exporter. No package upgrade is needed.
 
 Provider `mode` is `legacy` or `durable`. Provider `outcome` is one of
 `accepted`, `rejected`, `retry`, `held`, `unknown`, `failed`, `cancelled`.
+The queue consumer always uses `durable`; direct HTTP and subscription-triggered
+`NotificationFlow` calls still use `legacy`. There is no per-tenant mode selection.
 Legacy `true`/`false` becomes accepted/rejected. Durable acceptance requires a
 nonblank provider ID; otherwise it is unknown. A thrown exception is failed;
 `OperationCanceledException` is cancelled only when the supplied token was
@@ -110,6 +113,6 @@ checks ownership and ETags.
 
 This proves aggregate export for the current deployment and window, not attribution
 of a metric to a specific email. Durable decision/outcome instruments are locally
-verified; live enabled-path verification still belongs to the B02 cutover. The
+verified; live queue/provider recovery requires separate B02 evidence. The
 trusted immutable-main suite is independently required, and production verification
 continues to perform only GET `/health`.

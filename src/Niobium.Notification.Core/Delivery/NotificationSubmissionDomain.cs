@@ -8,13 +8,6 @@ namespace Niobium.Notification.Delivery
         IEnumerable<IDomainEventHandler<IDomain<NotificationSubmission>>> eventHandlers,
         IFileService files) : GenericDomain<NotificationSubmission>(repository, eventHandlers)
     {
-        public async Task<bool> IsRegisteredAsync(CancellationToken cancellationToken = default)
-        {
-            this.CheckInitialized();
-            NotificationSubmission? entry = await this.TryGetEntityAsync(cancellationToken);
-            return entry != null;
-        }
-
         public async Task RegisterAsync(NotificationSubmission request, FrozenNotification? payload, CancellationToken cancellationToken = default)
         {
             this.CheckInitialized();
@@ -44,6 +37,37 @@ namespace Niobium.Notification.Delivery
             // A losing/uncertain insert can leave an orphan blob. Never delete it without
             // reconciling references. A conflict propagates; redelivery loads the winner.
             await this.SaveVerifiedAsync(candidate, isNew: true, cancellationToken);
+        }
+
+        /// <summary>Determines whether fresh content is needed, holding unknown prior delivery outcomes.</summary>
+        public async Task<bool> PrepareRegistrationAsync(NotificationSubmission request, bool isFirstDelivery,
+            CancellationToken cancellationToken = default)
+        {
+            this.CheckInitialized();
+            ArgumentNullException.ThrowIfNull(request);
+            this.ValidateIdentity(request);
+            NotificationSubmission? existing = await this.TryGetEntityAsync(cancellationToken);
+            if (existing != null)
+            {
+                Validate(existing, request);
+                return false;
+            }
+
+            if (isFirstDelivery)
+            {
+                return true;
+            }
+
+            // A legacy consumer may have sent before losing settlement without an
+            // inbox row. A create-only hold cannot overwrite another registration.
+            // Do not render or store content while that prior outcome is unknown.
+            NotificationSubmission held = request.NewRegistration() with
+            {
+                StateCode = (int)SubmissionState.Held,
+                OutcomeCode = (int)SubmissionOutcome.SubmissionUnknown,
+            };
+            await this.SaveVerifiedAsync(held, isNew: true, cancellationToken);
+            return false;
         }
 
         public async Task<SubmissionAttempt> PrepareAttemptAsync(NotificationSubmission request, DateTimeOffset now,

@@ -4,7 +4,7 @@ The [model contract guide](model-contracts.md) defines business key names and
 model-owned identity, payload and provider-key representations. The domain keeps
 the lifecycle/recovery decisions described below.
 
-This implements the opt-in `NotifyCommand` path for B02 / Q28 #1. Provider
+This implements the mandatory `NotifyCommand` path for all tenants for B02 / Q28 #1. Provider
 submission is distinct from recipient delivery. B06 callbacks, cancellation and
 recipient mail-server confirmation are not implemented here. Direct HTTP and
 subscription-triggered calls to `NotificationFlow` keep their existing behavior.
@@ -17,8 +17,7 @@ field or a second implementation of transition rules in the flow.
 
 ## Identity and persistence
 
-`NotificationOptions:EnableDurableSubmission` defaults to false. When enabled for a sender, the queue
-consumer uses the Service Bus `MessageId` as the operation ID, including for old
+The queue consumer always uses the Service Bus `MessageId` as the operation ID, including for old
 producers that omit the body ID. Scheduled retries carry the same ID in both
 places. Invoicing already supplies its full invoice identity in both places.
 The storage key is the sender tenant plus SHA-256 of that operation ID. Reusing
@@ -58,8 +57,12 @@ the same access controls as other private notification data.
 
 ## Submission and recovery
 
-1. Load or conditionally register the operation and its frozen content. A missing
-   template creates an explicit Failed/TemplateMissing outcome without sending.
+1. Ask the domain whether registration is required. Existing durable evidence
+   always wins. Without a row, an envelope whose broker `DeliveryCount` is not 1
+   gets a verified, create-only Held/SubmissionUnknown record with zero attempts.
+   No rendering, Blob write, scheduling or provider call occurs for that hold.
+   A first envelope delivery can register frozen content; a missing template
+   creates an explicit Failed/TemplateMissing outcome without sending.
 2. Suppress Accepted, Failed and Held records. Accepted submissions remain
    suppressed after the provider's 24-hour window; no expiry is configured.
 3. Check the persisted first-submission boundary and due time. Early redelivery
@@ -116,72 +119,81 @@ requests may be retried. This implementation relies on that provider contract;
 it does not claim exactly-once recipient delivery or protection against arbitrary
 clock jumps, an indefinitely suspended worker, queue loss or out-of-band sends.
 
-## Sender-tenant rollout filter
+## All tenants use durable submission
 
-`NotificationOptions:DurableSubmissionTenants` optionally narrows the existing
-enable switch to explicitly selected sender tenants. It is one comma-separated
-string of nonempty GUIDs, not an indexed configuration array. For example, the
-generic settings path accepts
-`APPSETTING_NOTIFICATIONOPTIONS__DURABLESUBMISSIONTENANTS` with a value such as
-`11111111-1111-4111-8111-111111111111,22222222-2222-4222-8222-222222222222`.
-These are illustrative IDs, not approved activation targets.
+The owner required mandatory enrollment on 14 November 2026. Every valid queued
+`NotifyCommand` uses `DurableNotificationFlow`; the consumer requires it as a
+constructor dependency and has no legacy fallback. Missing durable services fail
+service construction, and storage/scheduling errors propagate for queue recovery.
+An empty tenant is rejected before storage or provider access. A valid command
+without an envelope `MessageId` fails before registration; a body ID is not a
+fallback for a missing envelope identity.
 
-| Configuration | Queue consumer behavior |
-| --- | --- |
-| Enable switch false | Existing legacy path, regardless of the filter |
-| Enable switch true; filter absent | Existing all-tenant durable behavior |
-| Enable switch true; valid filter | Durable path for listed sender tenants; existing legacy path for other tenants |
-| Enable switch true; empty or malformed filter | Fail before either provider or the inbox is called |
+`EnableDurableSubmission`, `DurableSubmissionTenants` and `UsesDurableSubmission`
+are removed from `NotificationOptions`. The remaining options are `SelfHostName`
+and `TemplateFolder`. Stale enable/filter application settings are ignored by the
+options binder and cannot disable or narrow the mandatory queue path. Remove those
+obsolete settings during normal configuration maintenance; no replacement flag or
+tenant list is required. Direct HTTP and subscription-triggered `NotificationFlow`
+calls are separate entry points, not an alternate route for queued commands.
 
-The raw string is validated in full before routing. GUID array binding can silently
-discard invalid entries; an invalid entry must never broaden a configured cohort.
-Whitespace around GUIDs is accepted, but empty entries and the empty GUID are not.
-The consumer rejects an empty command tenant before either route, independently
-of the enable switch or filter. DataAnnotations on a non-nullable GUID alone do
-not establish a valid tenant.
-Filtering does not establish that a tenant or its operation IDs are new, grant
-queue access, or supply historical suppression evidence.
+Existing durable operations retain their keys, payloads, version and suppression
+evidence. Changing a tenant setting can no longer send an accepted/held operation
+through a legacy fallback. New tenants automatically follow the same contract.
+The consumer maps broker delivery history; the domain owns the registration/hold
+decision. The flow renders only when the domain says fresh registration is needed.
 
-Keep a selected tenant enrolled while any of its operations can be replayed,
-including scheduled wakes and accepted operations. Removing that tenant or
-disabling the switch can route an old operation through the legacy sender and
-bypass its inbox evidence. Clearing the filter entirely broadens activation to
-all tenants. These are cutover changes requiring quiescence and reconciliation,
-not safe rollback actions. A whole-tenant filter cannot separate old and new
-operation IDs within one existing tenant.
+## Operational continuity and verification
 
-This change supplies routing and local verification only. It does not choose a
-production cohort or enable the queue path in an environment. The enabled real
-queue/provider checks and operational decisions below remain required.
+Deploy this behavior through the authorized [delivery process](delivery-and-operations.md).
+It is a code-level policy for all tenants, not a configuration activation step.
+Use the current consumer version consistently; an older binary can still send
+without consulting the durable inbox. Reverting to that binary is not a safe
+way to retry an operation with existing durable evidence.
 
-## Activation and remaining dependencies
+An old consumer can succeed at the provider and lose Service Bus settlement
+without writing a durable row. Such an untracked broker redelivery is held as
+SubmissionUnknown rather than submitted again. The hold is a conditional insert:
+it cannot overwrite a racing registration, and a failed/unverified write propagates
+without sending. A racing fresh registration can leave an orphan candidate blob
+if the hold wins, but cannot claim or submit over that hold. Existing registered
+operations continue normal recovery regardless of broker delivery count.
 
-The implementation was merged in PR #2. Ordinary feature deployment and review
-follow the authorized [delivery process](delivery-and-operations.md). The option
-remains disabled, and merging instrumentation does not enable it or migrate data.
-Before activation, review the concrete internal schema and failure policy and:
+This is deliberately conservative. A modern first delivery that fails before any
+row is committed will also be held on redelivery, even if it never called the
+provider. The row has zero attempts, no first-submission time and no scheduled
+retry. Operators must reconcile it before an explicit resend decision; do not
+delete a hold or reset its identity to force automatic recovery. Suppression is
+observable as `state=held`, `outcome=submissionunknown`, `action=suppress`.
 
-- Quiesce old queue consumers. They can send without consulting this inbox.
-- Decide how to seed suppression records for previously submitted operation IDs,
-  or explicitly delimit an approved new-operation cohort. A recent queue enqueue
-  time alone cannot prove an old logical operation has never sent. Do not replay
-  historical invoices to populate the new store.
-  The optional sender-tenant filter can delimit newly established tenants; it
-  cannot make an existing tenant's earlier operation IDs safe by itself.
-- Provision `NotificationSubmission` through the generic `storageTableNames` input
-  to `infra/main.bicep` in the existing data account before enabling the option.
+Broker `DeliveryCount == 1` proves only first delivery of that envelope. Manual
+or automatic producer republishing can create a new envelope for a historical
+operation. For example, an enqueue followed by a failed producer state update
+can cause automatic republishing. Without an existing durable row, Notification
+cannot infer that an older legacy consumer already sent that logical operation.
+This fence does not certify complete historical suppression or a reconciled
+legacy backlog. Retain durable records and stable operation IDs; reconcile legacy
+producer retries before replay/backfill. Do not replay notifications to populate
+the store. This change performs no migration, backlog replay or production queue
+operation.
+
+The existing runtime dependencies remain required:
+
+- `NotificationSubmission` is provisioned through the generic `storageTableNames` input
+  to `infra/main.bicep` in the existing data account.
   `main.bicepparam` reads `STORAGE_TABLE_NAMES` and includes the existing
   `Subscription` and `Template` tables in its default list; see
   [resource-name configuration](delivery-and-operations.md#resource-name-configuration).
   The generic repository does not create tables. Verify the app identity can use it, create/read the private
   payload container through `IFileService`, and schedule to the existing queue.
   No new Azure stack is required. Verify the current deployed resources and access
-  at activation; a source declaration alone is not evidence of working queue recovery.
+  when diagnosing delivery; a source declaration alone is not evidence of working queue recovery.
 - Verify configured provider keys belong to the intended account and preserve
   their selection across retries. Do not infer key/account continuity on rotation.
-- Exercise the enabled consumer, actual scheduled queue redelivery, provider
-  replay and terminal holds using the approved real test fixtures before promotion.
-  The current deployed harness still exercises the legacy synchronous path.
+- Tests exercise the mandatory consumer, identity, persisted suppression and
+  recovery. The current deployed harness exercises the separate synchronous
+  ContactUs path. Actual broker scheduling/provider replay and recipient delivery
+  require their own live evidence; a passing ContactUs check does not certify them.
 - Assign an operator for held records, credential changes and Service Bus dead
   letters. If scheduling fails until the source is dead-lettered, no successful
   provider call occurs on that attempt, but recovery requires redrive. A missing

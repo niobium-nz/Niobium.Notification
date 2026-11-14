@@ -10,12 +10,12 @@ namespace Niobium.Notification.Delivery
         TimeProvider clock,
         NotificationRetryPolicy retryPolicy) : IFlow
     {
-        public async Task RunAsync(NotifyCommand request, CancellationToken cancellationToken = default)
+        public async Task RunAsync(NotifyCommand request, bool isFirstDelivery, CancellationToken cancellationToken = default)
         {
             NotificationSubmission identity = NotificationSubmission.Create(request);
             NotificationSubmissionDomain submission = await submissions.GetAsync(identity.Tenant, identity.ID, forceLoad: true, cancellationToken: cancellationToken);
-            bool registered = await submission.IsRegisteredAsync(cancellationToken);
-            if (!registered)
+            bool registrationRequired = await submission.PrepareRegistrationAsync(identity, isFirstDelivery, cancellationToken);
+            if (registrationRequired)
             {
                 TemplateDomain.Deliverable? content = await renderer.PrepareAsync(request, cancellationToken);
                 FrozenNotification? payload = content == null ? null : provider.Freeze(content);

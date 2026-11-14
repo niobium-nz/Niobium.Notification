@@ -81,6 +81,17 @@ public sealed class NotificationTelemetryTests
     }
 
     [TestMethod]
+    public async Task Untracked_redelivery_reports_verified_hold_without_a_provider_attempt()
+    {
+        using Capture capture = new();
+        DurableNotificationTests.Scenario scenario = new();
+        await scenario.Flow().RunAsync(scenario.Request, isFirstDelivery: false);
+        AssertDecision(capture, "suppress", "held", "submissionunknown", 1);
+        Assert.AreEqual(1, capture.Read().Count);
+        Assert.AreEqual(0, scenario.Sends);
+    }
+
+    [TestMethod]
     public async Task Retry_and_early_wake_are_distinct_from_provider_calls_and_recorded_completion()
     {
         using Capture capture = new();

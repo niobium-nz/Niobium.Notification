@@ -28,7 +28,7 @@ submission ID implementation. The frozen contract retains only the digest.
 Private helpers replace the former public `NotificationFingerprint` utility.
 
 [NotificationSubmissionDomain](../src/Niobium.Notification.Core/Delivery/NotificationSubmissionDomain.cs)
-owns registration validity, request/claim ownership, initial state, conditional
+owns registration validity, uncertain-redelivery holds, request/claim ownership, initial state, conditional
 writes, retry eligibility, the provider window, suppression and outcomes.
 It orders the Blob write before saving its reference and uses `IFileService`;
 it does not define the path or JSON layout. The flow coordinates rendering,
@@ -58,5 +58,6 @@ Existing concurrency, lost-response and restart cases remain required.
 
 `Template.Tenant/Channel` and `Subscription.Belonging/Email` already use meaningful
 names and annotations. Keep infrastructure key parameters on `GenericDomain`
-and SDK test fixtures distinct from business-model property names. This refactor
-does not enable B02, choose a rollout cohort or change deployed notification policy.
+and SDK test fixtures distinct from business-model property names. The naming
+refactor preserved its prior routing policy; current queued routing follows the
+[mandatory submission policy](durable-submission.md#all-tenants-use-durable-submission).

@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Niobium.Messaging;
+using Niobium.Notification.Delivery;
 using Niobium.Notification.Server;
 using Niobium.Platform.Captcha.ReCaptcha;
 using Niobium.Platform.Notification.Email;
@@ -25,7 +26,7 @@ public sealed class EntryPointTests
     }
 
     private static ServiceBusReceivedMessage Message(object body)
-        => ServiceBusModelFactory.ServiceBusReceivedMessage(body: new BinaryData(JsonMarshaller.Marshall(body)), contentType: "application/json", messageId: "synthetic-message");
+        => ServiceBusModelFactory.ServiceBusReceivedMessage(body: new BinaryData(JsonMarshaller.Marshall(body)), contentType: "application/json", deliveryCount: 1, messageId: "synthetic-message");
 
     private static Mock<IVisitorRiskAssessor> Assessor()
     {
@@ -176,23 +177,31 @@ public sealed class EntryPointTests
     [TestMethod]
     public async Task NotifyQueue_TransformsJsonParametersAndAwaitsProvider()
     {
-        Guid tenant = Guid.NewGuid();
-        var (flow, _, sender, _) = CreateSut(CreateDomain(BuildTemplate(tenant, "Invoice"), "{{NAME}} {{COUNT}} <!-- ITEMS BEGIN -->{{LABEL}}<!-- ITEMS END -->", DefaultOptions));
-        NotifyCommand command = new() { Tenant = tenant, Channel = "Invoice", Destination = " person@example.invalid ", DestinationDisplayName = " Person ", Parameters = new() { ["name"] = "<Invoice>", ["count"] = 2, ["items"] = new object[] { new { label = "<Line>" }, "ignored" } } };
-        await new NotifyCommandConsumer(flow, NullLogger<NotifyCommandConsumer>.Instance).Run(Message(command), default);
-        sender.Verify(x => x.SendAsync(It.IsAny<EmailAddress>(), It.Is<IEnumerable<EmailAddress>>(r => r.Single().Address == "person@example.invalid"), It.IsAny<string>(),
-            It.Is<string>(body => body.Contains("&lt;Invoice&gt;") && body.Contains("&lt;Line&gt;") && body.Contains("2")), It.IsAny<CancellationToken>()), Times.Once);
+        DurableNotificationTests.Scenario s = new(body: "{{NAME}} {{COUNT}} <!-- ITEMS BEGIN -->{{LABEL}}<!-- ITEMS END -->");
+        TemplateDomain.Deliverable? frozen = null;
+        s.Provider.Setup(p => p.Freeze(It.IsAny<TemplateDomain.Deliverable>()))
+            .Callback<TemplateDomain.Deliverable>(content => frozen = content)
+            .Returns(new FrozenNotification("frozen-json", "example.invalid", "credential-digest"));
+        NotifyCommand command = new() { Tenant = s.Request.Tenant, Channel = s.Request.Channel, Destination = " person@example.invalid ", DestinationDisplayName = " Person ", Parameters = new() { ["name"] = "<Notice>", ["count"] = 2, ["items"] = new object[] { new { label = "<Line>" }, "ignored" } } };
+        await new NotifyCommandConsumer(s.Flow(), NullLogger<NotifyCommandConsumer>.Instance).Run(Message(command), default);
+        Assert.IsNotNull(frozen);
+        Assert.AreEqual("person@example.invalid", frozen.To);
+        Assert.IsTrue(frozen.Body.Contains("&lt;Notice&gt;") && frozen.Body.Contains("&lt;Line&gt;") && frozen.Body.Contains("2"));
+        Assert.AreEqual(1, s.Sends);
+        Assert.AreEqual(0, s.Legacy.Invocations.Count);
     }
 
     [TestMethod]
     public async Task NotifyQueue_InvalidTransportOrCommandNeverSends()
     {
-        var (flow, repo, sender, _) = CreateSut(CreateDomain(BuildTemplate(Guid.NewGuid(), "Invoice"), "body", DefaultOptions));
-        NotifyCommandConsumer consumer = new(flow, NullLogger<NotifyCommandConsumer>.Instance);
+        DurableNotificationTests.Scenario s = new();
+        NotifyCommandConsumer consumer = new(s.Flow(), NullLogger<NotifyCommandConsumer>.Instance);
         await consumer.Run(ServiceBusModelFactory.ServiceBusReceivedMessage(body: new BinaryData("invalid")), default);
         await consumer.Run(Message(new NotifyCommand { Tenant = Guid.NewGuid(), Channel = "", Parameters = [] }), default);
-        Assert.AreEqual(0, repo.Invocations.Count);
-        Assert.AreEqual(0, sender.Invocations.Count);
+        Assert.AreEqual(0, s.Templates.Invocations.Count);
+        Assert.AreEqual(0, s.Provider.Invocations.Count);
+        Assert.AreEqual(0, s.Store.Repository.Invocations.Count);
+        Assert.AreEqual(0, s.Legacy.Invocations.Count);
     }
 
     [TestMethod]

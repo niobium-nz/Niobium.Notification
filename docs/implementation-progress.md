@@ -1,5 +1,58 @@
 # Notification reliability implementation ledger
 
+## Mandatory queued submission for all tenants (14 November 2026)
+
+Baseline: `40a2b5581e005ec0019a6b0935e878768824d10f`. The owner required every
+tenant to use durable queued submission and removed the need for an enrollment
+option. This supersedes the historical disabled-by-default and selected-cohort
+routing descriptions below; the prior entries remain evidence for their own heads.
+
+`NotificationOptions` now contains only `SelfHostName` and `TemplateFolder`.
+The enable switch, tenant list and selection method are removed. The queue
+consumer requires `DurableNotificationFlow`, always uses the envelope's stable
+message ID, and cannot fall back to a legacy send on missing services or failed
+storage. Empty tenants are rejected before I/O; valid commands without envelope
+identity fail before registration. Stale settings cannot disable this policy.
+Existing model keys, payload formats, state/outcome codes and package versions remain
+compatible. Direct HTTP/subscription entry points keep their separate behavior.
+
+PR8 review identified an untracked legacy redelivery after provider success and
+lost settlement. The domain now holds missing-row redeliveries as verified
+Held/SubmissionUnknown without preparing content or sending. Conditional inserts
+preserve either winner of a race with fresh registration. A modern registration
+failure that left no row is also held conservatively. First delivery of a new
+broker envelope cannot establish the historical outcome of a republished logical
+operation; [continuity limits](durable-submission.md#operational-continuity-and-verification)
+cover automatic producer republishing and the reconciliation requirement.
+
+The initial head `441826a141a72741476a8b5598e1eb111cc142f3` passed the following
+local verification with the pinned packages and owned loopback storage runner.
+The subsequent review correction adds seven application cases and three storage
+cases for unknown redelivery, failed registration, verified holds, telemetry and
+both conditional race winners. Its exact-head CI and review evidence must be
+recorded on [PR8](https://github.com/niobium-nz/Niobium.Notification/pull/8):
+
+- 140 application cases passed, with zero failures/skips. Tests cover arbitrary
+  tenants, body/envelope identity differences, missing body IDs, invalid envelope
+  IDs, replay suppression, missing durable services and storage failure without
+  fallback. Obsolete filter-selection cases were replaced by mandatory behavior.
+- 11 Table/Blob cases passed with zero failures/skips. The added case uses the
+  real pinned adapters and recreated queue consumers/repositories to verify that
+  two tenants can share an envelope ID without sharing state or repeating sends.
+- Coverage is 98.54% combined (Contracts 100%, Core 99.15%, Server 97.51%). The
+  required thresholds and authored-source inclusion are unchanged.
+- 20 Node and 46 Python tooling tests passed. Release builds have zero errors
+  and the same six existing NU1603 dependency warnings. Owned emulators stopped
+  after the storage run.
+
+These checks use controlled broker/provider doubles around real Table/Blob I/O.
+They do not establish live Service Bus scheduling, provider replay or recipient
+delivery. The deployed harness still exercises the approved ContactUs fixture;
+production verification permits only GET `/health`. No migration, historical
+replay or production queue operation is part of this change. Record exact-head
+feature artifacts, native review, separate approval and terminal production/package
+results on the delivery PR before reporting it delivered.
+
 ## Model naming and contract ownership (14 November 2026)
 
 Baseline: `a8bc0e45b32f56cc3044c9b75b41dff974c1e930`. The owner requested business
