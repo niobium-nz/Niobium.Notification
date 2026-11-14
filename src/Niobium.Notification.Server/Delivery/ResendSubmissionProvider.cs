@@ -26,13 +26,13 @@ namespace Niobium.Notification.Server.Delivery
                 subject = content.Subject,
                 html = content.Body,
             });
-            return new FrozenNotification(json, domain, NotificationFingerprint.Hash(credential));
+            return FrozenNotification.Create(json, domain, credential);
         }
 
         public async Task<SubmissionResult> SubmitAsync(FrozenNotification content, string key, DateTimeOffset deadline, CancellationToken cancellationToken)
         {
             string credential = this.Credential(content.SenderDomain);
-            if (NotificationFingerprint.Hash(credential) != content.CredentialFingerprint
+            if (!content.MatchesCredential(credential)
                 || clock.GetUtcNow() + NotificationRetryPolicy.SendMargin >= deadline)
             {
                 return new(SubmissionOutcome.Hold);

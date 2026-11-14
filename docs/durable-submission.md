@@ -1,5 +1,9 @@
 # Durable queued notification submission (B02)
 
+The [model contract guide](model-contracts.md) defines business key names and
+model-owned identity, payload and provider-key representations. The domain keeps
+the lifecycle/recovery decisions described below.
+
 This implements the opt-in `NotifyCommand` path for B02 / Q28 #1. Provider
 submission is distinct from recipient delivery. B06 callbacks, cancellation and
 recipient mail-server confirmation are not implemented here. Direct HTTP and

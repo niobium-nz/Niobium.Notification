@@ -14,14 +14,13 @@ public sealed class SubmissionConcurrencyTests
         await using LocalStorageFixture storage = new();
         await storage.InitializeAsync();
         IRepository<NotificationSubmission> repository = storage.Repository();
-        NotificationSubmission input = new()
+        NotificationSubmission input = NotificationSubmission.Create(new NotifyCommand
         {
-            PartitionKey = "tenant", RowKey = "operation", Version = NotificationSubmission.CurrentVersion,
-            Fingerprint = "fingerprint", StateCode = (int)SubmissionState.Pending, WriteID = "initial",
-        };
+            ID = "operation", Tenant = Guid.NewGuid(), Channel = "Notice", Parameters = [],
+        }) with { StateCode = (int)SubmissionState.Pending, WriteID = "initial" };
         bool[] created = await Task.WhenAll(TryWrite(() => repository.CreateAsync(input)), TryWrite(() => repository.CreateAsync(input)));
         Assert.AreEqual(1, created.Count(x => x));
-        NotificationSubmission stored = (await repository.RetrieveAsync(input.PartitionKey, input.RowKey))!;
+        NotificationSubmission stored = (await repository.RetrieveAsync(input.Tenant, input.ID))!;
         Assert.IsFalse(String.IsNullOrWhiteSpace(stored.ETag));
         DateTimeOffset first = new(2026, 11, 6, 0, 0, 0, TimeSpan.Zero);
         NotificationSubmission claim = stored with
@@ -31,7 +30,7 @@ public sealed class SubmissionConcurrencyTests
         };
         bool[] claims = await Task.WhenAll(TryWrite(() => repository.UpdateAsync(claim)), TryWrite(() => repository.UpdateAsync(claim)));
         Assert.AreEqual(1, claims.Count(x => x));
-        NotificationSubmission winner = (await storage.Repository().RetrieveAsync(input.PartitionKey, input.RowKey))!;
+        NotificationSubmission winner = (await storage.Repository().RetrieveAsync(input.Tenant, input.ID))!;
         Assert.AreNotEqual(stored.ETag, winner.ETag);
         bool staleSucceeded = await TryWrite(() => repository.UpdateAsync(stored));
         Assert.IsFalse(staleSucceeded);
@@ -42,7 +41,7 @@ public sealed class SubmissionConcurrencyTests
         });
         // Pinned mapper discards the write response ETag. Domain tests require verified read-back.
         Assert.IsNull(result.ETag);
-        NotificationSubmission reread = (await storage.Repository().RetrieveAsync(input.PartitionKey, input.RowKey))!;
+        NotificationSubmission reread = (await storage.Repository().RetrieveAsync(input.Tenant, input.ID))!;
         Assert.IsNull(reread.NextAttempt);
         Assert.AreEqual(first, reread.FirstSubmission);
         Assert.AreEqual((int)SubmissionState.Accepted, reread.StateCode);

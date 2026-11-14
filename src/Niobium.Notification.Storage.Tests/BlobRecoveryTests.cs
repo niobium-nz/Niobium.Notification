@@ -37,20 +37,21 @@ public sealed class BlobRecoveryTests
     {
         await using LocalStorageFixture storage = new();
         await storage.InitializeAsync();
-        NotificationSubmissionDomain domain = storage.Domain("tenant", "operation");
+        NotificationSubmission identity = NotificationSubmission.Create(Request());
+        NotificationSubmissionDomain domain = storage.Domain(identity.Tenant, identity.ID);
         FrozenNotification payload = new("{html:Frozen ✓}", "example.invalid", "synthetic-digest");
-        await domain.RegisterAsync("fingerprint", payload);
+        await domain.RegisterAsync(identity, payload);
         NotificationSubmission entry = await domain.GetEntityAsync();
         Assert.AreEqual(PublicAccessType.None, (await storage.Container.GetAccessPolicyAsync()).Value.BlobPublicAccess);
-        SubmissionAttempt attempt = await domain.PrepareAttemptAsync("fingerprint", DateTimeOffset.UtcNow, new NotificationRetryPolicy());
+        SubmissionAttempt attempt = await domain.PrepareAttemptAsync(identity, DateTimeOffset.UtcNow, new NotificationRetryPolicy());
         Assert.AreEqual(payload, attempt.Payload);
         using MemoryStream changed = new("changed"u8.ToArray());
         RequestFailedException conflict = await Assert.ThrowsExactlyAsync<RequestFailedException>(() =>
-            storage.Files().PutAsync(NotificationSubmissionDomain.PayloadContainer, entry.PayloadName, changed, replaceIfExist: false));
+            storage.Files().PutAsync(NotificationSubmission.PayloadContainer, entry.PayloadName, changed, replaceIfExist: false));
         Assert.AreEqual(409, conflict.Status);
         await storage.Container.DeleteBlobAsync("/" + entry.PayloadName);
-        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => storage.Domain("tenant", "operation")
-            .PrepareAttemptAsync("fingerprint", attempt.Due!.Value, new NotificationRetryPolicy()));
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => storage.Domain(identity.Tenant, identity.ID)
+            .PrepareAttemptAsync(identity, attempt.Due!.Value, new NotificationRetryPolicy()));
     }
 
     [TestMethod]
@@ -63,8 +64,9 @@ public sealed class BlobRecoveryTests
         IRepository<NotificationSubmission> repository = storage.Repository();
         Clock clock = new();
         NotifyCommand request = Request();
-        string partition = request.Tenant.ToString("N");
-        string id = NotificationFingerprint.Hash(request.ID);
+        NotificationSubmission identity = NotificationSubmission.Create(request);
+        string partition = identity.Tenant;
+        string id = identity.ID;
         List<(string Key, string Json)> submissions = [];
         List<MessagingEntry<NotifyCommand>> scheduled = [];
         using HttpClient client = new(new Handler(async (message, token) =>
@@ -81,7 +83,7 @@ public sealed class BlobRecoveryTests
         {
             From = "sender@example.invalid", To = request.Destination!, Subject = "Frozen subject", Body = "<p>Frozen ✓</p>",
         });
-        await storage.Domain(partition, id).RegisterAsync(NotificationFingerprint.Of(request), frozen);
+        await storage.Domain(partition, id).RegisterAsync(identity, frozen);
         Mock<IMessagingBroker<NotifyCommand>> queue = new(MockBehavior.Strict);
         queue.Setup(q => q.EnqueueAsync(It.IsAny<IEnumerable<MessagingEntry<NotifyCommand>>>(), It.IsAny<CancellationToken>()))
             .Callback<IEnumerable<MessagingEntry<NotifyCommand>>, CancellationToken>((entries, _) => scheduled.AddRange(entries))

@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Niobium.File;
 
 namespace Niobium.Notification.Delivery
@@ -9,8 +8,6 @@ namespace Niobium.Notification.Delivery
         IEnumerable<IDomainEventHandler<IDomain<NotificationSubmission>>> eventHandlers,
         IFileService files) : GenericDomain<NotificationSubmission>(repository, eventHandlers)
     {
-        public const string PayloadContainer = "notification-submissions";
-
         public async Task<bool> IsRegisteredAsync(CancellationToken cancellationToken = default)
         {
             this.CheckInitialized();
@@ -18,43 +15,45 @@ namespace Niobium.Notification.Delivery
             return entry != null;
         }
 
-        public async Task RegisterAsync(string fingerprint, FrozenNotification? payload, CancellationToken cancellationToken = default)
+        public async Task RegisterAsync(NotificationSubmission request, FrozenNotification? payload, CancellationToken cancellationToken = default)
         {
             this.CheckInitialized();
-            if (String.IsNullOrWhiteSpace(fingerprint))
+            ArgumentNullException.ThrowIfNull(request);
+            this.ValidateIdentity(request);
+            if (String.IsNullOrWhiteSpace(request.Fingerprint))
             {
                 throw new ApplicationException(InternalError.BadRequest, "A notification fingerprint is required.");
             }
             NotificationSubmission? existing = await this.TryGetEntityAsync(cancellationToken);
             if (existing != null)
             {
-                Validate(existing, fingerprint);
+                Validate(existing, request);
                 return;
             }
 
-            NotificationSubmission candidate = new()
+            NotificationSubmission candidate = request.NewRegistration() with
             {
-                PartitionKey = this.PartitionKey, RowKey = this.RowKey,
-                Version = NotificationSubmission.CurrentVersion, Fingerprint = fingerprint,
-                PayloadName = $"{this.PartitionKey}/{this.RowKey}/{Guid.NewGuid():N}.json",
                 StateCode = (int)(payload == null ? SubmissionState.Failed : SubmissionState.Pending),
                 OutcomeCode = (int)(payload == null ? SubmissionOutcome.TemplateMissing : SubmissionOutcome.None),
             };
             if (payload != null)
             {
-                using MemoryStream content = new(JsonSerializer.SerializeToUtf8Bytes(payload));
-                await files.PutAsync(PayloadContainer, candidate.PayloadName, content, replaceIfExist: false, cancellationToken: cancellationToken);
+                using MemoryStream content = new(payload.Serialize());
+                await files.PutAsync(NotificationSubmission.PayloadContainer, candidate.PayloadName, content, replaceIfExist: false, cancellationToken: cancellationToken);
             }
             // A losing/uncertain insert can leave an orphan blob. Never delete it without
             // reconciling references. A conflict propagates; redelivery loads the winner.
             await this.SaveVerifiedAsync(candidate, isNew: true, cancellationToken);
         }
 
-        public async Task<SubmissionAttempt> PrepareAttemptAsync(string fingerprint, DateTimeOffset now,
+        public async Task<SubmissionAttempt> PrepareAttemptAsync(NotificationSubmission request, DateTimeOffset now,
             NotificationRetryPolicy retryPolicy, CancellationToken cancellationToken = default)
         {
+            this.CheckInitialized();
+            ArgumentNullException.ThrowIfNull(request);
+            this.ValidateIdentity(request);
             NotificationSubmission entry = await this.GetEntityAsync(cancellationToken);
-            Validate(entry, fingerprint);
+            Validate(entry, request);
             SubmissionState state = (SubmissionState)entry.StateCode;
             if (state is SubmissionState.Accepted or SubmissionState.Failed or SubmissionState.Held)
             {
@@ -76,10 +75,9 @@ namespace Niobium.Notification.Delivery
                 return new(SubmissionAction.Wait, Status(entry), entry.NextAttempt);
             }
 
-            using Stream content = await files.GetAsync(PayloadContainer, entry.PayloadName, createIfNotExist: false, cancellationToken: cancellationToken)
+            using Stream content = await files.GetAsync(NotificationSubmission.PayloadContainer, entry.PayloadName, createIfNotExist: false, cancellationToken: cancellationToken)
                 ?? throw new InvalidOperationException("Frozen notification content is unavailable.");
-            FrozenNotification payload = await JsonSerializer.DeserializeAsync<FrozenNotification>(content, cancellationToken: cancellationToken)
-                ?? throw new InvalidOperationException("Frozen notification content is invalid.");
+            FrozenNotification payload = await FrozenNotification.ReadAsync(content, cancellationToken);
             NotificationSubmission claim = await this.SaveVerifiedAsync(entry with
             {
                 StateCode = (int)SubmissionState.Sending,
@@ -94,10 +92,7 @@ namespace Niobium.Notification.Delivery
         {
             this.CheckInitialized();
             NotificationSubmission claim = attempt.Claim ?? throw new InvalidOperationException("A claimed attempt is required.");
-            if (claim.PartitionKey != this.PartitionKey || claim.RowKey != this.RowKey)
-            {
-                throw Conflict("The claim belongs to another notification.");
-            }
+            this.ValidateIdentity(claim);
             SubmissionState state = result.Outcome switch
             {
                 SubmissionOutcome.Accepted when !String.IsNullOrWhiteSpace(result.ProviderID) => SubmissionState.Accepted,
@@ -147,9 +142,17 @@ namespace Niobium.Notification.Delivery
             return saved;
         }
 
-        private static void Validate(NotificationSubmission entry, string fingerprint)
+        private void ValidateIdentity(NotificationSubmission entry)
         {
-            if (entry.Version != NotificationSubmission.CurrentVersion || entry.Fingerprint != fingerprint
+            if (entry.Tenant != this.PartitionKey || entry.ID != this.RowKey)
+            {
+                throw Conflict("The submission belongs to another notification.");
+            }
+        }
+
+        private static void Validate(NotificationSubmission entry, NotificationSubmission request)
+        {
+            if (entry.Version != NotificationSubmission.CurrentVersion || !entry.MatchesRequest(request)
                 || !Enum.IsDefined((SubmissionState)entry.StateCode) || !Enum.IsDefined((SubmissionOutcome)entry.OutcomeCode)
                 || entry.Attempts < 0 || (entry.Attempts > 0 && entry.FirstSubmission == null)
                 || (entry.StateCode == (int)SubmissionState.Sending && (entry.Attempts == 0 || entry.NextAttempt == null)))

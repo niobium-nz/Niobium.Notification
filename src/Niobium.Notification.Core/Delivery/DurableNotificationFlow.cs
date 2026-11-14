@@ -12,24 +12,17 @@ namespace Niobium.Notification.Delivery
     {
         public async Task RunAsync(NotifyCommand request, CancellationToken cancellationToken = default)
         {
-            ArgumentNullException.ThrowIfNull(request);
-            if (String.IsNullOrWhiteSpace(request.ID) || request.Tenant == Guid.Empty)
-            {
-                throw new ApplicationException(InternalError.BadRequest, "A stable notification identity is required.");
-            }
-            string partition = request.Tenant.ToString("N");
-            string id = NotificationFingerprint.Hash(request.ID);
-            string fingerprint = NotificationFingerprint.Of(request);
-            NotificationSubmissionDomain submission = await submissions.GetAsync(partition, id, forceLoad: true, cancellationToken: cancellationToken);
+            NotificationSubmission identity = NotificationSubmission.Create(request);
+            NotificationSubmissionDomain submission = await submissions.GetAsync(identity.Tenant, identity.ID, forceLoad: true, cancellationToken: cancellationToken);
             bool registered = await submission.IsRegisteredAsync(cancellationToken);
             if (!registered)
             {
                 TemplateDomain.Deliverable? content = await renderer.PrepareAsync(request, cancellationToken);
                 FrozenNotification? payload = content == null ? null : provider.Freeze(content);
-                await submission.RegisterAsync(fingerprint, payload, cancellationToken);
+                await submission.RegisterAsync(identity, payload, cancellationToken);
             }
 
-            SubmissionAttempt attempt = await submission.PrepareAttemptAsync(fingerprint, clock.GetUtcNow(), retryPolicy, cancellationToken);
+            SubmissionAttempt attempt = await submission.PrepareAttemptAsync(identity, clock.GetUtcNow(), retryPolicy, cancellationToken);
             NotificationTelemetry.RecordDecision(attempt);
             if (attempt.Action == SubmissionAction.Suppress)
             {
@@ -42,7 +35,7 @@ namespace Niobium.Notification.Delivery
             }
             // The recovery wake must be accepted before an irreversible provider submission.
             SubmissionResult result = await NotificationTelemetry.MeasureDurableAsync(
-                () => provider.SubmitAsync(attempt.Payload!, $"notification-v1/{partition}/{id}", attempt.Deadline!.Value, cancellationToken), cancellationToken);
+                () => provider.SubmitAsync(attempt.Payload!, identity.GetProviderIdempotencyKey(), attempt.Deadline!.Value, cancellationToken), cancellationToken);
             SubmissionStatus outcome = await submission.RecordOutcomeAsync(attempt, result, cancellationToken);
             NotificationTelemetry.RecordOutcome(outcome);
         }

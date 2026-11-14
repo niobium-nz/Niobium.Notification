@@ -32,7 +32,7 @@ internal sealed class LocalStorageFixture : IAsyncDisposable
         public BlobContainerClient OwnedContainer => base.GetBlobContainerClient(name);
         public override BlobContainerClient GetBlobContainerClient(string containerName)
         {
-            Assert.AreEqual(NotificationSubmissionDomain.PayloadContainer, containerName);
+            Assert.AreEqual(NotificationSubmission.PayloadContainer, containerName);
             return OwnedContainer;
         }
     }
@@ -64,6 +64,7 @@ internal sealed class LocalStorageFixture : IAsyncDisposable
     }
 
     public BlobContainerClient Container => blobs.OwnedContainer;
+    public TableClient Table => tables.GetTableClient(nameof(NotificationSubmission));
     public Task InitializeAsync() => tables.CreateTableAsync(tableName);
 
     public IRepository<NotificationSubmission> Repository()

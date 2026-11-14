@@ -70,13 +70,13 @@ public sealed class DurableNotificationTests
                         return new[] { value with { ETag = null } };
                     }
                 });
-            Files.Setup(f => f.PutAsync(NotificationSubmissionDomain.PayloadContainer, It.IsAny<string>(), It.IsAny<Stream>(), false, null, true, It.IsAny<CancellationToken>()))
+            Files.Setup(f => f.PutAsync(NotificationSubmission.PayloadContainer, It.IsAny<string>(), It.IsAny<Stream>(), false, null, true, It.IsAny<CancellationToken>()))
                 .Returns(async (string _, string name, Stream content, bool _, IDictionary<string, string>? _, bool _, CancellationToken token) =>
                 {
                     using MemoryStream copy = new(); await content.CopyToAsync(copy, token);
                     Payloads.Add(name, copy.ToArray());
                 });
-            Files.Setup(f => f.GetAsync(NotificationSubmissionDomain.PayloadContainer, It.IsAny<string>(), false, It.IsAny<CancellationToken>()))
+            Files.Setup(f => f.GetAsync(NotificationSubmission.PayloadContainer, It.IsAny<string>(), false, It.IsAny<CancellationToken>()))
                 .ReturnsAsync((string _, string name, bool _, CancellationToken _) => new MemoryStream(Payloads[name]));
         }
 
@@ -263,9 +263,11 @@ public sealed class DurableNotificationTests
         s.Request.Parameters["name"] = "Changed";
         await Assert.ThrowsExactlyAsync<Niobium.ApplicationException>(s.Run);
         s.Request.Parameters["name"] = "First";
-        s.Store.Entry = s.Store.Entry! with { Version = 1 };
+        // Simulate an incompatible stored version through the mapper-visible property.
+        typeof(NotificationSubmission).GetProperty(nameof(NotificationSubmission.Version))!.SetValue(s.Store.Entry, 1);
         await Assert.ThrowsExactlyAsync<Niobium.ApplicationException>(s.Run);
-        s.Store.Entry = s.Store.Entry with { Version = NotificationSubmission.CurrentVersion, StateCode = 999 };
+        typeof(NotificationSubmission).GetProperty(nameof(NotificationSubmission.Version))!.SetValue(s.Store.Entry, NotificationSubmission.CurrentVersion);
+        s.Store.Entry = s.Store.Entry! with { StateCode = 999 };
         await Assert.ThrowsExactlyAsync<Niobium.ApplicationException>(s.Run);
         Assert.AreEqual(1, s.Sends);
     }
@@ -317,7 +319,7 @@ public sealed class DurableNotificationTests
         NotifyCommandConsumer consumer = new(s.Renderer, NullLogger<NotifyCommandConsumer>.Instance, s.Flow(), Options.Create(options));
         ServiceBusReceivedMessage message = ServiceBusModelFactory.ServiceBusReceivedMessage(body: new BinaryData(JsonMarshaller.Marshall(s.Request)), contentType: "application/json", messageId: "envelope-identity");
         await consumer.Run(message, default); await consumer.Run(message, default);
-        Assert.AreEqual(NotificationFingerprint.Hash("envelope-identity"), s.Store.Entry!.RowKey);
+        Assert.AreEqual("68F554E657E9EEF383AF38E021EA7CD46AF887AE13EAF84F3F924FEB12CACAA3", s.Store.Entry!.ID);
         Assert.AreEqual(1, s.Sends);
         Assert.AreEqual(0, s.Legacy.Invocations.Count);
     }
@@ -394,13 +396,13 @@ public sealed class DurableNotificationTests
     {
         Scenario s = new();
         s.Request.Parameters = new() { ["b"] = new[] { "one", "two" }, ["a"] = "" };
-        string first = NotificationFingerprint.Of(s.Request);
+        string first = NotificationSubmission.Create(s.Request).Fingerprint;
         s.Request.Parameters = new() { ["a"] = "", ["b"] = new[] { "one", "two" } };
-        Assert.AreEqual(first, NotificationFingerprint.Of(s.Request));
+        Assert.AreEqual(first, NotificationSubmission.Create(s.Request).Fingerprint);
         s.Request.Parameters["b"] = new[] { "two", "one" };
-        Assert.AreNotEqual(first, NotificationFingerprint.Of(s.Request));
+        Assert.AreNotEqual(first, NotificationSubmission.Create(s.Request).Fingerprint);
         s.Request.Parameters["a"] = null!;
-        Assert.AreNotEqual(first, NotificationFingerprint.Of(s.Request));
+        Assert.AreNotEqual(first, NotificationSubmission.Create(s.Request).Fingerprint);
     }
 
     [TestMethod]
