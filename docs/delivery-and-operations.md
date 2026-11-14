@@ -167,6 +167,21 @@ unrelated-row and changed-template rejection, missing evidence, stale ETags,
 unknown write responses, changed readback and bounded peek-only wake discovery.
 These local safeguards complement the live report; they do not replace it.
 
+The recovery verifier independently accepts persisted submission versions 2 and 3.
+Version 2 must have no receipt metadata. Version 3 must retain the owned command's
+operation/channel and a nonempty opaque receipt proof. The first owned observation
+binds the version and proof; every later poll and post-write read must preserve
+them, including recovery in a distinct deployed invocation. The fixture copies all
+columns when restoring the lost outcome and uses the observed ETag. It rejects
+unknown versions, missing metadata and changes or downgrades instead of rewriting
+the row into the verifier's application-model version. The proof's representation
+remains private to the model, and neither proof nor payload enters the report.
+
+This prepares the immutable-main recovery harness for the separately reviewed
+provider receipt implementation. It does not establish webhook authentication or
+recipient-server delivery. That implementation still needs its configured provider
+endpoints and exact-head verification, including its reviewed workflow activation.
+
 The parent harness conditionally cleans its owned template and template blob.
 The real durable submission row and frozen payload remain as suppression and
 recovery evidence, including after failure. Deleting them while a late wake exists

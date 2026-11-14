@@ -9,6 +9,8 @@ namespace Niobium.Notification.Deployment.Tests;
 internal sealed class OwnedRecoveryFixture(NotifyCommand command, string sender)
 {
     internal NotificationSubmission Identity { get; } = NotificationSubmission.Create(command);
+    private int? observedVersion;
+    private string? observedReceiptProof;
 
     internal void ValidateTemplate(TableEntity template)
     {
@@ -21,9 +23,36 @@ internal sealed class OwnedRecoveryFixture(NotifyCommand command, string sender)
     internal void ValidateSubmission(TableEntity row)
     {
         Require(row.PartitionKey == Identity.Tenant && row.RowKey == Identity.ID
-            && row.GetInt32(nameof(NotificationSubmission.Version)) == NotificationSubmission.CurrentVersion
             && row.GetString(nameof(NotificationSubmission.Fingerprint)) == Identity.Fingerprint,
             "live_submission_identity_changed");
+
+        // This independent verifier understands the reviewed persisted versions,
+        // not whichever version its referenced application model happens to create.
+        // Correlation is opaque: bind the first owned observation and require it
+        // to survive every poll, fault write and recovered invocation unchanged.
+        bool hasVersion = row.TryGetValue(nameof(NotificationSubmission.Version), out object? storedVersion);
+        Require(hasVersion && storedVersion is int value && value is 2 or 3,
+            "live_submission_version_unsupported");
+        int version = (int)storedVersion!;
+        row.TryGetValue("Operation", out object? operation);
+        row.TryGetValue("Channel", out object? channel);
+        row.TryGetValue("ReceiptProof", out object? proof);
+        if (version == 2)
+        {
+            Require(operation == null && channel == null && proof == null,
+                "live_legacy_submission_correlation_invalid");
+        }
+        else
+        {
+            Require(operation is string operationID && operationID == command.ID
+                && channel is string channelName && channelName == command.Channel
+                && proof is string receiptProof && !String.IsNullOrWhiteSpace(receiptProof),
+                "live_submission_correlation_invalid");
+        }
+        Require(observedVersion == null || observedVersion == version
+            && observedReceiptProof == (string?)proof, "live_submission_correlation_changed");
+        observedVersion = version;
+        observedReceiptProof = (string?)proof;
     }
 
     internal async Task RestoreLostOutcomeAsync(TableClient table, TableEntity accepted, TableEntity template,
