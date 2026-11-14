@@ -60,6 +60,12 @@ pipeline and verify its terminal result before reporting the PR ready.
 
 ## Required repository administration and installation
 
+The B06 [provider receipt setup](provider-delivery-receipts.md#required-environment-configuration)
+adds one encrypted webhook-key bundle in each existing environment and an explicit
+deployment-workflow projection. Its new protected workflow blob requires the reviewed
+activation procedure below. Provider configuration and actual receipt evidence are
+separate from successful local tests or permission to create/merge ordinary PRs.
+
 Source changes cannot configure repository permissions/rules. The inspected baseline `989b7c4b36154c5da2cdd3391ec297e1f453ea14` had unprotected main, no rulesets and read-only access for `5he11`. On 2026-11-06, the owner granted `5he11` Write access and the connector verified it; main still had no protection. Recheck current settings before acting.
 
 Normal protection requires PR-only main updates, one approval, dismissal of stale approvals, resolved threads, up-to-date main, required successful `test` deployment, squash-only merges and the GitHub Actions `Test deployment verified` status, with no bypass actors. `5he11` needs permission for an approval to satisfy protection. Disable Actions permission to create/approve PRs. Native code/security review is authorized and has executed on the heads recorded above. Verify external settings and the receipt for the actual head separately; automatic review does not replace formal approval.

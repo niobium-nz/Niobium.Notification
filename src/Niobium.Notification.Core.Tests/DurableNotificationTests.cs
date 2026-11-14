@@ -105,7 +105,7 @@ public sealed class DurableNotificationTests
                 : CreateDomain(BuildTemplate(Request.Tenant, Request.Channel), body, DefaultOptions);
             if (missingTemplate) SetDomainKeys(domain, Template.BuildParitionKey(Request.Tenant), Request.Channel);
             (Renderer, Templates, Legacy, _) = CreateSut(domain);
-            Provider.Setup(p => p.Freeze(It.IsAny<TemplateDomain.Deliverable>())).Returns(new FrozenNotification("frozen-json", "example.invalid", "credential-digest"));
+            Provider.Setup(p => p.Freeze(It.IsAny<TemplateDomain.Deliverable>(), It.IsAny<NotificationCorrelation>())).Returns(new FrozenNotification("frozen-json", "example.invalid", "credential-digest"));
             Provider.Setup(p => p.SubmitAsync(It.IsAny<FrozenNotification>(), It.IsAny<string>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new SubmissionResult(SubmissionOutcome.Accepted, "provider-1"));
             Queue.Setup(q => q.EnqueueAsync(It.IsAny<IEnumerable<MessagingEntry<NotifyCommand>>>(), It.IsAny<CancellationToken>()))

@@ -37,6 +37,9 @@ namespace Niobium.Notification.Delivery
         public DateTimeOffset? NextAttempt { get; init; }
         public int Attempts { get; init; }
         public string? ProviderID { get; init; }
+        public string? Operation { get; private init; }
+        public string? Channel { get; private init; }
+        public string? ReceiptProof { get; private init; }
 
         /// <summary>Captures a request's stable identity and data contract without persisting it.</summary>
         public static NotificationSubmission Create(NotifyCommand request)
@@ -48,19 +51,29 @@ namespace Niobium.Notification.Delivery
             }
             string tenant = request.Tenant.ToString("N");
             string id = Hash(request.ID);
-            return Create(tenant, id, FingerprintOf(request));
+            return Create(tenant, id, FingerprintOf(request), request.ID, request.Channel, Guid.NewGuid().ToString("N"));
         }
 
         // A new registration gets a new reference and no persisted lifecycle/version
         // metadata from an input snapshot. The domain chooses its initial outcome.
-        internal NotificationSubmission NewRegistration() => Create(this.Tenant, this.ID, this.Fingerprint);
+        internal NotificationSubmission NewRegistration() => Create(this.Tenant, this.ID, this.Fingerprint, this.Operation, this.Channel, this.ReceiptProof);
 
-        private static NotificationSubmission Create(string tenant, string id, string fingerprint)
+        private static NotificationSubmission Create(string tenant, string id, string fingerprint,
+            string? operation, string? channel, string? receiptProof)
             => new()
             {
                 Tenant = tenant, ID = id, Version = CurrentVersion,
                 Fingerprint = fingerprint, PayloadName = CreatePayloadName(tenant, id),
+                Operation = operation, Channel = channel, ReceiptProof = receiptProof,
             };
+
+        public NotificationCorrelation GetReceiptCorrelation()
+            => new(this.Tenant, this.ID, this.ReceiptProof ?? throw new InvalidOperationException("This legacy submission has no receipt correlation."));
+
+        public bool MatchesReceiptCorrelation(NotificationCorrelation correlation)
+            => correlation.Tenant == this.Tenant && correlation.SubmissionID == this.ID
+                && !String.IsNullOrEmpty(this.ReceiptProof) && !String.IsNullOrEmpty(correlation.Proof)
+                && CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(this.ReceiptProof), Encoding.UTF8.GetBytes(correlation.Proof));
 
         public bool MatchesRequest(NotificationSubmission request)
             => this.Tenant == request.Tenant && this.ID == request.ID && this.Fingerprint == request.Fingerprint;
@@ -68,6 +81,8 @@ namespace Niobium.Notification.Delivery
         // Methods, rather than computed public properties, keep derived values out
         // of the framework's public-property Table mapping.
         public string GetProviderIdempotencyKey() => $"notification-v1/{this.Tenant}/{this.ID}";
+
+        public Guid GetTenantID() => Guid.ParseExact(this.Tenant, "N");
 
         private static string CreatePayloadName(string tenant, string id) => $"{tenant}/{id}/{Guid.NewGuid():N}.json";
 
@@ -137,7 +152,7 @@ namespace Niobium.Notification.Delivery
 
     public interface IIdempotentNotificationProvider
     {
-        FrozenNotification Freeze(TemplateDomain.Deliverable content);
+        FrozenNotification Freeze(TemplateDomain.Deliverable content, NotificationCorrelation? correlation = null);
         Task<SubmissionResult> SubmitAsync(FrozenNotification content, string key, DateTimeOffset deadline, CancellationToken cancellationToken);
     }
 }

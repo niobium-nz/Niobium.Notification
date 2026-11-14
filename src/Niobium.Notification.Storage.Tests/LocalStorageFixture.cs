@@ -22,8 +22,8 @@ internal sealed class LocalStorageFixture : IAsyncDisposable
     {
         public override TableClient GetTableClient(string tableName)
         {
-            Assert.AreEqual(nameof(NotificationSubmission), tableName);
-            return base.GetTableClient(name);
+            Assert.IsTrue(tableName is nameof(NotificationSubmission) or nameof(NotificationReceipt));
+            return base.GetTableClient(tableName == nameof(NotificationSubmission) ? name : name + "Receipt");
         }
     }
 
@@ -54,6 +54,7 @@ internal sealed class LocalStorageFixture : IAsyncDisposable
         tables = new(tableUri, new("devstoreaccount1", EmulatorKey), tableName);
         blobs = new(blobUri, new("devstoreaccount1", EmulatorKey), "notification-test-" + Guid.NewGuid().ToString("N"));
         tableFactory.Setup(f => f.CreateClientAsync(It.IsAny<IEnumerable<DatabasePermissions>>(), nameof(NotificationSubmission), It.IsAny<string?>(), It.IsAny<CancellationToken>())).ReturnsAsync(tables);
+        tableFactory.Setup(f => f.CreateClientAsync(It.IsAny<IEnumerable<DatabasePermissions>>(), nameof(NotificationReceipt), It.IsAny<string?>(), It.IsAny<CancellationToken>())).ReturnsAsync(tables);
         // Pinned internal factory has no injectable client constructor. Substitute only
         // this isolated cache entry; the actual framework Blob repository performs I/O.
         factoryType = typeof(StorageBlobOptions).Assembly.GetType("Niobium.File.Blob.AzureBlobClientFactory", throwOnError: true)!;
@@ -65,10 +66,24 @@ internal sealed class LocalStorageFixture : IAsyncDisposable
 
     public BlobContainerClient Container => blobs.OwnedContainer;
     public TableClient Table => tables.GetTableClient(nameof(NotificationSubmission));
-    public Task InitializeAsync() => tables.CreateTableAsync(tableName);
+    public TableClient ReceiptTable => tables.GetTableClient(nameof(NotificationReceipt));
+    public async Task InitializeAsync()
+    {
+        await tables.CreateTableAsync(tableName);
+        await tables.CreateTableAsync(tableName + "Receipt");
+    }
 
     public IRepository<NotificationSubmission> Repository()
         => new CloudTableRepository<NotificationSubmission>(tableFactory.Object, NullLogger<CloudTableRepository<NotificationSubmission>>.Instance);
+
+    public IRepository<NotificationReceipt> ReceiptRepository()
+        => new CloudTableRepository<NotificationReceipt>(tableFactory.Object, NullLogger<CloudTableRepository<NotificationReceipt>>.Instance);
+
+    public IDomainRepository<NotificationReceiptDomain, NotificationReceipt> ReceiptDomains()
+    {
+        Lazy<IRepository<NotificationReceipt>> repository = new(ReceiptRepository);
+        return new GenericDomainRepository<NotificationReceiptDomain, NotificationReceipt>(() => new(repository, []), repository);
+    }
 
     public IFileService Files()
     {
@@ -98,6 +113,8 @@ internal sealed class LocalStorageFixture : IAsyncDisposable
         try
         {
             try { await tables.DeleteTableAsync(tableName); }
+            catch (RequestFailedException error) when (error.Status == 404) { }
+            try { await tables.DeleteTableAsync(tableName + "Receipt"); }
             catch (RequestFailedException error) when (error.Status == 404) { }
         }
         finally

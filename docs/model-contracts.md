@@ -1,5 +1,10 @@
 # Model names and contract ownership
 
+`NotificationReceipt.Provider/ID` follows the same annotated business-key rule.
+Its private hash/event representation belongs to the receipt model; the submission
+model owns its opaque receipt proof and tenant decoding. Domains decide whether
+correlation permits publication. See [receipt boundaries and compatibility](provider-delivery-receipts.md#model-ownership-and-compatibility).
+
 The owner's rule of 14 November 2026 applies to every Table model. Read the
 [framework explanation and examples](https://github.com/niobium-nz/Niobium/blob/main/docs/model-contracts.md)
 together with [domain behavior](domain-data-access.md).

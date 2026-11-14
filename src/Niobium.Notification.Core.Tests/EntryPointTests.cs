@@ -179,8 +179,8 @@ public sealed class EntryPointTests
     {
         DurableNotificationTests.Scenario s = new(body: "{{NAME}} {{COUNT}} <!-- ITEMS BEGIN -->{{LABEL}}<!-- ITEMS END -->");
         TemplateDomain.Deliverable? frozen = null;
-        s.Provider.Setup(p => p.Freeze(It.IsAny<TemplateDomain.Deliverable>()))
-            .Callback<TemplateDomain.Deliverable>(content => frozen = content)
+        s.Provider.Setup(p => p.Freeze(It.IsAny<TemplateDomain.Deliverable>(), It.IsAny<NotificationCorrelation>()))
+            .Callback<TemplateDomain.Deliverable, NotificationCorrelation>((content, _) => frozen = content)
             .Returns(new FrozenNotification("frozen-json", "example.invalid", "credential-digest"));
         NotifyCommand command = new() { Tenant = s.Request.Tenant, Channel = s.Request.Channel, Destination = " person@example.invalid ", DestinationDisplayName = " Person ", Parameters = new() { ["name"] = "<Notice>", ["count"] = 2, ["items"] = new object[] { new { label = "<Line>" }, "ignored" } } };
         await new NotifyCommandConsumer(s.Flow(), NullLogger<NotifyCommandConsumer>.Instance).Run(Message(command), default);

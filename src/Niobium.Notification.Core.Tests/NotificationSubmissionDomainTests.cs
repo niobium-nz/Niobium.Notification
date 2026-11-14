@@ -59,6 +59,9 @@ public sealed class NotificationSubmissionDomainTests
         Assert.IsNull(store.Entry.NextAttempt);
         Assert.IsNull(store.Entry.ProviderID);
         Assert.AreNotEqual(request.PayloadName, store.Entry.PayloadName);
+        Assert.AreEqual(request.GetReceiptCorrelation(), store.Entry.GetReceiptCorrelation());
+        Assert.AreEqual(request.Operation, store.Entry.Operation);
+        Assert.AreEqual(request.Channel, store.Entry.Channel);
     }
 
     [TestMethod]

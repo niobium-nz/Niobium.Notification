@@ -7,7 +7,7 @@ import subprocess
 CHECKS = (
     "live_queue_provider_acceptance", "live_scheduled_recovery_observed",
     "live_owned_lost_outcome_snapshot", "live_same_provider_submission_recovered",
-    "live_frozen_payload_and_window_preserved",
+    "live_frozen_payload_and_window_preserved", "live_verified_delivery_receipt_published",
 )
 ERRORS = {
     "live_recovery_deadline_exceeded", "live_recovery_failed_details_suppressed",
@@ -20,6 +20,8 @@ ERRORS = {
     "live_submission_not_recoverable", "live_scheduled_recovery_missing",
     "live_storage_access_denied", "live_storage_resource_missing", "live_storage_condition_failed",
     "live_queue_access_denied", "live_queue_quota_exceeded", "live_queue_resource_missing",
+    "live_receipt_correlation_missing", "live_receipt_identity_changed",
+    "live_receipt_correlation_held", "live_receipt_evidence_incomplete", "live_receipt_query_limit",
 }
 ROOT = Path(__file__).resolve().parent.parent
 PROJECT = ROOT / "src/Niobium.Notification.Deployment.Tests/Niobium.Notification.Deployment.Tests.csproj"

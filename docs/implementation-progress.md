@@ -1,5 +1,42 @@
 # Notification reliability implementation ledger
 
+## B06 provider delivery receipts in implementation (14 November 2026)
+
+The feature based on `d34bffbc49b980d6c1c372f90a57c21846eccad4` adds runtime
+raw-body webhook authentication, durable normalized capture, model-owned opaque
+correlation, rich receipt-domain transitions, deduplicated publication and an additive
+generic delivery event. The deployed fixture now requires a real correlated Delivered
+receipt from its existing test send. See [implementation and configuration](provider-delivery-receipts.md).
+This is working code under verification, not a delivered milestone. Actual provider
+webhook/secret configuration, protected workflow activation, exact-head CI/reviews,
+merge, production verification and Contracts publication still need evidence.
+The Invoicing consumer, lifecycle/cancellation, audited recovery and later roadmap
+milestones remain outstanding.
+
+Local verification passed 249 application/fixture cases, 18 real loopback Table/Blob
+cases, 61 Python checks and 20 delivery-policy checks, with zero failures/skips.
+Authored coverage is 97.96% overall (Contracts 100%, Core 99.20%, Server 96.10%).
+Release builds have zero errors and only the existing NU1603 package warnings.
+Workflow YAML, both explicit secret projections and whitespace checks passed.
+These results do not establish deployed webhook configuration or delivery.
+
+## PR9 delivered checkpoint (14 November 2026)
+
+The earlier B02 entry below is now historical. PR9 feature
+`9e060809eb1b7b7bb383b4fd16d03a21831d8c62` passed Azure Deployment `43590967393`
+(13 candidate and 8 immutable-main trusted checks) and Storage `43590967404`
+(14 cases). Native review completed; the separate `5he11` reviewer approved that
+exact head in review `5904199869`. Readiness succeeded and the protected squash
+merge was `d34bffbc49b980d6c1c372f90a57c21846eccad4`.
+
+Production run `43592105122` and GET `/health` verification succeeded for the actual
+merge. Downloaded report artifact `14112887848` had ZIP SHA-256
+`885a69f58365bea432853c41a60bbefc69c638820cbacbb279a20e6bc1269e40`, matching GitHub
+and upload logs. Package run `43592105110` succeeded and correctly skipped publication
+because Contracts had not changed. Full evidence is recorded on
+[PR9](https://github.com/niobium-nz/Niobium.Notification/pull/9#issuecomment-6876923776).
+This completes live B02 verification, not B06 or the full Invoicing roadmap.
+
 ## Live B02 recovery verification in progress (14 November 2026)
 
 The separately invoked deployment executable now exercises the actual test queue,

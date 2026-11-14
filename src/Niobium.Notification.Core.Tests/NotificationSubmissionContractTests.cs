@@ -47,7 +47,7 @@ public sealed class NotificationSubmissionContractTests
         var mapping = EntityMappingHelper.GetMapping(typeof(NotificationSubmission));
         Assert.AreEqual(nameof(NotificationSubmission.Tenant), mapping["PartitionKey"].Name);
         Assert.AreEqual(nameof(NotificationSubmission.ID), mapping["RowKey"].Name);
-        Assert.AreEqual(14, mapping.Count);
+        Assert.AreEqual(17, mapping.Count);
         Assert.IsFalse(mapping.ContainsKey(nameof(NotificationSubmission.Tenant)));
         Assert.IsFalse(mapping.ContainsKey(nameof(NotificationSubmission.ID)));
         Assert.IsFalse(mapping.ContainsKey(nameof(NotificationSubmission.PayloadContainer)));
