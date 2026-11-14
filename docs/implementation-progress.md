@@ -1,5 +1,64 @@
 # Notification reliability implementation ledger
 
+## B07 automatic storage recovery verification: 2026-11-14
+
+Baseline: Notification main `72f100bfc5a742de42a4aa860e5e5e41585ff06f`, on
+`codex/notification-storage-ci` in `/workspace/Niobium.Notification-storage-ci`.
+Parent Invoicing main is `41deb0b6e6a030c66ac384c0ccf0f06716c467a8`; its complete
+original report remains readable and unchanged, SHA-256
+`1321b7712c4c9e10b477d03b230e12fce5485fbde3375d94c374fc96290313eb`.
+
+The nine real Table/Blob cases added under B02/B07 previously ran only when
+explicitly invoked. The new `Storage integration` workflow runs that existing
+suite on every feature push and uploads its TRX and emulator logs. The Linux
+runner starts owned in-memory Azurite Table/Blob processes on loopback, supplies
+both fixture endpoints, requires a fresh report with every case passing and
+stops its process groups on completion, failure, timeout or interruption.
+Missing, empty and skipped results fail verification. Each invocation keeps its
+own result directory and never deletes a prior run's files.
+
+This is additional local-adapter evidence, required by the documented delivery
+process alongside `Azure Deployment`. It has repository-read permission only,
+no Azure environment or readiness-status write permission. The existing main
+controller still independently certifies the deployed candidate/trusted suites;
+its protected workflow/helper definitions and repository rules are unchanged.
+Native review and separate formal current-head approval remain required.
+
+The framework graph remains Table/Blob/Abstractions 4.2.66 and integrations
+4.2.70. NuGet repository metadata and corresponding Table/Blob source were
+rechecked at `5c527723a607c1d03c002d4aa70531c9a55a767e`; Platform 4.2.70 is
+from `f5b1b46a4a8c83e8771d7a3e9ae9dcc7044b62f0`. No package reference or
+framework source changed. Azurite is pinned to the existing local version 3.37.0.
+
+Verification used .NET 10.0.403 and the existing local package cache:
+
+```sh
+dotnet restore src/Niobium.Notification.Storage.Tests/Niobium.Notification.Storage.Tests.csproj --nologo
+dotnet build src/Niobium.Notification.Storage.Tests/Niobium.Notification.Storage.Tests.csproj --configuration Release --no-restore --nologo --disable-build-servers -m:1
+python scripts/run-storage-integration.py --results-directory /workspace/scratch/notification-storage-ci-results
+node --test scripts/delivery-policy.test.cjs
+python -m unittest discover -s scripts -p 'test_*.py'
+git diff --check
+```
+
+The build passed with the same six existing NU1603 warnings and zero errors.
+All nine storage cases passed with no failures/skips; all 20 Node and 46 Python
+checks passed. The first Python invocation lacked PowerShell on PATH; adding the
+already installed workspace PowerShell resolved that environment-only failure.
+Local subprocess fault probes confirmed propagation of test exit 23, rejection
+of missing/skipped reports, and exit 143 on SIGTERM. Each probe verified that both
+emulator ports were released and the test child stopped. Empty and failing TRX
+counts were also rejected. Workflow YAML parsing and Python compilation passed.
+The current-head CI, native/separate reviews and terminal delivery evidence belong
+on the author-created PR, rather than being inferred from these local results.
+
+| Plan item | Acceptance gained and remaining dependency |
+| --- | --- |
+| B07 | Existing actual-adapter recovery/concurrency cases become automatic feature-push checks with retained reports and owned-process cleanup. |
+| B02 | Automatic local checks strengthen regression protection; enabled real queue scheduling, provider replay and cutover evidence remain required. No tenant cohort is selected and no environment is enabled. |
+| B06 / U06 | Verified B02 activation and the pending cohort/operator details remain dependencies. Recipient mail-server acceptance and cancellation-before-any-payment rules are unchanged. |
+| Other Invoicing plan IDs | The parent reconciliation remains authoritative; no lifecycle, payment, retention, template, key or machine-authority decision changes here. |
+
 ## B02 / B07 concurrent recovery integration: 2026-11-14
 
 Baseline: Notification main `708b9c27774d6895a61e187c20ed75f60f985376`,

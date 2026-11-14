@@ -1,0 +1,41 @@
+name: Storage integration
+
+on:
+  push:
+    branches: ['**', '!main']
+
+permissions:
+  contents: read
+
+jobs:
+  storage:
+    name: Table and Blob recovery tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.x.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned Azurite
+        run: |
+          npm install --prefix "$RUNNER_TEMP/notification-azurite" --no-audit --no-fund azurite@3.37.0
+          echo "$RUNNER_TEMP/notification-azurite/node_modules/.bin" >> "$GITHUB_PATH"
+      - name: Restore storage tests
+        run: dotnet restore src/Niobium.Notification.Storage.Tests/Niobium.Notification.Storage.Tests.csproj --nologo
+      - name: Build storage tests
+        run: dotnet build src/Niobium.Notification.Storage.Tests/Niobium.Notification.Storage.Tests.csproj --configuration Release --no-restore --nologo --disable-build-servers -m:1
+      - name: Run storage integration tests
+        run: python scripts/run-storage-integration.py
+      - name: Upload storage results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: storage-test-evidence-${{ github.sha }}
+          path: artifacts/storage/
+          if-no-files-found: error
