@@ -17,11 +17,26 @@ on the PR before changing this status. B06 provider confirmation and invoice
 cancellation, operator-controlled recovery/audited deliberate resends, and the
 remaining Invoicing roadmap are still outstanding.
 
-Local validation passed: 147 application cases with 98.58% authored line coverage,
-14 real Table/Blob cases, 20 delivery-policy cases, and the executable's production
-environment/host/namespace rejection checks. The Python harness suite also covers
-missing credentials, sanitized process failures, stale/incomplete reports and
-owned-template cleanup after recovery failure. Live results are still pending.
+At the review correction, local validation passed 175 application/fixture cases
+with 98.58% authored application coverage, 59 Python harness cases and 20 policy
+cases. The existing CI project now executes 28 additional cases against the actual
+fault helper: owned replacement, unrelated rows/templates, missing evidence,
+stale ETags, lost responses, changed readback and bounded peek-only scanning.
+The harness shares a ten-minute work deadline and ninety-second cleanup reserve;
+tests prove deadline exhaustion still cleans owned fixtures and writes a failed
+report. The prior real Table/Blob run passed all 14 cases; exact-head CI reruns it.
+
+The earlier candidate at `7e9039490d854c3439a473ee6c19cd80800d4006` passed all 13
+live checks, including the five recovery checks, in
+[run 43587942662](https://github.com/niobium-nz/Niobium.Notification/actions/runs/43587942662).
+Its downloaded candidate ZIP matched SHA-256
+`3103e9921f3f5b17453c7593ee630c410f8ad7b7d3674d697a5a9da28a16c894`.
+That run proves the observed recovery, not approval or certification of later
+changes. The protected credential helper was restored to main's exact bytes and
+the fixture now reads existing queue-scoped Send/Listen keys in memory. All four
+protected pipeline files remain unchanged. Current-head candidate/trusted/storage
+reports, review fixes and terminal delivery evidence belong on
+[PR9](https://github.com/niobium-nz/Niobium.Notification/pull/9).
 
 ## Mandatory queued submission for all tenants (14 November 2026)
 

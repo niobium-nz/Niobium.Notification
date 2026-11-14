@@ -117,6 +117,22 @@ It runs only in test, through `scripts/deployed-integration.py`, while that run'
 owned generic template exists. The current immutable-main harness remains the
 readiness authority; new candidate checks become trusted only after reviewed merge.
 
+The build, credential reads, health checks, fixture setup, live recovery and telemetry
+polling share one ten-minute work budget. Child processes, HTTP calls, CLI calls
+and sleeps use the remaining time. A fixed ninety-second cleanup reserve follows
+that deadline; entering another phase cannot extend it. This leaves time within
+the workflow's fifteen-minute integration step to write the final report. Budget
+exhaustion fails verification and still attempts ownership-checked cleanup.
+The executable writes partial diagnostic checkpoints before external effects and
+after proved checks, so interruption retains its synthetic fixture identity and
+last stage without reporting incomplete work as success.
+
+The trusted job's current Ubuntu 26.04 runner image includes .NET 10 SDKs
+(image `20261111.196.1`, SDKs 10.0.115/204/303/404). The executable targets .NET 10;
+its preparation build fails before fixture creation if that SDK is unavailable.
+This is a runner-image dependency, not an additional trusted setup step or a
+change to the readiness controller's protected pipeline definition.
+
 The live fixture preparation uses the existing test runner identity to read the
 queue-scoped `notifycommand-2` (Send) and `notifycommand-8` (Listen) keys. It keeps
 them only in the child environment, captures all child/CLI output and never logs
@@ -144,6 +160,12 @@ executable can restore that snapshot, using the original row's ETag. It never
 receives, settles, purges or cancels shared queue messages and makes no further
 enqueue after the first command. Peeking inspects message metadata to locate only
 its scheduled operation; no unrelated message body enters reports.
+
+The existing CI test project references the executable and runs its actual fault
+helper against strict SDK doubles. It verifies owned conditional restoration,
+unrelated-row and changed-template rejection, missing evidence, stale ETags,
+unknown write responses, changed readback and bounded peek-only wake discovery.
+These local safeguards complement the live report; they do not replace it.
 
 The parent harness conditionally cleans its owned template and template blob.
 The real durable submission row and frozen payload remain as suppression and

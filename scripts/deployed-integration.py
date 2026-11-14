@@ -24,6 +24,7 @@ def load(name):
 readonly = load("read-only-deployment")
 telemetry = load("test-telemetry")
 live = load("live-recovery")
+budgets = load("verification-budget")
 Failure = readonly.VerificationFailure
 
 
@@ -57,13 +58,18 @@ def configuration(environ):
 
 
 class Storage:
-    def __init__(self, config, runner=subprocess.run):
+    def __init__(self, config, runner=subprocess.run, budget=None):
         self.runner = runner
+        self.budget = budget
         self.environ = dict(os.environ, AZURE_STORAGE_ACCOUNT=config["account"], AZURE_STORAGE_KEY=config["key"])
 
     def call(self, *args):
-        result = self.runner(["az", "storage", *args, "--only-show-errors", "--output", "json"],
-                             env=self.environ, capture_output=True, text=True, check=False)
+        timeout = self.budget.timeout(30) if self.budget else 30
+        try:
+            result = self.runner(["az", "storage", *args, "--only-show-errors", "--output", "json"],
+                                 env=self.environ, capture_output=True, text=True, check=False, timeout=timeout)
+        except (OSError, subprocess.TimeoutExpired):
+            raise Failure("test_storage_operation_failed") from None
         if result.returncode:
             raise Failure("test_storage_operation_failed")
         try:
@@ -75,7 +81,7 @@ class Storage:
         return self.call("entity", "show", "--table-name", "Template", "--partition-key", tenant, "--row-key", channel)
 
 
-def post(base, payload, opener=None):
+def post(base, payload, opener=None, timeout=45):
     # Guard the side-effecting boundary independently as well. No retry of unknown side effects.
     base = readonly.origin(base)
     host = urlsplit(base).hostname
@@ -84,7 +90,7 @@ def post(base, payload, opener=None):
     request = Request(base + "/ContactUs", data=json.dumps(payload).encode("utf-8"), method="POST",
                       headers={"Content-Type": "application/json"})
     try:
-        with (opener or build_opener(readonly.NoRedirect())).open(request, timeout=45) as response:
+        with (opener or build_opener(readonly.NoRedirect())).open(request, timeout=timeout) as response:
             if response.geturl() != request.full_url:
                 raise Failure("test_redirect_rejected")
             return response.status
@@ -102,13 +108,14 @@ def entity_etag(entity):
 
 
 def run(environ, reporter):
+    budget = budgets.Budget(Failure)
     config = configuration(environ)
-    live_environment = live.prepare(environ, Failure)
-    health = readonly.verify(config["base"], environ.get("TEST_EXPECTED_COMMIT", ""))
+    live_environment = live.prepare(environ, Failure, budget=budget)
+    health = readonly.verify(config["base"], environ.get("TEST_EXPECTED_COMMIT", ""), budget=budget)
     reporter("deployed_commit")
-    metrics = telemetry.ProviderMetrics(environ)
+    metrics = telemetry.ProviderMetrics(environ, budget=budget)
     reporter("test_telemetry_destination")
-    storage = Storage(config)
+    storage = Storage(config, budget=budget)
     fixture_tenant = str(uuid.uuid4())
     blob = fixture_tenant + "/delivery-verification.html"
     owned = {"PartitionKey": fixture_tenant, "RowKey": "ContactUs", "From": config["sender"],
@@ -130,7 +137,7 @@ def run(environ, reporter):
         request = {"ID": str(uuid.uuid4()), "Tenant": fixture_tenant, "Message": "Notification test environment verification",
                    "Name": "Deployment verification", "Contact": "Synthetic fixture", "Token": "test-captcha-disabled"}
         # Missing body must fail, proving this host actually reads our unique template instead of silently skipping it.
-        if post(config["base"], request) != 500:
+        if post(config["base"], request, timeout=budget.timeout(45)) != 500:
             raise Failure("missing_blob_not_rejected")
         reporter("real_template_blob_failure")
         with tempfile.TemporaryDirectory() as directory:
@@ -141,21 +148,22 @@ def run(environ, reporter):
                          "--overwrite", "false", "--metadata", "verificationrun=" + fixture_tenant)
         request["ID"] = str(uuid.uuid4())
         started = datetime.now(timezone.utc)
-        if post(config["base"], request) != 201:
+        if post(config["base"], request, timeout=budget.timeout(45)) != 201:
             raise Failure("real_provider_send_failed")
         reporter("real_provider_submission")
         if entity_etag(storage.entity(fixture_tenant)) != original_etag:
             raise Failure("template_changed_by_send")
         reporter("template_unchanged")
         request["Message"] = ""
-        if post(config["base"], request) != 400:
+        if post(config["base"], request, timeout=budget.timeout(45)) != 400:
             raise Failure("invalid_request_not_rejected")
         reporter("invalid_request_rejected")
-        live.verify(live_environment, fixture_tenant, reporter, Failure)
+        live.verify(live_environment, fixture_tenant, reporter, Failure, budget=budget)
         metrics.verify(started)
         reporter("provider_metrics_exported")
         return health
     finally:
+        budget.begin_cleanup()
         # Delete only this run's unique records, never existing templates or shared containers/tables.
         cleanup_errors = []
         if blob_attempted:

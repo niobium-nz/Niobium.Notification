@@ -26,22 +26,26 @@ PROJECT = ROOT / "src/Niobium.Notification.Deployment.Tests/Niobium.Notification
 ASSEMBLY = PROJECT.parent / "bin/Release/net10.0/Niobium.Notification.Deployment.Tests.dll"
 
 
-def execute(arguments, environ, timeout, failure, runner):
+def execute(arguments, environ, timeout, failure, runner, budget=None):
+    if budget:
+        timeout = budget.timeout(timeout)
     try:
         return runner(arguments, env=dict(environ), cwd=ROOT, capture_output=True,
                       text=True, check=False, timeout=timeout)
     except (OSError, subprocess.TimeoutExpired):
+        if budget:
+            budget.check()
         raise failure("live_recovery_process_failed_output_suppressed") from None
 
 
-def prepare(environ, failure, runner=subprocess.run):
+def prepare(environ, failure, runner=subprocess.run, budget=None):
     if environ.get("AZURE_ENV_NAME") != "test" or environ.get("TEST_ENVIRONMENT") != "test":
         raise failure("live_test_environment_required")
     group = environ.get("AZURE_RESOURCE_GROUP", "")
     if not group or "\n" in group or "\r" in group:
         raise failure("live_test_resource_group_required")
     result = execute(["dotnet", "build", str(PROJECT), "--configuration", "Release", "--nologo"],
-                     environ, 240, failure, runner)
+                     environ, 240, failure, runner, budget)
     if result.returncode:
         raise failure("live_recovery_build_failed_output_suppressed")
     child_environment = dict(environ)
@@ -52,7 +56,7 @@ def prepare(environ, failure, runner=subprocess.run):
                           "--resource-group", group, "--namespace-name", "niobiumnotify-sb-test",
                           "--queue-name", "notifycommand", "--name", "notifycommand-" + permission,
                           "--query", "primaryConnectionString", "--only-show-errors", "--output", "tsv"],
-                         environ, 60, failure, runner)
+                         environ, 60, failure, runner, budget)
         connection = result.stdout.strip()
         if result.returncode or not connection or "\n" in connection or "\r" in connection:
             raise failure("live_test_queue_credential_lookup_failed")
@@ -62,13 +66,13 @@ def prepare(environ, failure, runner=subprocess.run):
     return child_environment
 
 
-def verify(environ, tenant, reporter, failure, runner=subprocess.run, report_path=None):
+def verify(environ, tenant, reporter, failure, runner=subprocess.run, report_path=None, budget=None):
     # A unique report path prevents an earlier run's success from being reused.
     report = Path(report_path) if report_path else ROOT / "artifacts/deployed" / ("live-recovery-" + tenant + ".json")
     if report.exists():
         raise failure("live_recovery_report_already_exists")
     result = execute(["dotnet", str(ASSEMBLY), str(report)],
-                     dict(environ, TEST_NOTIFICATION_TENANT=tenant), 510, failure, runner)
+                     dict(environ, TEST_NOTIFICATION_TENANT=tenant), 510, failure, runner, budget)
     try:
         evidence = json.loads(report.read_text(encoding="utf-8"))
     except (OSError, ValueError):

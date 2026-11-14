@@ -9,6 +9,7 @@ using Azure.Storage;
 using Azure.Storage.Blobs;
 using Niobium.Notification;
 using Niobium.Notification.Delivery;
+using Niobium.Notification.Deployment.Tests;
 
 // This executable is a test fixture, never a Function or a production entry point.
 // It observes a real acceptance, then restores only its own conditional snapshot
@@ -21,10 +22,12 @@ internal static class Program
     private static string? fixtureTenant;
     private static string? operation;
     private static string stage = "configuration";
+    private static string reportPath = String.Empty;
 
     public static async Task<int> Main(string[] args)
     {
         if (args.Length != 1) return 2;
+        reportPath = Path.GetFullPath(args[0]);
         string? failure = null;
         try
         {
@@ -40,17 +43,26 @@ internal static class Program
         catch (ServiceBusException error) when (error.Reason == ServiceBusFailureReason.MessagingEntityNotFound) { failure = "live_queue_resource_missing"; }
         catch (OperationCanceledException) { failure = "live_recovery_deadline_exceeded"; }
         catch { failure = "live_recovery_failed_details_suppressed"; }
-        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(args[0]))!);
-        await System.IO.File.WriteAllTextAsync(args[0], JsonSerializer.Serialize(new
+        WriteReport(failure, failure == null);
+        return failure == null ? 0 : 1;
+    }
+
+    private static void WriteReport(string? failure = "live_recovery_incomplete", bool success = false)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(reportPath)!);
+        // Checkpoints preserve synthetic fixture identity if the parent's shared
+        // deadline terminates this child. A partial report can never claim success.
+        string pending = reportPath + ".tmp";
+        System.IO.File.WriteAllText(pending, JsonSerializer.Serialize(new
         {
             commit = Environment.GetEnvironmentVariable("TEST_EXPECTED_COMMIT"),
-            checks = Checks, success = failure == null, error = failure,
-            fixtureTenant, operation, failureStage = failure == null ? null : stage,
+            checks = Checks, success, error = failure,
+            fixtureTenant, operation, failureStage = success ? null : stage,
             // Durable evidence must survive late wakes and repeated envelopes.
             // Template fixtures are cleaned by the parent harness; inbox evidence is retained.
             durableEvidencePolicy = "retain_if_created",
         }, new JsonSerializerOptions { WriteIndented = true }));
-        return failure == null ? 0 : 1;
+        System.IO.File.Move(pending, reportPath, overwrite: true);
     }
 
     private static async Task VerifyAsync(CancellationToken cancellationToken)
@@ -76,18 +88,18 @@ internal static class Program
             ID = operation, Tenant = tenant, Channel = "ContactUs", Destination = recipient,
             Parameters = new() { ["MESSAGE"] = "Notification durable recovery verification in the test environment." },
         };
-        NotificationSubmission identity = NotificationSubmission.Create(command);
+        OwnedRecoveryFixture fixture = new(command, Env("TEST_NOTIFICATION_SENDER"));
+        NotificationSubmission identity = fixture.Identity;
         TableClientOptions tableOptions = new();
         tableOptions.Retry.MaxRetries = 0;
         TableServiceClient tables = new(new Uri($"https://{Account}.table.core.windows.net"),
             new TableSharedKeyCredential(Account, Env("TEST_STORAGE_KEY")), tableOptions);
         TableClient inbox = tables.GetTableClient(nameof(NotificationSubmission));
-        stage = "fixture_ownership";
-        TableEntity template = (await tables.GetTableClient(nameof(Template)).GetEntityAsync<TableEntity>(
+        Stage("fixture_ownership");
+        TableClient templates = tables.GetTableClient(nameof(Template));
+        TableEntity template = (await templates.GetEntityAsync<TableEntity>(
             tenant.ToString(), "ContactUs", cancellationToken: cancellationToken)).Value;
-        Require(template.GetString("VerificationRun") == tenant.ToString()
-            && template.GetString("FallbackTo") == recipient
-            && template.GetString("From") == Env("TEST_NOTIFICATION_SENDER"), "live_template_ownership_required");
+        fixture.ValidateTemplate(template);
         NullableResponse<TableEntity> existing = await inbox.GetEntityIfExistsAsync<TableEntity>(identity.Tenant, identity.ID, cancellationToken: cancellationToken);
         Require(!existing.HasValue, "live_operation_must_be_new");
         ServiceBusClientOptions busOptions = new()
@@ -100,13 +112,13 @@ internal static class Program
         await using ServiceBusSender sender = outgoing.CreateSender("notifycommand");
         await using ServiceBusReceiver reader = incoming.CreateReceiver("notifycommand");
         // No receive, complete, abandon, purge or cancellation on the shared queue.
-        stage = "queue_send";
+        Stage("queue_send");
         await sender.SendMessageAsync(new ServiceBusMessage(JsonSerializer.Serialize(command))
         {
             MessageId = operation, ContentType = "application/json",
         }, cancellationToken);
-        stage = "initial_acceptance";
-        TableEntity accepted = await AcceptedAsync(inbox, identity, cancellationToken);
+        Stage("initial_acceptance");
+        TableEntity accepted = await AcceptedAsync(inbox, fixture, cancellationToken);
         Require(accepted.GetInt32(nameof(NotificationSubmission.Attempts)) == 1, "live_first_attempt_required");
         string providerID = accepted.GetString(nameof(NotificationSubmission.ProviderID))!;
         string payloadName = accepted.GetString(nameof(NotificationSubmission.PayloadName))!;
@@ -116,34 +128,25 @@ internal static class Program
         BlobClient payload = new BlobServiceClient(new Uri($"https://{Account}.blob.core.windows.net"),
             new StorageSharedKeyCredential(Account, Env("TEST_STORAGE_KEY")))
             .GetBlobContainerClient(NotificationSubmission.PayloadContainer).GetBlobClient(payloadName);
-        stage = "frozen_payload";
+        Stage("frozen_payload");
         byte[] originalDigest = SHA256.HashData((await payload.DownloadContentAsync(cancellationToken)).Value.Content.ToArray());
-        stage = "scheduled_wake";
-        ServiceBusReceivedMessage wake = await ScheduledWakeAsync(reader, operation, cancellationToken);
+        Stage("scheduled_wake");
+        ServiceBusReceivedMessage wake = await fixture.ScheduledWakeAsync(reader, cancellationToken);
         Require(wake.ScheduledEnqueueTime > DateTimeOffset.UtcNow.AddSeconds(10), "live_recovery_window_too_short");
         Passed("live_scheduled_recovery_observed");
 
         // Fault setup is restricted to the unique owned fixture and guarded by the
         // accepted ETag. Preserve the model-owned keys, fingerprint, frozen reference,
         // first-submission boundary and attempt count; only lose the outcome write.
-        stage = "owned_fault_setup";
-        TableEntity uncertain = new(accepted);
-        uncertain[nameof(NotificationSubmission.StateCode)] = (int)SubmissionState.Sending;
-        uncertain[nameof(NotificationSubmission.OutcomeCode)] = (int)SubmissionOutcome.SubmissionUnknown;
-        uncertain[nameof(NotificationSubmission.NextAttempt)] = wake.ScheduledEnqueueTime;
-        uncertain[nameof(NotificationSubmission.WriteID)] = Guid.NewGuid().ToString("N");
-        uncertain.Remove(nameof(NotificationSubmission.ProviderID));
-        await inbox.UpdateEntityAsync(uncertain, accepted.ETag, TableUpdateMode.Replace, cancellationToken);
-        TableEntity restored = (await inbox.GetEntityAsync<TableEntity>(identity.Tenant, identity.ID, cancellationToken: cancellationToken)).Value;
-        Require(restored.GetString(nameof(NotificationSubmission.WriteID)) == uncertain.GetString(nameof(NotificationSubmission.WriteID))
-            && restored.GetInt32(nameof(NotificationSubmission.StateCode)) == (int)SubmissionState.Sending
-            && restored.GetString(nameof(NotificationSubmission.ProviderID)) == null, "live_uncertain_snapshot_not_verified");
+        Stage("owned_fault_setup");
+        template = (await templates.GetEntityAsync<TableEntity>(tenant.ToString(), "ContactUs", cancellationToken: cancellationToken)).Value;
+        await fixture.RestoreLostOutcomeAsync(inbox, accepted, template, wake, DateTimeOffset.UtcNow, cancellationToken);
         Passed("live_owned_lost_outcome_snapshot");
 
         // The runner sends nothing further. A distinct deployed invocation must
         // recover through the previously scheduled broker wake and the actual provider.
-        stage = "scheduled_recovery";
-        TableEntity recovered = await AcceptedAsync(inbox, identity, cancellationToken);
+        Stage("scheduled_recovery");
+        TableEntity recovered = await AcceptedAsync(inbox, fixture, cancellationToken);
         Require(recovered.GetInt32(nameof(NotificationSubmission.Attempts)) >= 2
             && recovered.GetString(nameof(NotificationSubmission.ProviderID)) == providerID
             && recovered.GetDateTimeOffset(nameof(NotificationSubmission.FirstSubmission)) == accepted.GetDateTimeOffset(nameof(NotificationSubmission.FirstSubmission))
@@ -156,38 +159,22 @@ internal static class Program
         Passed("live_frozen_payload_and_window_preserved");
     }
 
-    private static async Task<TableEntity> AcceptedAsync(TableClient table, NotificationSubmission identity, CancellationToken cancellationToken)
+    private static async Task<TableEntity> AcceptedAsync(TableClient table, OwnedRecoveryFixture fixture, CancellationToken cancellationToken)
     {
+        NotificationSubmission identity = fixture.Identity;
         while (true)
         {
             NullableResponse<TableEntity> response = await table.GetEntityIfExistsAsync<TableEntity>(identity.Tenant, identity.ID, cancellationToken: cancellationToken);
             if (response.HasValue)
             {
                 TableEntity row = response.Value!;
-                Require(row.GetInt32(nameof(NotificationSubmission.Version)) == NotificationSubmission.CurrentVersion
-                    && row.GetString(nameof(NotificationSubmission.Fingerprint)) == identity.Fingerprint, "live_submission_identity_changed");
+                fixture.ValidateSubmission(row);
                 int? state = row.GetInt32(nameof(NotificationSubmission.StateCode));
                 Require(state != (int)SubmissionState.Failed && state != (int)SubmissionState.Held, "live_submission_not_recoverable");
                 if (state == (int)SubmissionState.Accepted) return row;
             }
             await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
         }
-    }
-
-    private static async Task<ServiceBusReceivedMessage> ScheduledWakeAsync(ServiceBusReceiver reader, string id, CancellationToken cancellationToken)
-    {
-        long next = 0;
-        for (int page = 0; page < 100; page++)
-        {
-            IReadOnlyList<ServiceBusReceivedMessage> messages = await reader.PeekMessagesAsync(100, next, cancellationToken);
-            foreach (ServiceBusReceivedMessage message in messages)
-            {
-                if (message.MessageId == id && message.State == ServiceBusMessageState.Scheduled) return message;
-            }
-            if (messages.Count == 0) break;
-            next = messages[^1].SequenceNumber + 1;
-        }
-        throw new VerificationFailure("live_scheduled_recovery_missing");
     }
 
     private static string QueueConnection(string setting)
@@ -199,7 +186,7 @@ internal static class Program
     }
 
     private static string Env(string key) => Environment.GetEnvironmentVariable(key) ?? String.Empty;
-    private static void Passed(string check) => Checks.Add(new { check, passed = true });
+    private static void Stage(string value) { stage = value; WriteReport(); }
+    private static void Passed(string check) { Checks.Add(new { check, passed = true }); WriteReport(); }
     private static void Require(bool valid, string code) { if (!valid) throw new VerificationFailure(code); }
-    private sealed class VerificationFailure(string code) : Exception(code);
 }

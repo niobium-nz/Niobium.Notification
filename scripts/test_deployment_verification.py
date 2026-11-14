@@ -164,7 +164,7 @@ class DeployedTests(unittest.TestCase):
         checks = []
         iterator = iter(statuses)
 
-        def post(base, body):
+        def post(base, body, **kwargs):
             self.assertEqual(HOST, base)
             posted.append(dict(body))
             return next(iterator)

@@ -14,10 +14,11 @@ class Failure(RuntimeError):
 
 
 class ProviderMetrics:
-    def __init__(self, environ, runner=None, clock=time.monotonic, sleeper=time.sleep):
+    def __init__(self, environ, runner=None, clock=time.monotonic, sleeper=time.sleep, budget=None):
         self.runner = runner or subprocess.run
         self.clock = clock
         self.sleeper = sleeper
+        self.budget = budget
         self.group = environ.get("AZURE_RESOURCE_GROUP", "")
         build = environ.get("buildVersion", "")
         base = environ.get("TEST_API_URL", "")
@@ -69,6 +70,8 @@ class ProviderMetrics:
         raise Failure("test_telemetry_identifier_invalid")
 
     def azure(self, *args, timeout=60):
+        if self.budget:
+            timeout = self.budget.timeout(timeout)
         query = args[0] == "rest"
         try:
             result = self.runner(["az", *args, "--only-show-errors", "--output", "tsv"],
@@ -114,13 +117,19 @@ class ProviderMetrics:
                 if not error.retryable:
                     raise
                 last_failure = error
-                self.sleeper(max(0, min(10, deadline - self.clock())))
+                self.sleep(max(0, min(10, deadline - self.clock())))
                 continue
             if observed not in ("0", "1", "2"):
                 raise Failure("test_telemetry_count_invalid")
             if observed == "2":
                 return
-            self.sleeper(max(0, min(10, deadline - self.clock())))
+            self.sleep(max(0, min(10, deadline - self.clock())))
         if last_failure:
             raise Failure(str(last_failure) + "_after_six_minutes")
         raise Failure("test_provider_metrics_not_exported_within_six_minutes")
+
+    def sleep(self, seconds):
+        if self.budget:
+            self.budget.sleep(seconds, self.sleeper)
+        else:
+            self.sleeper(seconds)

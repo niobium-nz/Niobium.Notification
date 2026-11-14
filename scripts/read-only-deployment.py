@@ -35,16 +35,17 @@ def origin(value):
 
 
 class ReadOnlyClient:
-    def __init__(self, base_url, opener=None):
+    def __init__(self, base_url, opener=None, budget=None):
         self.base_url = origin(base_url)
         self.opener = opener or build_opener(NoRedirect())
+        self.budget = budget
 
     def request(self, method="GET", path="/health"):
         if method != "GET" or path != "/health":
             raise VerificationFailure("read_only_route_rejected")
         request = Request(self.base_url + path, method="GET", headers={"Accept": "application/json"})
         try:
-            with self.opener.open(request, timeout=20) as response:
+            with self.opener.open(request, timeout=self.budget.timeout(20) if self.budget else 20) as response:
                 if response.status != 200 or response.geturl() != request.full_url:
                     raise VerificationFailure("health_response_rejected")
                 data = response.read(4097)
@@ -55,11 +56,13 @@ class ReadOnlyClient:
             raise VerificationFailure("health_request_failed") from None
 
 
-def verify(base_url, expected_commit, attempts=30, delay=5, client=None, sleeper=time.sleep):
+def verify(base_url, expected_commit, attempts=30, delay=5, client=None, sleeper=time.sleep, budget=None):
     if not re.fullmatch(r"[0-9a-f]{40}", expected_commit or ""):
         raise VerificationFailure("invalid_expected_commit")
-    client = client or ReadOnlyClient(base_url)
+    client = client or ReadOnlyClient(base_url, budget=budget)
     for attempt in range(attempts):
+        if budget:
+            budget.check()
         try:
             payload = client.request()
             if isinstance(payload, dict) and payload.get("status") == "ready" and payload.get("commit") == expected_commit:
@@ -67,7 +70,10 @@ def verify(base_url, expected_commit, attempts=30, delay=5, client=None, sleeper
         except VerificationFailure:
             pass
         if attempt + 1 < attempts:
-            sleeper(delay)
+            if budget:
+                budget.sleep(delay, sleeper)
+            else:
+                sleeper(delay)
     raise VerificationFailure("deployed_commit_not_ready")
 
 

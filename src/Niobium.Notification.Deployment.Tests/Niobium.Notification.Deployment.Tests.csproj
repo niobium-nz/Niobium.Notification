@@ -7,5 +7,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Niobium.Notification.Server/Niobium.Notification.Server.csproj" />
+    <InternalsVisibleTo Include="Niobium.Notification.Core.Tests" />
   </ItemGroup>
 </Project>
