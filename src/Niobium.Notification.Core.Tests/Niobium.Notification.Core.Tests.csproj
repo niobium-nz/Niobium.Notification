@@ -13,6 +13,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Niobium.Notification.Core\Niobium.Notification.Core.csproj" />
     <ProjectReference Include="..\Niobium.Notification.Server\Niobium.Notification.Server.csproj" />
+    <ProjectReference Include="..\Niobium.Notification.Deployment.Tests\Niobium.Notification.Deployment.Tests.csproj" />
   </ItemGroup>
 
   <ItemGroup>
