@@ -62,6 +62,9 @@ public sealed class EventAndCompositionTests
         HostApplicationBuilder builder = Host.CreateApplicationBuilder();
         builder.Configuration["NotificationOptions:SelfHostName"] = "test.example.invalid";
         builder.Configuration["NotificationOptions:TemplateFolder"] = "templates";
+        // Stale application settings cannot disable queued durability or narrow tenants.
+        builder.Configuration["NotificationOptions:EnableDurableSubmission"] = "false";
+        builder.Configuration["NotificationOptions:DurableSubmissionTenants"] = "not-a-tenant";
         Type module = typeof(Server.DeploymentInfo).Assembly.GetType("Niobium.Notification.Server.DependencyModule", true)!;
         MethodInfo register = module.GetMethods(BindingFlags.Public | BindingFlags.Static).Single(m => m.Name == "AddNotification" && m.GetParameters().Length == 1).MakeGenericMethod(typeof(HostApplicationBuilder));
         Assert.AreSame(builder, register.Invoke(null, [builder]));
@@ -73,8 +76,7 @@ public sealed class EventAndCompositionTests
         Assert.AreEqual("test.example.invalid", options.SelfHostName);
         Assert.AreEqual("templates", options.TemplateFolder);
         Assert.IsNotNull(services.GetRequiredService<DurableNotificationFlow>());
-        Assert.IsFalse(services.GetRequiredService<IOptions<NotificationOptions>>().Value.EnableDurableSubmission);
-        Assert.IsNull(options.DurableSubmissionTenants);
+        Assert.IsNotNull(ActivatorUtilities.CreateInstance<Server.NotifyCommandConsumer>(services));
         HttpMessageHandler handler = services.GetRequiredService<IHttpMessageHandlerFactory>().CreateHandler(nameof(IIdempotentNotificationProvider));
         while (handler is DelegatingHandler wrapper)
         {
@@ -88,36 +90,10 @@ public sealed class EventAndCompositionTests
     }
 
     [TestMethod]
-    public void DurableCohortConfiguration_BindsTenantFilterWithoutConversion()
+    public void QueueConsumer_RequiresDurableServicesInsteadOfFallingBack()
     {
-        Guid first = Guid.NewGuid();
-        Guid second = Guid.NewGuid();
-        IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            ["NotificationOptions:SelfHostName"] = "example.invalid",
-            ["NotificationOptions:TemplateFolder"] = "templates",
-            ["NotificationOptions:EnableDurableSubmission"] = "true",
-            ["NotificationOptions:DurableSubmissionTenants"] = $"{first}, {second:N}",
-        }).Build();
-        NotificationOptions options = configuration.GetSection(nameof(NotificationOptions)).Get<NotificationOptions>()!;
-        Assert.AreEqual($"{first}, {second:N}", options.DurableSubmissionTenants);
-        Assert.IsTrue(options.UsesDurableSubmission(first));
-        Assert.IsTrue(options.UsesDurableSubmission(second));
-        Assert.IsFalse(options.UsesDurableSubmission(Guid.NewGuid()));
-    }
-
-    [TestMethod]
-    [DataRow("not-a-tenant")]
-    [DataRow("")]
-    [DataRow(" ")]
-    public void DurableCohortConfiguration_RejectsMalformedOrEmptyFilter(string filter)
-    {
-        IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            ["NotificationOptions:EnableDurableSubmission"] = "true",
-            ["NotificationOptions:DurableSubmissionTenants"] = filter,
-        }).Build();
-        NotificationOptions options = configuration.GetSection(nameof(NotificationOptions)).Get<NotificationOptions>()!;
-        Assert.ThrowsExactly<InvalidOperationException>(() => options.UsesDurableSubmission(Guid.NewGuid()));
+        var (legacy, _, _, _) = CreateSut(CreateDomain(BuildTemplate(Guid.NewGuid(), "Notice"), "body", DefaultOptions));
+        using ServiceProvider services = new ServiceCollection().AddLogging().AddSingleton(legacy).BuildServiceProvider();
+        Assert.ThrowsExactly<InvalidOperationException>(() => ActivatorUtilities.CreateInstance<Server.NotifyCommandConsumer>(services));
     }
 }

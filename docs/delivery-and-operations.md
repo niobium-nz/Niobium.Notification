@@ -190,22 +190,24 @@ execution to three minutes and emulator startup to twenty seconds per process;
 the workflow has a fifteen-minute total limit. These real-adapter checks use the
 pinned Niobium packages and synthetic local data. Queue timing and provider HTTP
 responses remain controlled in the suite, so passing it does not establish live
-B02 activation, provider deduplication or recipient delivery.
+live broker recovery, provider deduplication or recipient delivery.
 
-## B02 validation and activation
+## B02 mandatory routing and validation
 
-The [durable queued submission path](durable-submission.md) is disabled by default.
-Its optional [sender-tenant filter](durable-submission.md#sender-tenant-rollout-filter)
-supports a selected rollout without changing other senders' routing. A selected
-tenant still needs verified new-operation/suppression evidence; keep it enrolled
-while its operations can be replayed. No environment activation is part of adding
-the filter.
-The owner authorized test deployment and readiness verification on 2026-11-07.
+The owner required [durable queued submission for all tenants](durable-submission.md#all-tenants-use-durable-submission)
+on 14 November 2026. `NotifyCommandConsumer` always uses the durable flow. There is
+no enable switch, tenant filter or legacy queue fallback; obsolete option keys
+cannot change routing. Follow the delivery sequence and current-head approval
+requirements for this code change, without a separate enrollment/configuration step.
+
 Feature validation uses the existing test environment and approved Notification
-fixtures, with durable delivery still disabled. Follow the delivery sequence and
-current-head approval requirements before merging. Enabling durable delivery
-requires its concrete cutover and queue/provider verification prerequisites.
-The existing deployed ContactUs harness does not certify the enabled queue path.
+fixtures. Component tests cover every tenant, envelope identity, missing identities,
+failed storage without fallback, and redelivery. Real Table/Blob tests verify
+tenant isolation and suppression across recreated consumers/repositories.
+The deployed ContactUs harness remains a separate synchronous-provider check;
+it does not certify real broker scheduling or provider replay. Record those limits
+alongside actual results. The [continuity notes](durable-submission.md#operational-continuity-and-verification)
+explain why historical legacy sends cannot be inferred from an empty durable inbox.
 
 ## Submission measurements
 
@@ -218,8 +220,9 @@ for up to six minutes. It never resends a notification to obtain telemetry.
 An export or query failure fails the deployment check and still runs ownership-
 checked fixture cleanup. The immutable main harness remains independently required.
 
-This uses the current workflow identity and existing resources/settings. No new
-secret, telemetry resource, durable-path activation or production fixture is added.
+The measurements use the current workflow identity and existing resources/settings.
+They add no secret, telemetry resource or production fixture; queue routing is
+defined by the mandatory consumer policy above.
 The Functions detector's other resource metadata is retained while explicit
 `SERVICE_NAME` and `SERVICE_VERSION` values are reapplied after it. All OpenTelemetry
 signals using that resource now use the configured service identity; update queries

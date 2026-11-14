@@ -77,7 +77,9 @@ both disabled redirects and absent resilience handlers through the real registra
 
 Do not use unpublished placeholder versions or cross-repository ProjectReferences
 for framework adoption. Verify publication, restore and the resulting runtime graph.
-Notification remains open for review, undeployed and disabled by default.
+The validation entries below are historical package-adoption evidence. Current
+queued routing is [mandatory for every tenant](durable-submission.md#all-tenants-use-durable-submission);
+the delivery PR records the current head's deployment and verification results.
 
 ## Aligned-package validation on 2026-11-07
 

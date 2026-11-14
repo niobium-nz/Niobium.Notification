@@ -1,5 +1,11 @@
 # Working in Niobium.Notification
 
+Every valid queued `NotifyCommand` uses `DurableNotificationFlow` for every tenant.
+Durable submission is mandatory, not an enrollment option. Keep the Service Bus
+envelope identity stable and fail without a legacy send if durable dependencies
+fail; do not restore a tenant filter, enable switch or queue fallback. See
+[mandatory queue behavior](docs/durable-submission.md#all-tenants-use-durable-submission).
+
 Read [model names and contract ownership](docs/model-contracts.md) before adding or
 changing a Table model, key, fingerprint, serialized shape or file reference.
 Use business property names with EntityKey attributes. Models privately own their

@@ -42,10 +42,11 @@ Unknown enum codes fail closed. The unpublished inbox schema is version 2; versi
 rows from an earlier draft are rejected, not reinterpreted or replayed automatically.
 The provider idempotency key format stays unchanged.
 
-The application enable flag is `NotificationOptions:EnableDurableSubmission`, default
-false. The separate `NotificationDeliveryOptions` type/binding is removed. Existing
-host/template options and provider-specific Resend configuration remain in their
-own established classes. The old draft setting does not enable this version.
+Queued submission is mandatory for every tenant. `NotifyCommandConsumer` requires
+`DurableNotificationFlow` directly and has no legacy route or enrollment options.
+`NotificationOptions` contains the existing host/template settings; provider-specific
+Resend configuration remains in its established class. Removed enable/filter keys
+cannot disable durability, even if stale values remain in application settings.
 
 Across Notification, execute I/O and state-changing operations outside `if`
 conditions, name their results and then branch. Queue parsing was made explicit
