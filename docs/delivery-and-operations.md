@@ -104,7 +104,51 @@ The candidate and trusted harnesses each perform six checks:
 
 The harness never reads a pre-existing consumer template. Its sender and recipient come only from the explicit service-test settings; the tenant UUID is unique to this run. The fixture uses an isolated template partition and the existing HTTP entry point to observe the real provider result synchronously. No separate sink, provider stub or Azure stack is introduced. A configuration-only preflight checks the required sender and recipient before cloud login/provisioning. Missing configuration is failure, not skip. A POST with an unknown outcome is never retried by the harness. Cleanup reconciles attempted writes, including lost responses; if ownership or outcome cannot be established it fails without deleting unowned data. Resolve any reported test-fixture cleanup failure before claiming completion.
 
-The six checks demonstrate provider submission on this path, not recipient mail-server delivery, queue deduplication or B02 recovery. Future B02/B06 cases must verify those contracts separately. The old `src/Niobium.Notification.IntegrationTests/test/` scripts are not invoked because their fallback recipients are not scoped to this authorization.
+These synchronous checks demonstrate provider submission on the contact-form path.
+The additional live recovery fixture below verifies B02 separately. Neither path
+proves recipient mail-server delivery. The old `src/Niobium.Notification.IntegrationTests/test/`
+scripts are not invoked because their fallback recipients are not scoped to this authorization.
+
+### Live durable recovery fixture
+
+`scripts/live-recovery.py` builds and runs the separate .NET 10
+`Niobium.Notification.Deployment.Tests` executable from the checked-out harness.
+It runs only in test, through `scripts/deployed-integration.py`, while that run's
+owned generic template exists. The current immutable-main harness remains the
+readiness authority; new candidate checks become trusted only after reviewed merge.
+
+The resource helper additionally reads the existing test Service Bus namespace's
+authorization key, masks it and exports `TEST_SERVICEBUS_CONNECTION` to the runner.
+It creates or rotates no key and changes no runtime setting. The executable checks
+the exact test account, namespace, host, expected commit and template ownership
+before enqueueing. It sends only to `TEST_NOTIFICATION_RECIPIENT`. Provider
+credentials and production resources never enter this fixture.
+
+The five additional report checks establish:
+
+- The deployed queue consumer accepts the owned notification and records a provider ID.
+- A scheduled wake for that exact operation already exists in the real broker.
+- A conditional write restores only the owned row to its pre-outcome state, retaining
+  its keys, fingerprint, frozen reference, first-submission time and attempt count.
+- The previously scheduled wake recovers the operation in another deployed invocation,
+  with an increased attempt count and the same provider ID.
+- The frozen blob bytes, payload reference, fingerprint and initial provider-window
+  boundary remain unchanged.
+
+This deliberately simulates a lost outcome write after observing acceptance; it
+does not kill a host or claim to reproduce an actual platform crash. Only the test
+executable can restore that snapshot, using the original row's ETag. It never
+receives, settles, purges or cancels shared queue messages and makes no further
+enqueue after the first command. Peeking inspects message metadata to locate only
+its scheduled operation; no unrelated message body enters reports.
+
+The parent harness conditionally cleans its owned template and template blob.
+The real durable submission row and frozen payload remain as suppression and
+recovery evidence, including after failure. Deleting them while a late wake exists
+could create a new submission. Reports record the synthetic tenant and operation
+for investigation, but no address, provider ID, credential or payload. This is
+intentional durable evidence retention, not a claim that all queue state was drained.
+Inspect the report's fixed failure stage and diagnostic before any retry.
 
 ## Production verification
 
@@ -207,9 +251,9 @@ verified Held/SubmissionUnknown record without another send; a first-registratio
 failure that left no row is also held conservatively. Real Table/Blob tests verify
 tenant isolation, held/replay suppression across recreated consumers/repositories,
 and both winners of the conditional hold-versus-registration race.
-The deployed ContactUs harness remains a separate synchronous-provider check;
-it does not certify real broker scheduling or provider replay. Record those limits
-alongside actual results. The [continuity notes](durable-submission.md#operational-continuity-and-verification)
+The deployed ContactUs check remains synchronous. The live durable fixture above
+adds scheduled broker recovery and provider-identity verification; record its actual
+current-head report before claiming those checks passed. The [continuity notes](durable-submission.md#operational-continuity-and-verification)
 explain why historical legacy sends cannot be inferred from an empty durable inbox.
 
 ## Submission measurements

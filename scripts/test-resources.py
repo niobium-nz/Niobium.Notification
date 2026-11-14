@@ -34,6 +34,7 @@ def main():
     abbr = json.loads(Path("infra/abbreviations.json").read_text())
     function = "niobiumnotify-" + abbr["webSitesFunctions"] + "test"
     storage = ("niobiumnotify-" + abbr["storageStorageAccounts"] + "dtest").replace("-", "")
+    bus = "niobiumnotify-" + abbr["serviceBusNamespaces"] + "test"
     group = os.environ["AZURE_RESOURCE_GROUP"]
     hostname = azure("resource", "show", "--resource-group", group, "--name", function,
                      "--resource-type", "Microsoft.Web/sites", "--api-version", "2024-11-01",
@@ -46,6 +47,9 @@ def main():
     export("TEST_STORAGE_KEY", azure("storage", "account", "keys", "list", "--resource-group", group,
                                     "--account-name", storage, "--query", "[0].value"), secret=True)
     export("TEST_EXPECTED_COMMIT", sha)
+    export("TEST_SERVICEBUS_CONNECTION", azure("servicebus", "namespace", "authorization-rule", "keys", "list",
+        "--resource-group", group, "--namespace-name", bus, "--name", "RootManageSharedAccessKey",
+        "--query", "primaryConnectionString"), secret=True)
 
 
 if __name__ == "__main__":

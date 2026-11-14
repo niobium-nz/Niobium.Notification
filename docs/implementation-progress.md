@@ -1,5 +1,28 @@
 # Notification reliability implementation ledger
 
+## Live B02 recovery verification in progress (14 November 2026)
+
+The separately invoked deployment executable now exercises the actual test queue,
+deployed consumer, durable Table/Blob state and provider idempotency. It observes an
+accepted owned operation, conditionally simulates its lost outcome write, then
+requires the pre-existing scheduled wake to recover the same provider ID without
+changing the frozen content or original provider-window boundary. No runtime fault
+switch, provider credential in the runner, new Azure resource or production write
+is introduced. See [fixture scope and retained evidence](delivery-and-operations.md#live-durable-recovery-fixture).
+
+This is implementation under verification. Local build or harness tests are not
+live recovery evidence. Record the feature SHA, candidate report, immutable-main
+trusted report, native review, independent approval and terminal delivery results
+on the PR before changing this status. B06 provider confirmation and invoice
+cancellation, operator-controlled recovery/audited deliberate resends, and the
+remaining Invoicing roadmap are still outstanding.
+
+Local validation passed: 147 application cases with 98.58% authored line coverage,
+14 real Table/Blob cases, 20 delivery-policy cases, and the executable's production
+environment/host/namespace rejection checks. The Python harness suite also covers
+missing credentials, sanitized process failures, stale/incomplete reports and
+owned-template cleanup after recovery failure. Live results are still pending.
+
 ## Mandatory queued submission for all tenants (14 November 2026)
 
 Baseline: `40a2b5581e005ec0019a6b0935e878768824d10f`. The owner required every

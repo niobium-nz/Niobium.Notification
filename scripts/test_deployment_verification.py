@@ -135,6 +135,12 @@ class FixtureStorage:
 
 
 class DeployedTests(unittest.TestCase):
+    def setUp(self):
+        for name in ("prepare", "verify"):
+            patcher = patch.object(deployed.live, name)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
     def test_preflight_requires_no_resource_credentials_or_network(self):
         settings = {k: ENV[k] for k in ("AZURE_ENV_NAME", "TEST_NOTIFICATION_SENDER", "TEST_NOTIFICATION_RECIPIENT")}
         with patch.dict(os.environ, settings, clear=True), patch.object(sys, "argv", ["deployed-integration.py", "--check-configuration"]), patch.object(deployed, "Storage") as storage, patch.object(deployed.readonly, "verify") as health, contextlib.redirect_stdout(io.StringIO()) as output:
@@ -211,6 +217,23 @@ class DeployedTests(unittest.TestCase):
         self.assertEqual("Notification deployment verification", storage.owned["Subject"])
         self.assertEqual("Notification test environment verification", posted[1]["Message"])
         self.assertIn("real_provider_submission", checks)
+
+    def test_live_recovery_uses_owned_template_and_failure_still_cleans_it(self):
+        storage = FixtureStorage()
+        deployed.live.verify.side_effect = deployed.Failure("live_scheduled_recovery_missing")
+        with self.assertRaisesRegex(deployed.Failure, "^live_scheduled_recovery_missing$"):
+            self.run_fixture(storage)
+        deployed.live.verify.assert_called_once()
+        self.assertEqual(storage.owned["PartitionKey"], deployed.live.verify.call_args.args[1])
+        self.assertEqual(2, len([c for c in storage.calls if c[1] == "delete"]))
+
+    def test_live_build_failure_precedes_any_service_fixture(self):
+        deployed.live.prepare.side_effect = deployed.Failure("live_recovery_build_failed_output_suppressed")
+        with patch.object(deployed.readonly, "verify") as health, patch.object(deployed, "Storage") as storage:
+            with self.assertRaisesRegex(deployed.Failure, "^live_recovery_build_failed_output_suppressed$"):
+                deployed.run(ENV, Mock())
+        health.assert_not_called()
+        storage.assert_not_called()
 
     def test_uncertain_fixture_writes_are_reconciled(self):
         for mode, expected in [("insert-response-lost", 1), ("upload-response-lost", 2)]:
@@ -300,9 +323,9 @@ class ResourceTests(unittest.TestCase):
     def test_resource_lookup_masks_key_and_validates_arm_hostname(self):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory) / "env"
-            with patch.dict(os.environ, AZURE_ENV_NAME="test", APP_SHORT_NAME="niobiumnotify", GITHUB_SHA=SHA, AZURE_RESOURCE_GROUP="test-group", GITHUB_ENV=str(target)), patch.object(resources, "azure", side_effect=[HOST.removeprefix("https://"), "synthetic-key"]) as azure, contextlib.redirect_stdout(io.StringIO()) as output:
+            with patch.dict(os.environ, AZURE_ENV_NAME="test", APP_SHORT_NAME="niobiumnotify", GITHUB_SHA=SHA, AZURE_RESOURCE_GROUP="test-group", GITHUB_ENV=str(target)), patch.object(resources, "azure", side_effect=[HOST.removeprefix("https://"), "synthetic-key", "synthetic-bus-connection"]) as azure, contextlib.redirect_stdout(io.StringIO()) as output:
                 resources.main()
-            self.assertEqual("::add-mask::synthetic-key\n", output.getvalue())
+            self.assertEqual("::add-mask::synthetic-key\n::add-mask::synthetic-bus-connection\n", output.getvalue())
             values = dict(line.split("=", 1) for line in target.read_text().splitlines())
             self.assertEqual(HOST, values["TEST_API_URL"])
             self.assertEqual(SHA, values["TEST_EXPECTED_COMMIT"])

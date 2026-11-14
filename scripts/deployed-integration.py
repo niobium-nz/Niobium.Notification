@@ -23,6 +23,7 @@ def load(name):
 
 readonly = load("read-only-deployment")
 telemetry = load("test-telemetry")
+live = load("live-recovery")
 Failure = readonly.VerificationFailure
 
 
@@ -102,6 +103,7 @@ def entity_etag(entity):
 
 def run(environ, reporter):
     config = configuration(environ)
+    live.prepare(environ, Failure)
     health = readonly.verify(config["base"], environ.get("TEST_EXPECTED_COMMIT", ""))
     reporter("deployed_commit")
     metrics = telemetry.ProviderMetrics(environ)
@@ -149,6 +151,7 @@ def run(environ, reporter):
         if post(config["base"], request) != 400:
             raise Failure("invalid_request_not_rejected")
         reporter("invalid_request_rejected")
+        live.verify(environ, fixture_tenant, reporter, Failure)
         metrics.verify(started)
         reporter("provider_metrics_exported")
         return health
