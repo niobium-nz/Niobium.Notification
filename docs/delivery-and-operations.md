@@ -157,6 +157,41 @@ The workflow explicitly projects GitHub settings into runner `env`. `SetAppSetti
 
 The runner's `TEST_STORAGE_KEY` is used only for owned integration fixtures. Runtime Table/Blob access retains existing identity configuration; Resend uses existing runtime provider secrets. Do not publish credential values, mailbox values or provider responses in source, logs, reports or review comments.
 
+## Automatic local storage verification
+
+The [Storage integration workflow](../.github/workflows/storage-integration.yml)
+runs on every feature push, including documentation-only changes. Before creating
+a PR or merging, verify its terminal result and uploaded TRX on the current head
+alongside `Azure Deployment`. Its read-only repository token has no Azure identity,
+environment secrets or readiness-status permission. The existing immutable-main
+controller continues to certify deployed integration independently; this additional
+workflow does not change that trust boundary or repository protection settings.
+
+The job builds the separately invoked `Niobium.Notification.Storage.Tests` project
+and uses Azurite 3.37.0 with .NET 10 and Node 22. The reusable Linux runner starts
+its own in-memory Table and Blob processes on available loopback ports, overrides
+both test endpoints, and waits for readiness before starting tests. It stops only
+those owned process groups on success, failure, timeout or interruption. Each run
+gets a new output directory, so an old TRX cannot supply a passing result. Missing,
+empty, failing or skipped test results fail verification. The job uploads its TRX
+and emulator logs even after failure.
+
+With Azurite and .NET on PATH, the same local commands are:
+
+```sh
+dotnet restore src/Niobium.Notification.Storage.Tests/Niobium.Notification.Storage.Tests.csproj --nologo
+dotnet build src/Niobium.Notification.Storage.Tests/Niobium.Notification.Storage.Tests.csproj --configuration Release --no-restore --nologo --disable-build-servers -m:1
+python scripts/run-storage-integration.py
+```
+
+Results are under `artifacts/storage/run-*`; `--results-directory` selects another
+parent directory without deleting its existing contents. The runner limits test
+execution to three minutes and emulator startup to twenty seconds per process;
+the workflow has a fifteen-minute total limit. These real-adapter checks use the
+pinned Niobium packages and synthetic local data. Queue timing and provider HTTP
+responses remain controlled in the suite, so passing it does not establish live
+B02 activation, provider deduplication or recipient delivery.
+
 ## B02 validation and activation
 
 The [durable queued submission path](durable-submission.md) is disabled by default.

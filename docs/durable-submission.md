@@ -196,9 +196,11 @@ claims, restart, lost provider responses/result saves, scheduling failures,
 timeouts, credential changes, window boundaries, exhaustion, missing templates,
 storage failures and the actual runtime HTTP-handler composition.
 
-`Niobium.Notification.Storage.Tests` is an explicitly invoked suite outside the
-solution. It fails when its loopback emulator setting is absent, rather than
-silently skipping. It uses the real pinned Niobium Table repository to test competing
+`Niobium.Notification.Storage.Tests` remains outside the solution and runs
+automatically on feature pushes through [Storage integration](delivery-and-operations.md#automatic-local-storage-verification).
+The reusable runner owns disposable loopback emulators; a direct project invocation
+still fails when its emulator settings are absent rather than silently skipping.
+It uses the real pinned Niobium Table repository to test competing
 inserts, competing ETag claims, stale rejection, round trips and cleared nullable
 fields. Additional cases exercise the pinned Niobium Blob adapter against Azurite:
 private-container creation, leading-slash path round trips, create-only content,
