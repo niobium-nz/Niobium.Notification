@@ -22,6 +22,17 @@ The owner approved applying Niobium.Invoicing's delivery safeguards to this depe
 
 Package publication compares the actual merge commit's Contracts tree with its first parent. Missing history fails. Unchanged Contracts skips restore/build/NuGet login/publication. Feature packages are no longer published. Production and package concurrency queues retain pending runs.
 
+A PR update can reach the main-owned readiness controller before its feature run
+starts or finishes. After authenticating the pipeline, the controller reports
+`Test deployment verified` as **pending** for that unfinished work. The controller
+job may finish successfully after reporting pending; this is not verification
+success and cannot satisfy the required custom status. The completed feature run
+triggers the normal full verification and publishes success or failure. Terminal
+failures, missing trusted evidence and pipeline/API errors still fail; merge-time
+validation never accepts pending work or borrows an older successful run.
+Readiness events for one feature SHA run serially without cancellation, preventing
+an earlier observation from overwriting a completed result with stale pending.
+
 ## Automatic review authorization and activation
 
 The owner approved automatic review on 2026-11-06 (Pacific/Auckland). The intended
