@@ -1,17 +1,19 @@
 // Privileged entry point: only the controller loaded from the default branch may publish readiness status.
 const WORKFLOW = 'azure-deploy.yml';
 const WORKFLOW_PATH = `.github/workflows/${WORKFLOW}`;
-const PIPELINE_FILES = [WORKFLOW_PATH, 'azure.yaml', 'scripts/check-coverage.py', 'scripts/test-resources.py'];
+const PIPELINE_FILES = [WORKFLOW_PATH, 'azure.yaml', 'scripts/check-coverage.py', 'scripts/test-resources.py',
+  'scripts/check-webhook-configuration.py'];
 // A single concrete next revision, reviewed as data on main before a feature can
 // use it. This is deliberately bound to the complete predecessor pipeline: an
 // unrelated future pipeline revision must never revive an old staged approval.
 const REVIEWED_WORKFLOW_PATH = '.github/reviewed-pipelines/azure-deploy.yml';
-const REVIEWED_WORKFLOW_SHA = '9e69e51be2317bcca6edf74de7004281a0b9ed70';
+const REVIEWED_WORKFLOW_SHA = '7a2cefa03c4868c8b56fe8bfba241c15d8a5dbb3';
 const REVIEWED_PIPELINE_BASE = Object.freeze({
   [WORKFLOW_PATH]: '622675bc1c131a11268e49a09efc0d3eb4a7fca6',
   'azure.yaml': 'bcc11f088596a50c2c68b92d84553c84da3ceefd',
   'scripts/check-coverage.py': 'fe7e478c3d3feca4505dc6f824153fbdf4eff6bf',
   'scripts/test-resources.py': '8b84f121c4cce94a51b50e71102cacf4bc79902b',
+  'scripts/check-webhook-configuration.py': '51bdf9ae176531f9f9d02fff2949b6a2f918569c',
 });
 const REQUIRED_JOBS = ['Build and local tests', 'Deploy test and run integration'];
 const REQUIRED_STEP = 'Run deployed integration tests';

@@ -24,6 +24,7 @@ function fixture() {
     comparison: { status: 'ahead' },
     created: [], statuses: [], notices: [], contentReads: [], tamperedPath: null, missingTrustedPath: null,
     featureWorkflow: null, reviewedWorkflow: null, changedBaseline: null, stageReadError: null,
+    activated: false, featureHelper: null,
   };
   const github = {
     paginate: async (method, args) => { if (method === 'runs') assert.equal(args.head_sha, 'head'); return state[method]; },
@@ -44,9 +45,14 @@ function fixture() {
             return { data: state.reviewedWorkflow };
           }
           let sha = REVIEWED_PIPELINE_BASE[args.path];
+          if (state.activated && args.path === PIPELINE_FILES[0]) sha = REVIEWED_WORKFLOW_SHA;
           if (args.path === state.changedBaseline) sha = 'new-main-pipeline';
           if (args.ref === 'head' && args.path === PIPELINE_FILES[0] && state.featureWorkflow) sha = state.featureWorkflow;
           if (args.ref === 'head' && args.path === state.tamperedPath) sha = 'no-op-pipeline';
+          if (args.ref === 'head' && args.path === 'scripts/check-webhook-configuration.py' && state.featureHelper) {
+            if (state.featureHelper.error) throw state.featureHelper.error;
+            return { data: state.featureHelper };
+          }
           return { data: { type: 'file', sha } };
         },
         compareCommits: async () => ({ data: state.comparison }), createCommitStatus: async status => state.statuses.push(status),
@@ -162,6 +168,27 @@ test('staged approval cannot authorize any other workflow or helper revision', a
   }
 });
 
+test('the preflight cannot be replaced or removed during activation or after the workflow reaches main', async () => {
+  for (const activated of [false, true]) {
+    const valid = fixture(); valid.state.activated = activated;
+    valid.state.featureWorkflow = REVIEWED_WORKFLOW_SHA;
+    valid.state.reviewedWorkflow = { type: 'file', sha: REVIEWED_WORKFLOW_SHA };
+    await readiness(valid);
+    assert.equal(valid.state.statuses.at(-1).state, 'success');
+    assert.ok(valid.state.contentReads.some(read => read.path === 'scripts/check-webhook-configuration.py' && read.ref === 'head'));
+    for (const featureHelper of [{ type: 'file', sha: 'no-op-preflight' }, { type: 'file' },
+      { type: 'symlink', sha: REVIEWED_PIPELINE_BASE['scripts/check-webhook-configuration.py'] },
+      { error: Object.assign(new Error('Missing feature preflight'), { status: 404 }) }]) {
+      const input = fixture(); input.state.activated = activated;
+      input.state.featureWorkflow = REVIEWED_WORKFLOW_SHA;
+      input.state.reviewedWorkflow = { type: 'file', sha: REVIEWED_WORKFLOW_SHA };
+      input.state.featureHelper = featureHelper;
+      await assert.rejects(readiness(input), /Untrusted pipeline definition|Missing feature preflight/);
+      assert.deepEqual(input.state.statuses.map(status => status.state), ['failure']);
+    }
+  }
+});
+
 test('changing any predecessor pipeline blob expires the staged approval even if the feature matches its new helper', async () => {
   for (const path of PIPELINE_FILES) {
     const input = fixture(); input.state.featureWorkflow = REVIEWED_WORKFLOW_SHA;
@@ -211,6 +238,11 @@ test('the reviewed data file matches its actual Git blob identity and the predec
     return createHash('sha1').update(`blob ${content.length}\0`).update(content).digest('hex');
   };
   assert.equal(blob(REVIEWED_WORKFLOW_PATH), REVIEWED_WORKFLOW_SHA);
+  const preflight = 'scripts/check-webhook-configuration.py';
+  assert.ok(PIPELINE_FILES.includes(preflight));
+  assert.equal(blob(preflight), REVIEWED_PIPELINE_BASE[preflight]);
+  const staged = fs.readFileSync(path.join(root, REVIEWED_WORKFLOW_PATH), 'utf8');
+  assert.equal(staged.split(`python -I ${preflight}`).length - 1, 2);
   assert.deepEqual(Object.keys(REVIEWED_PIPELINE_BASE).sort(), [...PIPELINE_FILES].sort());
   for (const sha of Object.values(REVIEWED_PIPELINE_BASE)) assert.match(sha, /^[0-9a-f]{40}$/);
   assert.ok(!REVIEWED_WORKFLOW_PATH.startsWith('.github/workflows/'));

@@ -90,8 +90,11 @@ is needed for this main-owned activation record.
 
 Then update the implementation branch from that main and use the exact reviewed
 workflow. The controller requires all other protected files to match main, all
-four predecessor blobs to match the reviewed tuple, and the feature workflow to
+five predecessor blobs to match the reviewed tuple, and the feature workflow to
 match both its pinned target SHA and the staged file's Git blob on immutable main.
+The reviewed webhook preflight is added to main with its tests before activation,
+and remains part of exact-main comparison after activation. The staged workflow
+runs it in Python isolated mode to prevent feature-local import substitution.
 A missing file, different helper, expired predecessor or metadata error fails
 closed. Feature files cannot approve themselves. A later change to any predecessor
 blob expires the staged authorization, preventing an old approval from authorizing
