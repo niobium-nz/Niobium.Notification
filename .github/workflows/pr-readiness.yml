@@ -13,6 +13,13 @@ permissions:
   actions: read
   statuses: write
 
+# Serialize observations and status writes for one feature head. Otherwise an
+# earlier PR event could overwrite completed verification with a stale pending.
+concurrency:
+  group: readiness-${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha || github.sha }}
+  cancel-in-progress: false
+  queue: max
+
 jobs:
   readiness:
     runs-on: ubuntu-latest

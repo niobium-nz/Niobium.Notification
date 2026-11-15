@@ -18,10 +18,19 @@ const REVIEWED_PIPELINE_BASE = Object.freeze({
 const REQUIRED_JOBS = ['Build and local tests', 'Deploy test and run integration'];
 const REQUIRED_STEP = 'Run deployed integration tests';
 const TRUSTED_TEST_JOB = 'Verify trusted deployed integration';
+const ACTIVE_RUN_STATES = new Set(['queued', 'in_progress', 'waiting', 'pending', 'requested']);
+
+class VerificationPending extends Error {
+  constructor() { super('The current feature verification has not completed.'); }
+}
+
+function featureRun(run, sha, repository) {
+  return run.head_sha === sha && run.event === 'push' && run.head_branch !== 'main' &&
+    run.head_repository?.full_name === repository && run.path === WORKFLOW_PATH;
+}
 
 function eligibleRun(run, sha, repository) {
-  return run.head_sha === sha && run.event === 'push' && run.head_branch !== 'main' &&
-    run.conclusion === 'success' && run.head_repository?.full_name === repository && run.path === WORKFLOW_PATH;
+  return featureRun(run, sha, repository) && run.status === 'completed' && run.conclusion === 'success';
 }
 
 function approvedHead(reviews, head) {
@@ -70,16 +79,26 @@ async function authenticatePipeline(github, owner, repo, featureSha, trustedSha)
   }
 }
 
-async function testedRun(github, owner, repo, sha, trustedSha, runId) {
+async function testedRun(github, owner, repo, sha, trustedSha, runId, allowPending = false) {
   const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
     owner, repo, workflow_id: WORKFLOW, event: 'push', head_sha: sha, per_page: 100,
   });
   // A failed triggering run must not borrow success from an older run of the same SHA.
   const candidates = runId ? runs.filter(run => run.id === runId) :
     [...runs].sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at)).slice(0, 1);
-  for (const run of candidates) {
-    if (!eligibleRun(run, sha, `${owner}/${repo}`)) continue;
+  // A PR synchronization may arrive before its push run is visible. Authenticate
+  // the pipeline even while waiting; missing or changed trust is still failure.
+  if (allowPending && !runId && candidates.length === 0) {
     await authenticatePipeline(github, owner, repo, sha, trustedSha);
+    throw new VerificationPending();
+  }
+  for (const run of candidates) {
+    if (!featureRun(run, sha, `${owner}/${repo}`)) continue;
+    await authenticatePipeline(github, owner, repo, sha, trustedSha);
+    if (allowPending && !runId && run.conclusion === null && ACTIVE_RUN_STATES.has(run.status)) {
+      throw new VerificationPending();
+    }
+    if (!eligibleRun(run, sha, `${owner}/${repo}`)) continue;
     const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
       owner, repo, run_id: run.id, filter: 'latest', per_page: 100,
     });
@@ -128,8 +147,15 @@ async function readiness({ github, context, core, trustedSha, workflowRef }) {
   if (!sha) throw new Error('Missing feature commit.');
   let run;
   try {
-    run = await testedRun(github, owner, repo, sha, trustedSha, eventRun?.id);
+    run = await testedRun(github, owner, repo, sha, trustedSha, eventRun?.id,
+      context.eventName === 'pull_request_target' && !!pr && !eventRun);
   } catch (error) {
+    if (error instanceof VerificationPending) {
+      await github.rest.repos.createCommitStatus({ owner, repo, sha, state: 'pending', context: 'Test deployment verified',
+        description: 'Waiting for this commit to finish authenticated feature verification.' });
+      core.notice(error.message);
+      return;
+    }
     await github.rest.repos.createCommitStatus({ owner, repo, sha, state: 'failure', context: 'Test deployment verified',
       description: 'A successful run with the trusted main pipeline definition is required.' });
     throw error;

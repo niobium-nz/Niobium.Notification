@@ -8,7 +8,7 @@ const { approvedHead, eligibleRun, testedRun, mergeEligibility, readiness, PIPEL
   REVIEWED_WORKFLOW_PATH, REVIEWED_WORKFLOW_SHA, REVIEWED_PIPELINE_BASE } = require('./delivery-policy.cjs');
 const { contractsChanged } = require('./package-policy.cjs');
 const trustedSha = 'a'.repeat(40);
-const run = { id: 42, head_sha: 'head', event: 'push', head_branch: 'feature/test', conclusion: 'success',
+const run = { id: 42, head_sha: 'head', event: 'push', head_branch: 'feature/test', status: 'completed', conclusion: 'success',
   head_repository: { full_name: 'owner/repo' }, path: '.github/workflows/azure-deploy.yml',
   updated_at: '2026-10-30T12:00:00Z', html_url: 'https://github.com/owner/repo/actions/runs/42' };
 
@@ -65,6 +65,13 @@ function fixture() {
     core: { notice: message => state.notices.push(message) } };
 }
 
+function prFixture() {
+  const input = fixture();
+  input.context.eventName = 'pull_request_target';
+  input.context.payload = { pull_request: input.state.pr };
+  return input;
+}
+
 function packageRepository(t) {
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'invoicing-package-'));
   t.after(() => fs.rmSync(cwd, { recursive: true, force: true }));
@@ -111,9 +118,104 @@ test('missing merge history and invalid revisions fail instead of skipping publi
 test('only a successful exact-repository feature run of the expected workflow qualifies', () => {
   assert.equal(eligibleRun(run, 'head', 'owner/repo'), true);
   for (const patch of [{ head_sha: 'old' }, { event: 'pull_request' }, { head_branch: 'main' }, { conclusion: 'skipped' },
-    { head_repository: { full_name: 'fork/repo' } }, { path: '.github/workflows/forged.yml' }]) {
+    { head_repository: { full_name: 'fork/repo' } }, { path: '.github/workflows/forged.yml' }, { status: 'in_progress' }]) {
     assert.equal(eligibleRun({ ...run, ...patch }, 'head', 'owner/repo'), false);
   }
+});
+
+test('an early PR reports pending for absent or active verification without granting readiness or merge eligibility', async () => {
+  for (const status of [null, 'queued', 'in_progress', 'waiting', 'pending', 'requested']) {
+    const input = prFixture();
+    if (status === null) input.state.runs = [];
+    else Object.assign(input.state.runs[0], { status, conclusion: null });
+    await readiness(input);
+    assert.deepEqual(input.state.statuses.map(result => result.state), ['pending']);
+    assert.equal(input.state.statuses[0].context, 'Test deployment verified');
+    assert.equal(input.state.statuses[0].sha, 'head');
+    assert.match(input.state.notices[0], /has not completed/);
+    assert.equal(input.state.contentReads.length, PIPELINE_FILES.length * 2);
+    assert.equal(input.state.created.length, 0);
+    await assert.rejects(mergeEligibility(input), /no successful authenticated/);
+  }
+});
+
+test('an unfinished latest run cannot borrow an older success and later completion replaces pending with verified success', async () => {
+  const input = prFixture(); Object.assign(input.state.runs[0], { status: 'in_progress', conclusion: null });
+  input.state.runs.push({ ...run, id: 41, updated_at: '2026-10-29T12:00:00Z' });
+  await readiness(input);
+  assert.deepEqual(input.state.statuses.map(result => result.state), ['pending']);
+  Object.assign(input.state.runs[0], { status: 'completed', conclusion: 'success' });
+  input.context.eventName = 'workflow_run'; input.context.payload = { workflow_run: { ...run } };
+  await readiness(input);
+  assert.deepEqual(input.state.statuses.map(result => result.state), ['pending', 'success']);
+  assert.equal(input.state.statuses[1].target_url, run.html_url);
+});
+
+test('terminal or inconsistent feature outcomes remain failures on PR events even with an older success', async () => {
+  for (const patch of ['failure', 'cancelled', 'skipped', 'action_required', 'timed_out'].map(conclusion => ({ conclusion }))
+    .concat([{ status: 'completed', conclusion: null }, { status: 'unknown', conclusion: null },
+      { status: 'in_progress', conclusion: 'success' }])) {
+    const input = prFixture(); Object.assign(input.state.runs[0], patch);
+    input.state.runs.push({ ...run, id: 41, updated_at: '2026-10-29T12:00:00Z' });
+    await assert.rejects(readiness(input), /no successful authenticated/);
+    assert.deepEqual(input.state.statuses.map(result => result.state), ['failure']);
+  }
+});
+
+test('completed workflow events never turn absent or unfinished evidence into pending', async () => {
+  for (const absent of [false, true]) {
+    const input = fixture();
+    if (absent) input.state.runs = [];
+    else Object.assign(input.state.runs[0], { status: 'in_progress', conclusion: null });
+    await assert.rejects(readiness(input), /no successful authenticated/);
+    assert.deepEqual(input.state.statuses.map(result => result.state), ['failure']);
+  }
+});
+
+test('waiting does not conceal a changed pipeline, missing trust or an API failure', async () => {
+  for (const absent of [false, true]) {
+    for (const mutate of [
+      ...PIPELINE_FILES.map(path => input => { input.state.tamperedPath = path; }),
+      input => { input.state.missingTrustedPath = PIPELINE_FILES[0]; },
+      ...[403, 429, 500].map(status => input => { input.github.rest.repos.getContent = async () => {
+        throw Object.assign(new Error('Synthetic GitHub dependency failure'), { status });
+      }; }),
+    ]) {
+      const input = prFixture();
+      if (absent) input.state.runs = [];
+      else Object.assign(input.state.runs[0], { status: 'queued', conclusion: null });
+      mutate(input);
+      await assert.rejects(readiness(input));
+      assert.deepEqual(input.state.statuses.map(result => result.state), ['failure']);
+    }
+  }
+});
+
+test('pending staged activation still authenticates the exact reviewed main definition', async () => {
+  const input = prFixture(); Object.assign(input.state.runs[0], { status: 'queued', conclusion: null });
+  input.state.featureWorkflow = REVIEWED_WORKFLOW_SHA;
+  input.state.reviewedWorkflow = { type: 'file', sha: REVIEWED_WORKFLOW_SHA };
+  await readiness(input);
+  assert.deepEqual(input.state.statuses.map(result => result.state), ['pending']);
+  assert.deepEqual(input.state.contentReads.filter(read => read.path === REVIEWED_WORKFLOW_PATH),
+    [{ owner: 'owner', repo: 'repo', path: REVIEWED_WORKFLOW_PATH, ref: trustedSha }]);
+});
+
+test('PR and workflow completion observations serialize on the same head without cancelling queued work', () => {
+  const yaml = fs.readFileSync(path.join(__dirname, '../.github/workflows/pr-readiness.yml'), 'utf8');
+  const block = yaml.match(/^concurrency:\n((?:[ \t]+[^\n]*\n)+)/m)?.[1];
+  assert.ok(block);
+  assert.match(block, /^  cancel-in-progress: false$/m);
+  assert.match(block, /^  queue: max$/m);
+  const group = block.match(/^  group: (.*?)\$\{\{\s*(.*?)\s*\}\}$/m);
+  assert.ok(group);
+  // Evaluate this workflow's property/fallback expression for both event shapes.
+  // No feature code, status mutation or GitHub API is executed by this check.
+  assert.match(group[2], /^[\w.]+(?:\s*\|\|\s*[\w.]+)*$/);
+  const key = event => group[1] + group[2].split('||').map(property => property.trim().split('.')
+    .reduce((value, part) => value?.[part], { github: { event, sha: trustedSha } })).find(Boolean);
+  assert.equal(key({ pull_request: { head: { sha: 'first-head' } } }), key({ workflow_run: { head_sha: 'first-head' } }));
+  assert.notEqual(key({ pull_request: { head: { sha: 'first-head' } } }), key({ workflow_run: { head_sha: 'other-head' } }));
 });
 
 test('one permitted approval suffices, with no restriction on the PR author', () => {
