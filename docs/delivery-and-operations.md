@@ -73,6 +73,37 @@ need a concrete reviewed activation decision when they cannot be authenticated
 against current main. A skipped trusted step is never a successful verification.
 Do not infer an exception from an earlier installation or fabricate status.
 
+### Reviewed workflow activation
+
+The readiness controller accepts the active pipeline's exact main blobs. For the
+concrete receipt workflow revision, it also supports one exact definition staged
+as [review material](../.github/reviewed-pipelines/README.md) on immutable main.
+That definition is outside `.github/workflows`, so staging it does not activate
+its deployment jobs or consume new environment settings.
+
+First deliver the staged workflow and its controller pins as an ordinary feature
+using the unchanged active pipeline. Require successful feature/storage/candidate/
+trusted integration, native review, genuine independent current-head approval and
+a protected merge. The review includes the complete proposed workflow and its
+diff from the pinned predecessor. No administration bypass or fabricated status
+is needed for this main-owned activation record.
+
+Then update the implementation branch from that main and use the exact reviewed
+workflow. The controller requires all other protected files to match main, all
+four predecessor blobs to match the reviewed tuple, and the feature workflow to
+match both its pinned target SHA and the staged file's Git blob on immutable main.
+A missing file, different helper, expired predecessor or metadata error fails
+closed. Feature files cannot approve themselves. A later change to any predecessor
+blob expires the staged authorization, preventing an old approval from authorizing
+a downgrade after the active pipeline evolves.
+
+The implementation still needs its own exact-head successful build, storage tests,
+actual test deployment, candidate tests and the immutable-main trusted harness.
+Approval of staging is not approval of that application PR. Native review,
+independent approval, protected merge and terminal production/package verification
+remain required. The receipt webhook/signing configuration and operator authority
+are separate dependencies; staging does not create or infer them.
+
 The connector cannot administer rulesets, Actions settings, environment configuration
 or collaborator roles. Prepare concrete changes and candidate evidence before
 requesting any necessary installation decision; verify current rules separately.
