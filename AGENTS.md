@@ -67,6 +67,13 @@ production verification, not a reason to stop the goal.
 
 ## Infrastructure composition
 
+Use `rg-niobium-<service-slug>-<env>` for resource groups and
+`<prefix>-<abbr>-<env>` for named service resources such as Functions and
+vaults. Functions host/package storage uses `<prefix>sts<env>` and application
+data storage uses `<prefix>std<env>`.
+Notification uses the compact prefix `niobiumnotify`. Read the resource group from the target environment's `AZURE_RESOURCE_GROUP`.
+[Shared Azure naming guide](https://github.com/niobium-nz/Niobium.DevOps/blob/main/docs/azure-resource-naming.md)
+
 The owner requires environment-agnostic Bicep and reusable Function App modules. `infra/function-app.bicep` owns host-bound resources and unions generic caller `appSettings` with internal host settings. `infra/main.bicep` owns application-specific resources. Environment suffixes and supplied values select the actual resources.
 
 Business resource names belong in `infra/main.bicepparam` defaults or deployment inputs. Bicep takes generic lists and creates resources; do not hardcode table or queue names in resource declarations. Follow `serviceBusQueueNames`/`SERVICE_BUS_QUEUE_NAMES` and `storageTableNames`/`STORAGE_TABLE_NAMES`. Include existing service-owned tables in the default list, and match the entity type names used by the repository. See [resource-name configuration](docs/delivery-and-operations.md#resource-name-configuration).
