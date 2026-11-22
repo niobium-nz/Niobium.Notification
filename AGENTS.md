@@ -72,7 +72,7 @@ Use `rg-niobium-<service-slug>-<env>` for resource groups and
 vaults. Functions host/package storage uses `<prefix>sts<env>` and application
 data storage uses `<prefix>std<env>`.
 Notification uses the compact prefix `niobiumnotify`. Read the resource group from the target environment's `AZURE_RESOURCE_GROUP`.
-[Shared Azure naming guide](https://github.com/niobium-nz/Niobium.DevOps/blob/main/docs/azure-resource-naming.md)
+[Azure naming guide](https://github.com/niobium-nz/Niobium.DevOps/blob/453d80db4c965223623e1dbacd9775b929e09a07/docs/azure-resource-naming.md) · [Current DevOps documentation](https://github.com/niobium-nz/Niobium.DevOps/tree/main/docs)
 
 The owner requires environment-agnostic Bicep and reusable Function App modules. `infra/function-app.bicep` owns host-bound resources and unions generic caller `appSettings` with internal host settings. `infra/main.bicep` owns application-specific resources. Environment suffixes and supplied values select the actual resources.
 
