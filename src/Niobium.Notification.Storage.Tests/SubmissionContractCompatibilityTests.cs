@@ -49,6 +49,8 @@ public sealed class SubmissionContractCompatibilityTests
         Assert.AreEqual(tenant, stored.PartitionKey);
         Assert.AreEqual(id, stored.RowKey);
         Assert.AreEqual(payloadName, stored.GetString("PayloadName"));
+        Assert.AreEqual(2, stored.GetInt32("Version"));
+        Assert.IsFalse(stored.ContainsKey(nameof(NotificationSubmission.ReceiptProof)));
         Assert.AreEqual(3, stored.GetInt32("StateCode"));
         Assert.IsFalse(stored.ContainsKey("Tenant"));
         Assert.IsFalse(stored.ContainsKey("ID"));

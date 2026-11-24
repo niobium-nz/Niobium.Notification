@@ -16,6 +16,11 @@ records historical-operation and live-verification limits separately.
 adapter results and latency from verified durable decisions and saved outcomes.
 The deployed test checks Azure Monitor export using its existing approved send.
 
+[Provider delivery receipts](docs/provider-delivery-receipts.md) document signed
+Resend callbacks, durable capture and the consumer event contract.
+[Operator recovery](docs/operator-recovery.md) records the approved design and
+[configuration steps](docs/operator-recovery-setup.md) for the deferred work.
+
 ## Local verification
 
 Use the pinned SDK and packages in `global.json` and the project files. Python 3, Node.js 22 and PowerShell 7 are needed for deployment-tooling tests. These commands do not contact deployed services:

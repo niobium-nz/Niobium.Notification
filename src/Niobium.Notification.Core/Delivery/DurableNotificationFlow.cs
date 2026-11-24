@@ -18,7 +18,7 @@ namespace Niobium.Notification.Delivery
             if (registrationRequired)
             {
                 TemplateDomain.Deliverable? content = await renderer.PrepareAsync(request, cancellationToken);
-                FrozenNotification? payload = content == null ? null : provider.Freeze(content);
+                FrozenNotification? payload = content == null ? null : provider.Freeze(content, identity.GetReceiptCorrelation());
                 await submission.RegisterAsync(identity, payload, cancellationToken);
             }
 

@@ -1,5 +1,20 @@
 # Notification reliability implementation ledger
 
+## Provider receipts and operator scope (25 November 2026, Pacific/Auckland)
+
+The owner configured Resend endpoints and signing bundles for `test` and `prod`.
+The receipt candidate resumes from the current protected main with its reviewed
+workflow. The earlier deployment run
+[43596972075](https://github.com/niobium-nz/Niobium.Notification/actions/runs/43596972075)
+stopped at signing configuration before provisioning. The new release requires
+a real Published Delivered receipt, the independent main verifier and terminal
+production and package evidence. [Receipt rollout](provider-delivery-receipts.md)
+
+The owner approved the operator design and deferred implementation. Operators use
+the manual data access process. Future activation includes GET token exchange,
+service local role grants, reviewed bootstrap and fresh test identity acquisition.
+[Operator design](operator-recovery.md) · [Configuration steps](operator-recovery-setup.md)
+
 ## Trusted recovery compatibility for receipt metadata (14 November 2026)
 
 Notification [PR #9](https://github.com/niobium-nz/Niobium.Notification/pull/9)

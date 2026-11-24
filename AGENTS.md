@@ -8,6 +8,16 @@ fail; do not restore a tenant filter, enable switch or queue fallback. See
 Keep the domain's conservative hold for an untracked redelivery. Broker first
 delivery describes an envelope, not proof that its logical operation was never sent.
 
+Read [provider delivery receipts](docs/provider-delivery-receipts.md) for webhook,
+correlation, event publication and delivery changes. Verify signatures over the
+raw request, durably queue receipts before acknowledgement and preserve legacy
+uncorrelated evidence. Models own opaque correlation and event identities. Domains
+own receipt transitions and publication evidence.
+
+Operators obtain data access through the existing manual process. The approved
+[operator recovery design](docs/operator-recovery.md) and
+[identity setup](docs/operator-recovery-setup.md) are for the deferred feature.
+
 Read [model names and contract ownership](docs/model-contracts.md) before adding or
 changing a Table model, key, fingerprint, serialized shape or file reference.
 Use business property names with EntityKey attributes. Models privately own their

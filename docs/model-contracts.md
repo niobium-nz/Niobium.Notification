@@ -1,5 +1,10 @@
 # Model names and contract ownership
 
+`NotificationReceipt.Provider/ID` follows the same annotated business-key rule.
+Its private hash/event representation belongs to the receipt model; the submission
+model owns its opaque receipt proof and tenant decoding. Domains decide whether
+correlation permits publication. See [receipt boundaries and compatibility](provider-delivery-receipts.md#model-ownership-and-compatibility).
+
 The owner's rule of 14 November 2026 applies to every Table model. Read the
 [framework explanation and examples](https://github.com/niobium-nz/Niobium/blob/main/docs/model-contracts.md)
 together with [domain behavior](domain-data-access.md).
@@ -37,8 +42,11 @@ even though a model has factory and representation methods.
 
 ## Compatibility and verification
 
-Key values, version 2, Table column names, payload container/path convention,
-provider idempotency keys and frozen JSON names remain unchanged. Existing
+Key values, existing version-2 rows, Table column names, payload container/path
+convention, provider idempotency keys and frozen JSON names remain unchanged. New
+receipt-bearing rows use version 3 to reject older replace-mode writers before
+they can erase correlation. Read/retry support keeps existing rows at version 2;
+see [the rollout boundary](provider-delivery-receipts.md#model-ownership-and-compatibility). Existing
 payload references are read from the row, not regenerated on replay. Private
 ownership does not authorize changing a persisted algorithm without a rollout:
 an incompatible ID can bypass suppression and cause a duplicate external effect.

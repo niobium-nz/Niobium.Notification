@@ -41,6 +41,7 @@ namespace Niobium.Notification.Server
 
             builder.Services.AddNotificationTelemetry(builder.Configuration);
             builder.Services.Configure<NotificationOptions>(o => options?.Invoke(o));
+            builder.Services.Configure<ResendWebhookOptions>(builder.Configuration.GetSection(nameof(ResendWebhookOptions)).Bind);
             builder.Services.AddSingleton(TimeProvider.System);
             builder.Services.AddSingleton<NotificationRetryPolicy>();
             builder.Services.AddHttpClient<IIdempotentNotificationProvider, ResendSubmissionProvider>()

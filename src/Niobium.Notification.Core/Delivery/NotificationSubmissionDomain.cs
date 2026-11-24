@@ -176,7 +176,7 @@ namespace Niobium.Notification.Delivery
 
         private static void Validate(NotificationSubmission entry, NotificationSubmission request)
         {
-            if (entry.Version != NotificationSubmission.CurrentVersion || !entry.MatchesRequest(request)
+            if (!entry.HasSupportedVersion() || !entry.MatchesRequest(request)
                 || !Enum.IsDefined((SubmissionState)entry.StateCode) || !Enum.IsDefined((SubmissionOutcome)entry.OutcomeCode)
                 || entry.Attempts < 0 || (entry.Attempts > 0 && entry.FirstSubmission == null)
                 || (entry.StateCode == (int)SubmissionState.Sending && (entry.Attempts == 0 || entry.NextAttempt == null)))

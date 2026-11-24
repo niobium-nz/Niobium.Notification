@@ -71,6 +71,12 @@ pipeline and verify its terminal result before reporting the PR ready.
 
 ## Required repository administration and installation
 
+The receipt workflow projects a webhook signing bundle from each environment's
+GitHub secret to its Key Vault. See [provider receipt setup](provider-delivery-receipts.md#required-environment-configuration).
+Operator access continues through the manual process. The approved
+[operator identity setup](operator-recovery-setup.md) applies when that separate
+feature resumes.
+
 Source changes cannot configure repository permissions/rules. The inspected baseline `989b7c4b36154c5da2cdd3391ec297e1f453ea14` had unprotected main, no rulesets and read-only access for `5he11`. On 2026-11-06, the owner granted `5he11` Write access and the connector verified it; main still had no protection. Recheck current settings before acting.
 
 Normal protection requires PR-only main updates, one approval, dismissal of stale approvals, resolved threads, up-to-date main, required successful `test` deployment, squash-only merges and the GitHub Actions `Test deployment verified` status, with no bypass actors. `5he11` needs permission for an approval to satisfy protection. Disable Actions permission to create/approve PRs. Native code/security review is authorized and has executed on the heads recorded above. Verify external settings and the receipt for the actual head separately; automatic review does not replace formal approval.
@@ -115,8 +121,8 @@ The implementation still needs its own exact-head successful build, storage test
 actual test deployment, candidate tests and the immutable-main trusted harness.
 Approval of staging is not approval of that application PR. Native review,
 independent approval, protected merge and terminal production/package verification
-remain required. The receipt webhook/signing configuration and operator authority
-are separate dependencies; staging does not create or infer them.
+remain required. The receipt candidate requires provider webhook signing configuration. The
+operator feature is deferred and has its own future workflow activation.
 
 The connector cannot administer rulesets, Actions settings, environment configuration
 or collaborator roles. Prepare concrete changes and candidate evidence before
@@ -222,10 +228,10 @@ unknown versions, missing metadata and changes or downgrades instead of rewritin
 the row into the verifier's application-model version. The proof's representation
 remains private to the model, and neither proof nor payload enters the report.
 
-This prepares the immutable-main recovery harness for the separately reviewed
-provider receipt implementation. It does not establish webhook authentication or
-recipient-server delivery. That implementation still needs its configured provider
-endpoints and exact-head verification, including its reviewed workflow activation.
+The receipt candidate requires a real Delivered receipt in Published state for
+this run's owned send. The existing immutable-main harness independently checks
+durable recovery and preserved correlation. Its own checks remain the readiness
+authority. See [receipt evidence](provider-delivery-receipts.md#verification-and-limits).
 
 The parent harness conditionally cleans its owned template and template blob.
 The real durable submission row and frozen payload remain as suppression and
@@ -254,8 +260,8 @@ environment variables, using the same pattern for queues and tables:
 
 | Parameter | Runner variable | Default |
 | --- | --- | --- |
-| `serviceBusQueueNames` | `SERVICE_BUS_QUEUE_NAMES` | `subscribecommand,notifycommand,subscribedevent` |
-| `storageTableNames` | `STORAGE_TABLE_NAMES` | `Subscription,Template,NotificationSubmission` |
+| `serviceBusQueueNames` | `SERVICE_BUS_QUEUE_NAMES` | `subscribecommand,notifycommand,subscribedevent,capturenotificationreceiptcommand,notificationdeliveryevent` |
+| `storageTableNames` | `STORAGE_TABLE_NAMES` | `Subscription,Template,NotificationSubmission,NotificationReceipt` |
 
 The table list includes historical service-owned tables as well as the new inbox.
 Table names use singular PascalCase entity names: the Niobium repository defaults
@@ -272,7 +278,7 @@ it in the deployment job's `env`, for example:
 
 ```yaml
 env:
-  STORAGE_TABLE_NAMES: ${{ vars.STORAGE_TABLE_NAMES || 'Subscription,Template,NotificationSubmission' }}
+  STORAGE_TABLE_NAMES: ${{ vars.STORAGE_TABLE_NAMES || 'Subscription,Template,NotificationSubmission,NotificationReceipt' }}
 ```
 
 The fallback matters because an undefined GitHub variable expands to an empty

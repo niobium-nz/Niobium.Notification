@@ -49,6 +49,7 @@
 
   <ItemGroup>
     <AssemblyMetadata Include="Commit" Value="$(SourceRevisionId)" />
+    <InternalsVisibleTo Include="Niobium.Notification.Core.Tests" />
   </ItemGroup>
 
 </Project>

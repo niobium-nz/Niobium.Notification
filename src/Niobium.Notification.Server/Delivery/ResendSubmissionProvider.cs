@@ -11,7 +11,7 @@ namespace Niobium.Notification.Server.Delivery
 {
     public sealed class ResendSubmissionProvider(HttpClient client, IOptions<ResendServiceOptions> options, TimeProvider clock) : IIdempotentNotificationProvider
     {
-        public FrozenNotification Freeze(TemplateDomain.Deliverable content)
+        public FrozenNotification Freeze(TemplateDomain.Deliverable content, NotificationCorrelation? correlation = null)
         {
             string domain = new MailAddress(content.From).Host;
             string credential = this.Credential(domain);
@@ -19,13 +19,23 @@ namespace Niobium.Notification.Server.Delivery
             {
                 throw new InvalidOperationException("Notification provider credentials are not configured.");
             }
-            string json = JsonSerializer.Serialize(new
+            Dictionary<string, object?> fields = new()
             {
-                from = new MailAddress(content.From, content.FromName).ToString(),
-                to = new[] { new MailAddress(content.To, content.ToName).ToString() },
-                subject = content.Subject,
-                html = content.Body,
-            });
+                ["from"] = new MailAddress(content.From, content.FromName).ToString(),
+                ["to"] = new[] { new MailAddress(content.To, content.ToName).ToString() },
+                ["subject"] = content.Subject,
+                ["html"] = content.Body,
+            };
+            if (correlation != null)
+            {
+                fields["tags"] = new[]
+                {
+                    new { name = "niobium_tenant", value = correlation.Tenant },
+                    new { name = "niobium_submission", value = correlation.SubmissionID },
+                    new { name = "niobium_proof", value = correlation.Proof },
+                };
+            }
+            string json = JsonSerializer.Serialize(fields);
             return FrozenNotification.Create(json, domain, credential);
         }
 

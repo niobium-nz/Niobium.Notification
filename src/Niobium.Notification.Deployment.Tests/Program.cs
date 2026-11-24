@@ -157,6 +157,13 @@ internal static class Program
         Require(CryptographicOperations.FixedTimeEquals(originalDigest, recoveredDigest), "live_frozen_payload_changed");
         Passed("live_same_provider_submission_recovered");
         Passed("live_frozen_payload_and_window_preserved");
+
+        // Observe the real provider callback for this already-sent fixture. Never
+        // manufacture a receipt or send another email to make verification pass.
+        Stage("verified_delivery_receipt");
+        OwnedReceiptFixture receipt = new(identity, accepted);
+        await receipt.WaitForPublishedDeliveryAsync(tables.GetTableClient(nameof(NotificationReceipt)), cancellationToken);
+        Passed("live_verified_delivery_receipt_published");
     }
 
     private static async Task<TableEntity> AcceptedAsync(TableClient table, OwnedRecoveryFixture fixture, CancellationToken cancellationToken)

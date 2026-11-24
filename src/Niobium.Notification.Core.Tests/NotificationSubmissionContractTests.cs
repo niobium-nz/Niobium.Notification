@@ -28,6 +28,8 @@ public sealed class NotificationSubmissionContractTests
         Assert.AreEqual(Tenant, first.Tenant);
         Assert.AreEqual(ID, first.ID);
         Assert.AreEqual(Fingerprint, first.Fingerprint);
+        Assert.AreEqual(3, first.Version);
+        Assert.IsTrue(first.HasSupportedVersion());
         Assert.AreEqual("notification-v1/aaaaaaaabbbbccccddddeeeeeeeeeeee/187F0349DD12B6DC73D76D86F421CD454FACCCC36EF9A2BA6956B37ABBB31102",
             first.GetProviderIdempotencyKey());
         Assert.IsTrue(first.MatchesRequest(replay));
@@ -47,7 +49,7 @@ public sealed class NotificationSubmissionContractTests
         var mapping = EntityMappingHelper.GetMapping(typeof(NotificationSubmission));
         Assert.AreEqual(nameof(NotificationSubmission.Tenant), mapping["PartitionKey"].Name);
         Assert.AreEqual(nameof(NotificationSubmission.ID), mapping["RowKey"].Name);
-        Assert.AreEqual(14, mapping.Count);
+        Assert.AreEqual(17, mapping.Count);
         Assert.IsFalse(mapping.ContainsKey(nameof(NotificationSubmission.Tenant)));
         Assert.IsFalse(mapping.ContainsKey(nameof(NotificationSubmission.ID)));
         Assert.IsFalse(mapping.ContainsKey(nameof(NotificationSubmission.PayloadContainer)));
