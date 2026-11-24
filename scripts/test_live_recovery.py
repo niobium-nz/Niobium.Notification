@@ -84,6 +84,14 @@ class LiveRecoveryTests(unittest.TestCase):
             with self.subTest(error=error), self.assertRaisesRegex(RuntimeError, "^" + expected + "$"):
                 self.verify_report(dict(self.good_report(), success=False, error=error), code=1)
 
+    def test_receipt_failures_preserve_fixed_codes_but_suppress_arbitrary_details(self):
+        for error in ("live_submission_version_unsupported", "live_legacy_submission_correlation_invalid",
+                      "live_submission_correlation_invalid", "live_submission_correlation_changed"):
+            with self.subTest(error=error), self.assertRaisesRegex(RuntimeError, "^" + error + "$"):
+                self.verify_report(dict(self.good_report(), success=False, error=error), code=1)
+            with self.subTest(error=error, details=True), self.assertRaisesRegex(RuntimeError, "^live_recovery_failed_details_suppressed$"):
+                self.verify_report(dict(self.good_report(), success=False, error=error + ": private receipt proof"), code=1)
+
     def test_stale_report_is_never_reused(self):
         runner = Mock()
         with tempfile.TemporaryDirectory() as directory:

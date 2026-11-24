@@ -17,6 +17,8 @@ ERRORS = {
     "live_acceptance_evidence_required", "live_recovery_window_too_short",
     "live_uncertain_snapshot_not_verified", "live_recovery_identity_changed",
     "live_frozen_payload_changed", "live_submission_identity_changed",
+    "live_submission_version_unsupported", "live_legacy_submission_correlation_invalid",
+    "live_submission_correlation_invalid", "live_submission_correlation_changed",
     "live_submission_not_recoverable", "live_scheduled_recovery_missing",
     "live_storage_access_denied", "live_storage_resource_missing", "live_storage_condition_failed",
     "live_queue_access_denied", "live_queue_quota_exceeded", "live_queue_resource_missing",

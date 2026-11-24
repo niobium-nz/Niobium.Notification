@@ -4,10 +4,11 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
-const { approvedHead, eligibleRun, testedRun, mergeEligibility, readiness, PIPELINE_FILES } = require('./delivery-policy.cjs');
+const { approvedHead, eligibleRun, testedRun, mergeEligibility, readiness, PIPELINE_FILES,
+  REVIEWED_WORKFLOW_PATH, REVIEWED_WORKFLOW_SHA, REVIEWED_PIPELINE_BASE } = require('./delivery-policy.cjs');
 const { contractsChanged } = require('./package-policy.cjs');
 const trustedSha = 'a'.repeat(40);
-const run = { id: 42, head_sha: 'head', event: 'push', head_branch: 'feature/test', conclusion: 'success',
+const run = { id: 42, head_sha: 'head', event: 'push', head_branch: 'feature/test', status: 'completed', conclusion: 'success',
   head_repository: { full_name: 'owner/repo' }, path: '.github/workflows/azure-deploy.yml',
   updated_at: '2026-10-30T12:00:00Z', html_url: 'https://github.com/owner/repo/actions/runs/42' };
 
@@ -22,6 +23,8 @@ function fixture() {
         steps: [{ name: `Run trusted deployed integration tests at ${trustedSha}`, conclusion: 'success' }] }],
     comparison: { status: 'ahead' },
     created: [], statuses: [], notices: [], contentReads: [], tamperedPath: null, missingTrustedPath: null,
+    featureWorkflow: null, reviewedWorkflow: null, changedBaseline: null, stageReadError: null,
+    activated: false, featureHelper: null,
   };
   const github = {
     paginate: async (method, args) => { if (method === 'runs') assert.equal(args.head_sha, 'head'); return state[method]; },
@@ -35,7 +38,22 @@ function fixture() {
           state.contentReads.push(args);
           assert.ok(['head', trustedSha].includes(args.ref));
           if (args.ref === trustedSha && args.path === state.missingTrustedPath) throw new Error('Missing trusted file');
-          return { data: { type: 'file', sha: args.ref === 'head' && args.path === state.tamperedPath ? 'no-op-pipeline' : `blob:${args.path}` } };
+          if (args.path === REVIEWED_WORKFLOW_PATH) {
+            assert.equal(args.ref, trustedSha, 'A feature cannot provide its own staged approval.');
+            if (state.stageReadError) throw state.stageReadError;
+            if (!state.reviewedWorkflow) throw Object.assign(new Error('Missing staged file'), { status: 404 });
+            return { data: state.reviewedWorkflow };
+          }
+          let sha = REVIEWED_PIPELINE_BASE[args.path];
+          if (state.activated && args.path === PIPELINE_FILES[0]) sha = REVIEWED_WORKFLOW_SHA;
+          if (args.path === state.changedBaseline) sha = 'new-main-pipeline';
+          if (args.ref === 'head' && args.path === PIPELINE_FILES[0] && state.featureWorkflow) sha = state.featureWorkflow;
+          if (args.ref === 'head' && args.path === state.tamperedPath) sha = 'no-op-pipeline';
+          if (args.ref === 'head' && args.path === 'scripts/check-webhook-configuration.py' && state.featureHelper) {
+            if (state.featureHelper.error) throw state.featureHelper.error;
+            return { data: state.featureHelper };
+          }
+          return { data: { type: 'file', sha } };
         },
         compareCommits: async () => ({ data: state.comparison }), createCommitStatus: async status => state.statuses.push(status),
       },
@@ -45,6 +63,13 @@ function fixture() {
     workflowRef: 'owner/repo/.github/workflows/pr-readiness.yml@refs/heads/main',
     context: { repo: { owner: 'owner', repo: 'repo' }, sha: trustedSha, ref: 'refs/heads/main', eventName: 'workflow_run', payload: { workflow_run: { ...run } } },
     core: { notice: message => state.notices.push(message) } };
+}
+
+function prFixture() {
+  const input = fixture();
+  input.context.eventName = 'pull_request_target';
+  input.context.payload = { pull_request: input.state.pr };
+  return input;
 }
 
 function packageRepository(t) {
@@ -93,9 +118,104 @@ test('missing merge history and invalid revisions fail instead of skipping publi
 test('only a successful exact-repository feature run of the expected workflow qualifies', () => {
   assert.equal(eligibleRun(run, 'head', 'owner/repo'), true);
   for (const patch of [{ head_sha: 'old' }, { event: 'pull_request' }, { head_branch: 'main' }, { conclusion: 'skipped' },
-    { head_repository: { full_name: 'fork/repo' } }, { path: '.github/workflows/forged.yml' }]) {
+    { head_repository: { full_name: 'fork/repo' } }, { path: '.github/workflows/forged.yml' }, { status: 'in_progress' }]) {
     assert.equal(eligibleRun({ ...run, ...patch }, 'head', 'owner/repo'), false);
   }
+});
+
+test('an early PR reports pending for absent or active verification without granting readiness or merge eligibility', async () => {
+  for (const status of [null, 'queued', 'in_progress', 'waiting', 'pending', 'requested']) {
+    const input = prFixture();
+    if (status === null) input.state.runs = [];
+    else Object.assign(input.state.runs[0], { status, conclusion: null });
+    await readiness(input);
+    assert.deepEqual(input.state.statuses.map(result => result.state), ['pending']);
+    assert.equal(input.state.statuses[0].context, 'Test deployment verified');
+    assert.equal(input.state.statuses[0].sha, 'head');
+    assert.match(input.state.notices[0], /has not completed/);
+    assert.equal(input.state.contentReads.length, PIPELINE_FILES.length * 2);
+    assert.equal(input.state.created.length, 0);
+    await assert.rejects(mergeEligibility(input), /no successful authenticated/);
+  }
+});
+
+test('an unfinished latest run cannot borrow an older success and later completion replaces pending with verified success', async () => {
+  const input = prFixture(); Object.assign(input.state.runs[0], { status: 'in_progress', conclusion: null });
+  input.state.runs.push({ ...run, id: 41, updated_at: '2026-10-29T12:00:00Z' });
+  await readiness(input);
+  assert.deepEqual(input.state.statuses.map(result => result.state), ['pending']);
+  Object.assign(input.state.runs[0], { status: 'completed', conclusion: 'success' });
+  input.context.eventName = 'workflow_run'; input.context.payload = { workflow_run: { ...run } };
+  await readiness(input);
+  assert.deepEqual(input.state.statuses.map(result => result.state), ['pending', 'success']);
+  assert.equal(input.state.statuses[1].target_url, run.html_url);
+});
+
+test('terminal or inconsistent feature outcomes remain failures on PR events even with an older success', async () => {
+  for (const patch of ['failure', 'cancelled', 'skipped', 'action_required', 'timed_out'].map(conclusion => ({ conclusion }))
+    .concat([{ status: 'completed', conclusion: null }, { status: 'unknown', conclusion: null },
+      { status: 'in_progress', conclusion: 'success' }])) {
+    const input = prFixture(); Object.assign(input.state.runs[0], patch);
+    input.state.runs.push({ ...run, id: 41, updated_at: '2026-10-29T12:00:00Z' });
+    await assert.rejects(readiness(input), /no successful authenticated/);
+    assert.deepEqual(input.state.statuses.map(result => result.state), ['failure']);
+  }
+});
+
+test('completed workflow events never turn absent or unfinished evidence into pending', async () => {
+  for (const absent of [false, true]) {
+    const input = fixture();
+    if (absent) input.state.runs = [];
+    else Object.assign(input.state.runs[0], { status: 'in_progress', conclusion: null });
+    await assert.rejects(readiness(input), /no successful authenticated/);
+    assert.deepEqual(input.state.statuses.map(result => result.state), ['failure']);
+  }
+});
+
+test('waiting does not conceal a changed pipeline, missing trust or an API failure', async () => {
+  for (const absent of [false, true]) {
+    for (const mutate of [
+      ...PIPELINE_FILES.map(path => input => { input.state.tamperedPath = path; }),
+      input => { input.state.missingTrustedPath = PIPELINE_FILES[0]; },
+      ...[403, 429, 500].map(status => input => { input.github.rest.repos.getContent = async () => {
+        throw Object.assign(new Error('Synthetic GitHub dependency failure'), { status });
+      }; }),
+    ]) {
+      const input = prFixture();
+      if (absent) input.state.runs = [];
+      else Object.assign(input.state.runs[0], { status: 'queued', conclusion: null });
+      mutate(input);
+      await assert.rejects(readiness(input));
+      assert.deepEqual(input.state.statuses.map(result => result.state), ['failure']);
+    }
+  }
+});
+
+test('pending staged activation still authenticates the exact reviewed main definition', async () => {
+  const input = prFixture(); Object.assign(input.state.runs[0], { status: 'queued', conclusion: null });
+  input.state.featureWorkflow = REVIEWED_WORKFLOW_SHA;
+  input.state.reviewedWorkflow = { type: 'file', sha: REVIEWED_WORKFLOW_SHA };
+  await readiness(input);
+  assert.deepEqual(input.state.statuses.map(result => result.state), ['pending']);
+  assert.deepEqual(input.state.contentReads.filter(read => read.path === REVIEWED_WORKFLOW_PATH),
+    [{ owner: 'owner', repo: 'repo', path: REVIEWED_WORKFLOW_PATH, ref: trustedSha }]);
+});
+
+test('PR and workflow completion observations serialize on the same head without cancelling queued work', () => {
+  const yaml = fs.readFileSync(path.join(__dirname, '../.github/workflows/pr-readiness.yml'), 'utf8');
+  const block = yaml.match(/^concurrency:\n((?:[ \t]+[^\n]*\n)+)/m)?.[1];
+  assert.ok(block);
+  assert.match(block, /^  cancel-in-progress: false$/m);
+  assert.match(block, /^  queue: max$/m);
+  const group = block.match(/^  group: (.*?)\$\{\{\s*(.*?)\s*\}\}$/m);
+  assert.ok(group);
+  // Evaluate this workflow's property/fallback expression for both event shapes.
+  // No feature code, status mutation or GitHub API is executed by this check.
+  assert.match(group[2], /^[\w.]+(?:\s*\|\|\s*[\w.]+)*$/);
+  const key = event => group[1] + group[2].split('||').map(property => property.trim().split('.')
+    .reduce((value, part) => value?.[part], { github: { event, sha: trustedSha } })).find(Boolean);
+  assert.equal(key({ pull_request: { head: { sha: 'first-head' } } }), key({ workflow_run: { head_sha: 'first-head' } }));
+  assert.notEqual(key({ pull_request: { head: { sha: 'first-head' } } }), key({ workflow_run: { head_sha: 'other-head' } }));
 });
 
 test('one permitted approval suffices, with no restriction on the PR author', () => {
@@ -128,6 +248,106 @@ test('pipeline proof pins both API reads to exact immutable commits', async () =
   const input = fixture(); await readiness(input);
   assert.equal(input.state.contentReads.length, PIPELINE_FILES.length * 2);
   assert.ok(input.state.contentReads.every(read => ['head', trustedSha].includes(read.ref)));
+});
+
+test('an exact staged workflow on immutable main permits only its bound pipeline revision', async () => {
+  const input = fixture(); input.state.featureWorkflow = REVIEWED_WORKFLOW_SHA;
+  input.state.reviewedWorkflow = { type: 'file', sha: REVIEWED_WORKFLOW_SHA };
+  await readiness(input);
+  assert.equal(input.state.statuses.at(-1).state, 'success');
+  assert.deepEqual(input.state.contentReads.filter(read => read.path === REVIEWED_WORKFLOW_PATH),
+    [{ owner: 'owner', repo: 'repo', path: REVIEWED_WORKFLOW_PATH, ref: trustedSha }]);
+  assert.equal(input.state.created.length, 0);
+});
+
+test('staged approval cannot authorize any other workflow or helper revision', async () => {
+  for (const path of PIPELINE_FILES) {
+    const input = fixture(); input.state.featureWorkflow = REVIEWED_WORKFLOW_SHA;
+    input.state.reviewedWorkflow = { type: 'file', sha: REVIEWED_WORKFLOW_SHA };
+    input.state.tamperedPath = path;
+    await assert.rejects(readiness(input), /Untrusted pipeline definition/);
+    assert.equal(input.state.statuses.at(-1).state, 'failure');
+  }
+});
+
+test('the preflight cannot be replaced or removed during activation or after the workflow reaches main', async () => {
+  for (const activated of [false, true]) {
+    const valid = fixture(); valid.state.activated = activated;
+    valid.state.featureWorkflow = REVIEWED_WORKFLOW_SHA;
+    valid.state.reviewedWorkflow = { type: 'file', sha: REVIEWED_WORKFLOW_SHA };
+    await readiness(valid);
+    assert.equal(valid.state.statuses.at(-1).state, 'success');
+    assert.ok(valid.state.contentReads.some(read => read.path === 'scripts/check-webhook-configuration.py' && read.ref === 'head'));
+    for (const featureHelper of [{ type: 'file', sha: 'no-op-preflight' }, { type: 'file' },
+      { type: 'symlink', sha: REVIEWED_PIPELINE_BASE['scripts/check-webhook-configuration.py'] },
+      { error: Object.assign(new Error('Missing feature preflight'), { status: 404 }) }]) {
+      const input = fixture(); input.state.activated = activated;
+      input.state.featureWorkflow = REVIEWED_WORKFLOW_SHA;
+      input.state.reviewedWorkflow = { type: 'file', sha: REVIEWED_WORKFLOW_SHA };
+      input.state.featureHelper = featureHelper;
+      await assert.rejects(readiness(input), /Untrusted pipeline definition|Missing feature preflight/);
+      assert.deepEqual(input.state.statuses.map(status => status.state), ['failure']);
+    }
+  }
+});
+
+test('changing any predecessor pipeline blob expires the staged approval even if the feature matches its new helper', async () => {
+  for (const path of PIPELINE_FILES) {
+    const input = fixture(); input.state.featureWorkflow = REVIEWED_WORKFLOW_SHA;
+    input.state.reviewedWorkflow = { type: 'file', sha: REVIEWED_WORKFLOW_SHA };
+    input.state.changedBaseline = path;
+    await assert.rejects(readiness(input), /Untrusted pipeline definition/);
+    assert.equal(input.state.statuses.at(-1).state, 'failure');
+    assert.ok(!input.state.contentReads.some(read => read.path === REVIEWED_WORKFLOW_PATH));
+  }
+});
+
+test('missing, wrong or non-file staged evidence fails closed', async () => {
+  for (const reviewedWorkflow of [null, { type: 'file', sha: 'different' }, { type: 'file' },
+    { type: 'symlink', sha: REVIEWED_WORKFLOW_SHA }, { type: 'dir', sha: REVIEWED_WORKFLOW_SHA }]) {
+    const input = fixture(); input.state.featureWorkflow = REVIEWED_WORKFLOW_SHA;
+    input.state.reviewedWorkflow = reviewedWorkflow;
+    await assert.rejects(readiness(input), /Untrusted pipeline definition/);
+    assert.deepEqual(input.state.statuses.map(status => status.state), ['failure']);
+  }
+});
+
+test('staged evidence permission and platform errors propagate without publishing success', async () => {
+  for (const status of [403, 429, 500]) {
+    const input = fixture(); input.state.featureWorkflow = REVIEWED_WORKFLOW_SHA;
+    input.state.stageReadError = Object.assign(new Error('Synthetic GitHub dependency failure'), { status });
+    await assert.rejects(readiness(input), /Synthetic GitHub dependency failure/);
+    assert.deepEqual(input.state.statuses.map(result => result.state), ['failure']);
+  }
+});
+
+test('a staged pipeline still requires all successful jobs, deployed steps and the exact trusted main harness', async () => {
+  for (const mutate of [s => { s.jobs[0].conclusion = 'failure'; }, s => { s.jobs[1].steps[0].conclusion = 'skipped'; },
+    s => { s.jobs.pop(); }, s => { s.jobs[2].steps[0].name = 'Run trusted deployed integration tests at feature'; }]) {
+    const input = fixture(); input.state.featureWorkflow = REVIEWED_WORKFLOW_SHA;
+    input.state.reviewedWorkflow = { type: 'file', sha: REVIEWED_WORKFLOW_SHA };
+    mutate(input.state);
+    await assert.rejects(readiness(input), /no successful authenticated/);
+    assert.equal(input.state.statuses.at(-1).state, 'failure');
+  }
+});
+
+test('the reviewed data file matches its actual Git blob identity and the predecessor pins every protected path', () => {
+  const { createHash } = require('node:crypto');
+  const root = path.resolve(__dirname, '..');
+  const blob = file => {
+    const content = fs.readFileSync(path.join(root, file));
+    return createHash('sha1').update(`blob ${content.length}\0`).update(content).digest('hex');
+  };
+  assert.equal(blob(REVIEWED_WORKFLOW_PATH), REVIEWED_WORKFLOW_SHA);
+  const preflight = 'scripts/check-webhook-configuration.py';
+  assert.ok(PIPELINE_FILES.includes(preflight));
+  assert.equal(blob(preflight), REVIEWED_PIPELINE_BASE[preflight]);
+  const staged = fs.readFileSync(path.join(root, REVIEWED_WORKFLOW_PATH), 'utf8');
+  assert.equal(staged.split(`python -I ${preflight}`).length - 1, 2);
+  assert.deepEqual(Object.keys(REVIEWED_PIPELINE_BASE).sort(), [...PIPELINE_FILES].sort());
+  for (const sha of Object.values(REVIEWED_PIPELINE_BASE)) assert.match(sha, /^[0-9a-f]{40}$/);
+  assert.ok(!REVIEWED_WORKFLOW_PATH.startsWith('.github/workflows/'));
 });
 
 test('feature contexts cannot invoke privileged repository writes', async () => {

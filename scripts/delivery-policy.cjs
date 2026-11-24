@@ -1,14 +1,36 @@
 // Privileged entry point: only the controller loaded from the default branch may publish readiness status.
 const WORKFLOW = 'azure-deploy.yml';
 const WORKFLOW_PATH = `.github/workflows/${WORKFLOW}`;
-const PIPELINE_FILES = [WORKFLOW_PATH, 'azure.yaml', 'scripts/check-coverage.py', 'scripts/test-resources.py'];
+const PIPELINE_FILES = [WORKFLOW_PATH, 'azure.yaml', 'scripts/check-coverage.py', 'scripts/test-resources.py',
+  'scripts/check-webhook-configuration.py'];
+// A single concrete next revision, reviewed as data on main before a feature can
+// use it. This is deliberately bound to the complete predecessor pipeline: an
+// unrelated future pipeline revision must never revive an old staged approval.
+const REVIEWED_WORKFLOW_PATH = '.github/reviewed-pipelines/azure-deploy.yml';
+const REVIEWED_WORKFLOW_SHA = '7a2cefa03c4868c8b56fe8bfba241c15d8a5dbb3';
+const REVIEWED_PIPELINE_BASE = Object.freeze({
+  [WORKFLOW_PATH]: '622675bc1c131a11268e49a09efc0d3eb4a7fca6',
+  'azure.yaml': 'bcc11f088596a50c2c68b92d84553c84da3ceefd',
+  'scripts/check-coverage.py': 'fe7e478c3d3feca4505dc6f824153fbdf4eff6bf',
+  'scripts/test-resources.py': '8b84f121c4cce94a51b50e71102cacf4bc79902b',
+  'scripts/check-webhook-configuration.py': '51bdf9ae176531f9f9d02fff2949b6a2f918569c',
+});
 const REQUIRED_JOBS = ['Build and local tests', 'Deploy test and run integration'];
 const REQUIRED_STEP = 'Run deployed integration tests';
 const TRUSTED_TEST_JOB = 'Verify trusted deployed integration';
+const ACTIVE_RUN_STATES = new Set(['queued', 'in_progress', 'waiting', 'pending', 'requested']);
+
+class VerificationPending extends Error {
+  constructor() { super('The current feature verification has not completed.'); }
+}
+
+function featureRun(run, sha, repository) {
+  return run.head_sha === sha && run.event === 'push' && run.head_branch !== 'main' &&
+    run.head_repository?.full_name === repository && run.path === WORKFLOW_PATH;
+}
 
 function eligibleRun(run, sha, repository) {
-  return run.head_sha === sha && run.event === 'push' && run.head_branch !== 'main' &&
-    run.conclusion === 'success' && run.head_repository?.full_name === repository && run.path === WORKFLOW_PATH;
+  return featureRun(run, sha, repository) && run.status === 'completed' && run.conclusion === 'success';
 }
 
 function approvedHead(reviews, head) {
@@ -23,29 +45,60 @@ function approvedHead(reviews, head) {
 
 async function authenticatePipeline(github, owner, repo, featureSha, trustedSha) {
   if (!/^[0-9a-f]{40}$/.test(trustedSha ?? '')) throw new Error('An immutable trusted main commit is required.');
+  const observed = new Map();
   for (const path of PIPELINE_FILES) {
     // Read Git blob identities through the API. Never download or execute feature policy code.
     const [feature, trusted] = await Promise.all([
       github.rest.repos.getContent({ owner, repo, path, ref: featureSha }),
       github.rest.repos.getContent({ owner, repo, path, ref: trustedSha }),
     ]);
-    if (feature.data.type !== 'file' || trusted.data.type !== 'file' ||
-        !feature.data.sha || feature.data.sha !== trusted.data.sha) {
+    if (feature.data.type !== 'file' || trusted.data.type !== 'file' || !feature.data.sha || !trusted.data.sha) {
       throw new Error(`Untrusted pipeline definition: ${path}. Pipeline changes require reviewed activation on main before automatic certification.`);
     }
+    observed.set(path, { feature: feature.data.sha, trusted: trusted.data.sha });
+  }
+  const changed = PIPELINE_FILES.filter(path => observed.get(path).feature !== observed.get(path).trusted);
+  if (changed.length === 0) return;
+  const predecessorMatches = PIPELINE_FILES.every(path => observed.get(path).trusted === REVIEWED_PIPELINE_BASE[path]);
+  if (changed.length !== 1 || changed[0] !== WORKFLOW_PATH || !predecessorMatches ||
+      observed.get(WORKFLOW_PATH).feature !== REVIEWED_WORKFLOW_SHA) {
+    throw new Error('Untrusted pipeline definition: no exact reviewed revision for this main pipeline.');
+  }
+  // Load only metadata of the complete reviewed definition at immutable main.
+  // Never accept a staged file from the feature, execute it here or borrow it
+  // from mutable main. Missing/malformed evidence cannot bootstrap itself.
+  let staged;
+  try {
+    staged = await github.rest.repos.getContent({ owner, repo, path: REVIEWED_WORKFLOW_PATH, ref: trustedSha });
+  } catch (error) {
+    if (error.status !== 404) throw error;
+    throw new Error('Untrusted pipeline definition: reviewed main workflow is missing.');
+  }
+  if (staged.data.type !== 'file' || staged.data.sha !== REVIEWED_WORKFLOW_SHA) {
+    throw new Error('Untrusted pipeline definition: reviewed main workflow does not match its pinned revision.');
   }
 }
 
-async function testedRun(github, owner, repo, sha, trustedSha, runId) {
+async function testedRun(github, owner, repo, sha, trustedSha, runId, allowPending = false) {
   const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
     owner, repo, workflow_id: WORKFLOW, event: 'push', head_sha: sha, per_page: 100,
   });
   // A failed triggering run must not borrow success from an older run of the same SHA.
   const candidates = runId ? runs.filter(run => run.id === runId) :
     [...runs].sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at)).slice(0, 1);
-  for (const run of candidates) {
-    if (!eligibleRun(run, sha, `${owner}/${repo}`)) continue;
+  // A PR synchronization may arrive before its push run is visible. Authenticate
+  // the pipeline even while waiting; missing or changed trust is still failure.
+  if (allowPending && !runId && candidates.length === 0) {
     await authenticatePipeline(github, owner, repo, sha, trustedSha);
+    throw new VerificationPending();
+  }
+  for (const run of candidates) {
+    if (!featureRun(run, sha, `${owner}/${repo}`)) continue;
+    await authenticatePipeline(github, owner, repo, sha, trustedSha);
+    if (allowPending && !runId && run.conclusion === null && ACTIVE_RUN_STATES.has(run.status)) {
+      throw new VerificationPending();
+    }
+    if (!eligibleRun(run, sha, `${owner}/${repo}`)) continue;
     const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
       owner, repo, run_id: run.id, filter: 'latest', per_page: 100,
     });
@@ -94,8 +147,15 @@ async function readiness({ github, context, core, trustedSha, workflowRef }) {
   if (!sha) throw new Error('Missing feature commit.');
   let run;
   try {
-    run = await testedRun(github, owner, repo, sha, trustedSha, eventRun?.id);
+    run = await testedRun(github, owner, repo, sha, trustedSha, eventRun?.id,
+      context.eventName === 'pull_request_target' && !!pr && !eventRun);
   } catch (error) {
+    if (error instanceof VerificationPending) {
+      await github.rest.repos.createCommitStatus({ owner, repo, sha, state: 'pending', context: 'Test deployment verified',
+        description: 'Waiting for this commit to finish authenticated feature verification.' });
+      core.notice(error.message);
+      return;
+    }
     await github.rest.repos.createCommitStatus({ owner, repo, sha, state: 'failure', context: 'Test deployment verified',
       description: 'A successful run with the trusted main pipeline definition is required.' });
     throw error;
@@ -105,4 +165,5 @@ async function readiness({ github, context, core, trustedSha, workflowRef }) {
   core.notice(`Feature commit is eligible for review: ${run.html_url}`);
 }
 
-module.exports = { mergeEligibility, readiness, testedRun, eligibleRun, approvedHead, authenticatePipeline, PIPELINE_FILES };
+module.exports = { mergeEligibility, readiness, testedRun, eligibleRun, approvedHead, authenticatePipeline, PIPELINE_FILES,
+  REVIEWED_WORKFLOW_PATH, REVIEWED_WORKFLOW_SHA, REVIEWED_PIPELINE_BASE };

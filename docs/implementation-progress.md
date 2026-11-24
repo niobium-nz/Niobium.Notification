@@ -1,58 +1,47 @@
 # Notification reliability implementation ledger
 
-## B06 provider delivery receipts in implementation (14 November 2026)
+## Provider receipts and operator scope (25 November 2026, Pacific/Auckland)
 
-The feature based on `d34bffbc49b980d6c1c372f90a57c21846eccad4` adds runtime
-raw-body webhook authentication, durable normalized capture, model-owned opaque
-correlation, rich receipt-domain transitions, deduplicated publication and an additive
-generic delivery event. The deployed fixture now requires a real correlated Delivered
-receipt from its existing test send. See [implementation and configuration](provider-delivery-receipts.md).
-This is working code under verification, not a delivered milestone. Actual provider
-webhook/secret configuration, protected workflow activation, exact-head CI/reviews,
-merge, production verification and Contracts publication still need evidence.
-The Invoicing consumer, lifecycle/cancellation, audited recovery and later roadmap
-milestones remain outstanding.
+The owner configured Resend endpoints and signing bundles for `test` and `prod`.
+The receipt candidate resumes from the current protected main with its reviewed
+workflow. The earlier deployment run
+[43596972075](https://github.com/niobium-nz/Niobium.Notification/actions/runs/43596972075)
+stopped at signing configuration before provisioning. The new release requires
+a real Published Delivered receipt, the independent main verifier and terminal
+production and package evidence. [Receipt rollout](provider-delivery-receipts.md)
 
-Local verification passed 249 application/fixture cases, 18 real loopback Table/Blob
-cases, 61 Python checks and 20 delivery-policy checks, with zero failures/skips.
-Authored coverage is 97.96% overall (Contracts 100%, Core 99.20%, Server 96.10%).
-Release builds have zero errors and only the existing NU1603 package warnings.
-Workflow YAML, both explicit secret projections and whitespace checks passed.
-These results do not establish deployed webhook configuration or delivery.
+The owner approved the operator design and deferred implementation. Operators use
+the manual data access process. Future activation includes GET token exchange,
+service local role grants, reviewed bootstrap and fresh test identity acquisition.
+[Operator design](operator-recovery.md) · [Configuration steps](operator-recovery-setup.md)
 
-The first feature head `23dd2d8d29dc90acc581a4d9831867bfb4cadb5e` passed hosted
-build/local checks and [Storage 43595754845](https://github.com/niobium-nz/Niobium.Notification/actions/runs/43595754845).
-[Azure Deployment 43595754853](https://github.com/niobium-nz/Niobium.Notification/actions/runs/43595754853)
-stopped before provisioning with `provider_webhook_signing_configuration_required`.
-No deployed report existed; the following artifact-upload failure was consequential,
-not evidence of an upload-service outage. Trusted/production jobs were skipped.
-The owner configuration request is pending; no retry is justified without a change.
+## Trusted recovery compatibility for receipt metadata (14 November 2026)
 
-The independent reviewer found that old version-2 replace-mode writers could erase
-new receipt metadata. The correction gives new rows version 3 while retaining
-version-2 retry support, with a pinned-prior-writer/real-adapter regression. It also
-makes the trusted fixture's version expectation an explicit installation dependency.
-The correction passed 249 application/fixture cases and 20 real storage cases,
-including both old-writer controls and the unchanged version-2 replay fixture.
-Authored coverage remains 97.96%. Exact-head CI and independent follow-up remain
-required; no formal approval or PR has been claimed.
+Notification [PR #9](https://github.com/niobium-nz/Niobium.Notification/pull/9)
+completed the live B02 recovery verification below. Its merge
+`d34bffbc49b980d6c1c372f90a57c21846eccad4` passed production run 43592105122 and
+GET-only verification. The downloaded production ZIP matched SHA-256
+`885a69f58365bea432853c41a60bbefc69c638820cbacbb279a20e6bc1269e40`;
+package run 43592105110 succeeded and correctly skipped unchanged Contracts.
 
-## PR9 delivered checkpoint (14 November 2026)
+This follow-up prepares the installed trusted recovery harness for the version-3
+provider receipt representation. It independently validates versions 2/3, requires
+owned operation/channel and stable opaque proof on version 3, forbids correlation
+on version 2, and rejects changed versions/proofs across fault setup and recovery.
+All raw columns and the conditional write protocol remain preserved. The production
+application, Contracts and pipeline definitions are unchanged by this increment.
 
-The earlier B02 entry below is now historical. PR9 feature
-`9e060809eb1b7b7bb383b4fd16d03a21831d8c62` passed Azure Deployment `43590967393`
-(13 candidate and 8 immutable-main trusted checks) and Storage `43590967404`
-(14 cases). Native review completed; the separate `5he11` reviewer approved that
-exact head in review `5904199869`. Readiness succeeded and the protected squash
-merge was `d34bffbc49b980d6c1c372f90a57c21846eccad4`.
-
-Production run `43592105122` and GET `/health` verification succeeded for the actual
-merge. Downloaded report artifact `14112887848` had ZIP SHA-256
-`885a69f58365bea432853c41a60bbefc69c638820cbacbb279a20e6bc1269e40`, matching GitHub
-and upload logs. Package run `43592105110` succeeded and correctly skipped publication
-because Contracts had not changed. Full evidence is recorded on
-[PR9](https://github.com/niobium-nz/Niobium.Notification/pull/9#issuecomment-6876923776).
-This completes live B02 verification, not B06 or the full Invoicing roadmap.
+Local verification passes 193 application/fixture cases with no skips or failures
+and 98.58% authored application line coverage.
+Eighteen additional cases cover correlated restoration, malformed metadata, version
+changes and lost correlation at fault readback or later recovery. The build succeeds
+with the existing NU1603 dependency-resolution warnings. All 60 Python wrapper/tooling
+cases pass, including exact allowlisting of the four new fixed verifier diagnostics
+and continued suppression of arbitrary appended receipt details. Exact-head feature/storage
+runs, candidate/trusted reports, native review, independent approval and terminal
+production/package evidence belong on this increment's PR before it is delivered.
+Provider receipt endpoints/configuration, authenticated live confirmation and the
+remaining Invoicing roadmap are separate outstanding work.
 
 ## Live B02 recovery verification in progress (14 November 2026)
 

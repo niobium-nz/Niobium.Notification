@@ -22,6 +22,17 @@ The owner approved applying Niobium.Invoicing's delivery safeguards to this depe
 
 Package publication compares the actual merge commit's Contracts tree with its first parent. Missing history fails. Unchanged Contracts skips restore/build/NuGet login/publication. Feature packages are no longer published. Production and package concurrency queues retain pending runs.
 
+A PR update can reach the main-owned readiness controller before its feature run
+starts or finishes. After authenticating the pipeline, the controller reports
+`Test deployment verified` as **pending** for that unfinished work. The controller
+job may finish successfully after reporting pending; this is not verification
+success and cannot satisfy the required custom status. The completed feature run
+triggers the normal full verification and publishes success or failure. Terminal
+failures, missing trusted evidence and pipeline/API errors still fail; merge-time
+validation never accepts pending work or borrows an older successful run.
+Readiness events for one feature SHA run serially without cancellation, preventing
+an earlier observation from overwriting a completed result with stale pending.
+
 ## Automatic review authorization and activation
 
 The owner approved automatic review on 2026-11-06 (Pacific/Auckland). The intended
@@ -60,11 +71,11 @@ pipeline and verify its terminal result before reporting the PR ready.
 
 ## Required repository administration and installation
 
-The B06 [provider receipt setup](provider-delivery-receipts.md#required-environment-configuration)
-adds one encrypted webhook-key bundle in each existing environment and an explicit
-deployment-workflow projection. Its new protected workflow blob requires the reviewed
-activation procedure below. Provider configuration and actual receipt evidence are
-separate from successful local tests or permission to create/merge ordinary PRs.
+The receipt workflow projects a webhook signing bundle from each environment's
+GitHub secret to its Key Vault. See [provider receipt setup](provider-delivery-receipts.md#required-environment-configuration).
+Operator access continues through the manual process. The approved
+[operator identity setup](operator-recovery-setup.md) applies when that separate
+feature resumes.
 
 Source changes cannot configure repository permissions/rules. The inspected baseline `989b7c4b36154c5da2cdd3391ec297e1f453ea14` had unprotected main, no rulesets and read-only access for `5he11`. On 2026-11-06, the owner granted `5he11` Write access and the connector verified it; main still had no protection. Recheck current settings before acting.
 
@@ -78,6 +89,40 @@ not certify the candidate. Future changes to protected pipeline definitions stil
 need a concrete reviewed activation decision when they cannot be authenticated
 against current main. A skipped trusted step is never a successful verification.
 Do not infer an exception from an earlier installation or fabricate status.
+
+### Reviewed workflow activation
+
+The readiness controller accepts the active pipeline's exact main blobs. For the
+concrete receipt workflow revision, it also supports one exact definition staged
+as [review material](../.github/reviewed-pipelines/README.md) on immutable main.
+That definition is outside `.github/workflows`, so staging it does not activate
+its deployment jobs or consume new environment settings.
+
+First deliver the staged workflow and its controller pins as an ordinary feature
+using the unchanged active pipeline. Require successful feature/storage/candidate/
+trusted integration, native review, genuine independent current-head approval and
+a protected merge. The review includes the complete proposed workflow and its
+diff from the pinned predecessor. No administration bypass or fabricated status
+is needed for this main-owned activation record.
+
+Then update the implementation branch from that main and use the exact reviewed
+workflow. The controller requires all other protected files to match main, all
+five predecessor blobs to match the reviewed tuple, and the feature workflow to
+match both its pinned target SHA and the staged file's Git blob on immutable main.
+The reviewed webhook preflight is added to main with its tests before activation,
+and remains part of exact-main comparison after activation. The staged workflow
+runs it in Python isolated mode to prevent feature-local import substitution.
+A missing file, different helper, expired predecessor or metadata error fails
+closed. Feature files cannot approve themselves. A later change to any predecessor
+blob expires the staged authorization, preventing an old approval from authorizing
+a downgrade after the active pipeline evolves.
+
+The implementation still needs its own exact-head successful build, storage tests,
+actual test deployment, candidate tests and the immutable-main trusted harness.
+Approval of staging is not approval of that application PR. Native review,
+independent approval, protected merge and terminal production/package verification
+remain required. The receipt candidate requires provider webhook signing configuration. The
+operator feature is deferred and has its own future workflow activation.
 
 The connector cannot administer rulesets, Actions settings, environment configuration
 or collaborator roles. Prepare concrete changes and candidate evidence before
@@ -173,6 +218,21 @@ unrelated-row and changed-template rejection, missing evidence, stale ETags,
 unknown write responses, changed readback and bounded peek-only wake discovery.
 These local safeguards complement the live report; they do not replace it.
 
+The recovery verifier independently accepts persisted submission versions 2 and 3.
+Version 2 must have no receipt metadata. Version 3 must retain the owned command's
+operation/channel and a nonempty opaque receipt proof. The first owned observation
+binds the version and proof; every later poll and post-write read must preserve
+them, including recovery in a distinct deployed invocation. The fixture copies all
+columns when restoring the lost outcome and uses the observed ETag. It rejects
+unknown versions, missing metadata and changes or downgrades instead of rewriting
+the row into the verifier's application-model version. The proof's representation
+remains private to the model, and neither proof nor payload enters the report.
+
+The receipt candidate requires a real Delivered receipt in Published state for
+this run's owned send. The existing immutable-main harness independently checks
+durable recovery and preserved correlation. Its own checks remain the readiness
+authority. See [receipt evidence](provider-delivery-receipts.md#verification-and-limits).
+
 The parent harness conditionally cleans its owned template and template blob.
 The real durable submission row and frozen payload remain as suppression and
 recovery evidence, including after failure. Deleting them while a late wake exists
@@ -200,8 +260,8 @@ environment variables, using the same pattern for queues and tables:
 
 | Parameter | Runner variable | Default |
 | --- | --- | --- |
-| `serviceBusQueueNames` | `SERVICE_BUS_QUEUE_NAMES` | `subscribecommand,notifycommand,subscribedevent` |
-| `storageTableNames` | `STORAGE_TABLE_NAMES` | `Subscription,Template,NotificationSubmission` |
+| `serviceBusQueueNames` | `SERVICE_BUS_QUEUE_NAMES` | `subscribecommand,notifycommand,subscribedevent,capturenotificationreceiptcommand,notificationdeliveryevent` |
+| `storageTableNames` | `STORAGE_TABLE_NAMES` | `Subscription,Template,NotificationSubmission,NotificationReceipt` |
 
 The table list includes historical service-owned tables as well as the new inbox.
 Table names use singular PascalCase entity names: the Niobium repository defaults
@@ -218,7 +278,7 @@ it in the deployment job's `env`, for example:
 
 ```yaml
 env:
-  STORAGE_TABLE_NAMES: ${{ vars.STORAGE_TABLE_NAMES || 'Subscription,Template,NotificationSubmission' }}
+  STORAGE_TABLE_NAMES: ${{ vars.STORAGE_TABLE_NAMES || 'Subscription,Template,NotificationSubmission,NotificationReceipt' }}
 ```
 
 The fallback matters because an undefined GitHub variable expands to an empty

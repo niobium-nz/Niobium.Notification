@@ -105,9 +105,10 @@ There is no tenant enrollment or delivery-confirmation enable switch.
 Configure each relevant Resend account's webhook to the respective environment's
 HTTPS origin plus `/webhooks/resend`, subscribing to `email.sent`, `email.delivered`,
 `email.delivery_delayed`, `email.bounced`, `email.failed`, `email.suppressed` and
-`email.complained`. Keep test and production endpoints/keys distinct. The managed
-GitHub connector cannot configure Resend or GitHub environment secrets; this
-requires an operator with those existing configuration permissions.
+`email.complained`. Keep test and production endpoints/keys distinct. The owner
+confirmed both environments' endpoints and signing bundles are configured on
+25 November 2026 (Pacific/Auckland). The live test checks the test callback and
+matching publication. Coordinate production endpoint activation with deployment.
 
 The additive resources are `NotificationReceipt`, `capturenotificationreceiptcommand`
 and `notificationdeliveryevent` in existing storage/Service Bus. Their business
@@ -115,15 +116,14 @@ names are defaults in `infra/main.bicepparam`; any supplied name-list override m
 retain all existing names and include these additions. Generic infrastructure
 modules remain environment agnostic.
 
-This change also projects a new setting in the protected deployment workflow.
-The current main readiness controller intentionally rejects a different workflow
-blob until reviewed activation on main. Its old live fixture also expects version-2
-new rows; the new version-3 fixture must be included in that reviewed installation.
-An old trusted-fixture failure is not a successful compatibility check or a skipped
-requirement. Local/candidate success cannot substitute
-for that status. Follow [the installation procedure](delivery-and-operations.md#required-repository-administration-and-installation)
-with concrete diff, test and independent-review evidence; do not fabricate readiness,
-direct-push main or infer an exception from an earlier installation.
+The receipt release uses the exact deployment workflow staged on protected main
+in PR11. The current main harness accepts version-3 submissions and independently
+verifies preserved correlation through a durable retry. Follow the reviewed
+activation procedure and verify the current feature head through both harnesses.
+Operator access follows the current manual process. Automated investigation and
+copy authorization remain deferred.
+[Reviewed activation](delivery-and-operations.md#reviewed-workflow-activation) ·
+[Operator design](operator-recovery.md)
 
 ## Verification and limits
 

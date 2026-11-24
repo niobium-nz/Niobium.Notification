@@ -9,11 +9,14 @@ Keep the domain's conservative hold for an untracked redelivery. Broker first
 delivery describes an envelope, not proof that its logical operation was never sent.
 
 Read [provider delivery receipts](docs/provider-delivery-receipts.md) for webhook,
-correlation, event publication or delivery changes. Verify signatures over raw bytes
-before parsing, durably queue before acknowledgement, and keep receipt publication
-separate from submission acceptance. Models own opaque correlation/event identities;
-domains own transitions. Delivery requires authenticated recipient-server acceptance.
-Respect at-least-once/out-of-order events and preserve legacy uncorrelated evidence.
+correlation, event publication and delivery changes. Verify signatures over the
+raw request, durably queue receipts before acknowledgement and preserve legacy
+uncorrelated evidence. Models own opaque correlation and event identities. Domains
+own receipt transitions and publication evidence.
+
+Operators obtain data access through the existing manual process. The approved
+[operator recovery design](docs/operator-recovery.md) and
+[identity setup](docs/operator-recovery-setup.md) are for the deferred feature.
 
 Read [model names and contract ownership](docs/model-contracts.md) before adding or
 changing a Table model, key, fingerprint, serialized shape or file reference.
@@ -59,6 +62,7 @@ production verification, not a reason to stop the goal.
 - Request `5he11` and keep implementation (`niobium-nz`) and formal approval in separate sessions. The implementation agent must not submit its own reviewer decision or direct a rubber stamp. It must invoke the independent `pr_approver` agent, which verifies the authorized reviewer connection and current-head evidence before making and recording its own GitHub decision. Native comments/reactions are not formal approval and do not replace this handoff. This makes the same standing process explicit in Notification, Store and Invoicing.
 - Address actionable review feedback, rerun deployment/tests for changed heads and obtain one valid formal current-head approval from any approver GitHub permits. Do not invent an additional author exclusion. Check all comments/threads and verify native review results separately.
 - Require up-to-date main, resolved threads, successful test deployment and the trusted custom status. Verify the proposed merge tree equals the tested tree. Squash merge through the connector with an expected-head SHA, without a second permission request once the rules are satisfied.
+- A changed deployment workflow needs its exact staged definition and complete predecessor pins reviewed on protected main first. Follow [reviewed workflow activation](docs/delivery-and-operations.md#reviewed-workflow-activation). Staging grants no skipped-test exception or feature-owned trust; every normal review and deployment requirement still applies.
 - Monitor the resulting production deployment, read-only tests and package workflow to terminal success. A failure requires immediate investigation and a fix through the same feature/review process. Never direct-push main, weaken protections or fabricate status.
 - The initial trusted listener/harness cannot certify itself before it exists on main. A skipped trusted step is not success. Obtain an explicit administrative installation decision for this repository; earlier Invoicing exceptions do not carry over.
 
@@ -72,6 +76,14 @@ production verification, not a reason to stop the goal.
 - The deployed harness reads runner-only `TEST_NOTIFICATION_SENDER` from the GitHub `test` environment variable (`vars`) and `TEST_NOTIFICATION_RECIPIENT` from its environment secret (`secrets`). The owner confirmed these bindings on 2026-11-06; do not request a second sender secret. The sender must be explicitly approved and permitted by the existing test provider configuration; the recipient must be an approved test mailbox. Do not infer either from an arbitrary tenant/template or require any Invoicing setting. Create only this run's generic template and blob in existing test resources, with ownership-checked cleanup.
 
 ## Infrastructure composition
+
+Use `rg-niobium-<service-slug>-<env>` for resource groups and
+`<prefix>-<abbr>-<env>` for named service resources such as Functions and
+vaults. Functions deployment packages use `<prefix>sts<env>` and application
+data uses `<prefix>std<env>`. The `AzureWebJobsStorage` Blob and Table endpoints
+in `infra/main.bicep` use the `std` account.
+Notification uses the compact prefix `niobiumnotify`. Read the resource group from the target environment's `AZURE_RESOURCE_GROUP`.
+[Azure naming guide](https://github.com/niobium-nz/Niobium.DevOps/blob/f437f5a77dbec45296c0586b5bbe828d36eeb38b/docs/azure-resource-naming.md) · [Current DevOps documentation](https://github.com/niobium-nz/Niobium.DevOps/tree/main/docs)
 
 The owner requires environment-agnostic Bicep and reusable Function App modules. `infra/function-app.bicep` owns host-bound resources and unions generic caller `appSettings` with internal host settings. `infra/main.bicep` owns application-specific resources. Environment suffixes and supplied values select the actual resources.
 
