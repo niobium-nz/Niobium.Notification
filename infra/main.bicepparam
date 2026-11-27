@@ -3,10 +3,25 @@ using 'main.bicep'
 var targetEnvironment = readEnvironmentVariable('AZURE_ENV_NAME', 'dev')
 
 param environmentName = targetEnvironment
-param notificationDeliveryRoutes = targetEnvironment == 'test' ? [
+var deployInvoiceDestination = targetEnvironment == 'test' || targetEnvironment == 'prod'
+var invoiceReceiptQueue = 'notificationdeliveryevent-invoicing'
+
+param notificationDeliveryRoutes = concat(deployInvoiceDestination ? [
+  {
+    channel: 'Invoice'
+    queue: invoiceReceiptQueue
+  }
+] : [], targetEnvironment == 'test' ? [
   {
     channel: 'ContactUs'
     queue: 'notificationdeliveryevent-test-verification'
+  }
+] : [])
+param notificationDeliveryReaders = deployInvoiceDestination ? [
+  {
+    queue: invoiceReceiptQueue
+    resourceGroup: 'rg-niobium-invoicing-${targetEnvironment}'
+    identity: 'niobiuminvoicing-id-${targetEnvironment}'
   }
 ] : []
 param appShortName = readEnvironmentVariable('APP_SHORT_NAME', 'niobiumnotify')

@@ -33,6 +33,9 @@ type NotificationDeliveryRoute = {
 @maxLength(32)
 param notificationDeliveryRoutes NotificationDeliveryRoute[] = []
 
+@description('Managed identities with queue-scoped Listen access to named receipt destinations.')
+param notificationDeliveryReaders array = []
+
 @description('Names of storage tables, separated by comma.')
 param storageTableNames string = ''
 
@@ -63,6 +66,18 @@ module serviceBus 'service-bus.bicep' = {
     serviceBusQueueNames: union(empty(serviceBusQueueNames) ? [] : split(serviceBusQueueNames, ','), routedReceiptQueueNames)
   }
 }
+resource receiptReaderIdentities 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = [for reader in notificationDeliveryReaders: {
+  name: reader.identity
+  scope: resourceGroup(reader.resourceGroup)
+}]
+module deliveryReaderGrants 'receipt-reader.bicep' = [for (reader, i) in notificationDeliveryReaders: if (contains(routedReceiptQueueNames, reader.queue)) {
+  name: 'receipt-reader-${uniqueString(reader.queue, reader.resourceGroup, reader.identity)}'
+  params: {
+    serviceBusNamespaceName: serviceBus.outputs.name
+    queueName: reader.queue
+    principalId: receiptReaderIdentities[i].properties.principalId
+  }
+}]
 var serviceBusSettings = [ 
     { 
         name: 'AzureWebJobsServiceBus__fullyQualifiedNamespace'
