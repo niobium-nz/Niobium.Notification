@@ -17,13 +17,6 @@ param notificationDeliveryRoutes = concat(deployInvoiceDestination ? [
     queue: 'notificationdeliveryevent-test-verification'
   }
 ] : [])
-param notificationDeliveryReaders = deployInvoiceDestination ? [
-  {
-    queue: invoiceReceiptQueue
-    resourceGroup: 'rg-niobium-invoicing-${targetEnvironment}'
-    identity: 'niobiuminvoicing-id-${targetEnvironment}'
-  }
-] : []
 param appShortName = readEnvironmentVariable('APP_SHORT_NAME', 'niobiumnotify')
 param customDomainName = readEnvironmentVariable('CUSTOM_DOMAIN_NAME', '')
 param serviceBusQueueNames = readEnvironmentVariable('SERVICE_BUS_QUEUE_NAMES', 'subscribecommand,notifycommand,subscribedevent,capturenotificationreceiptcommand,notificationdeliveryevent')
