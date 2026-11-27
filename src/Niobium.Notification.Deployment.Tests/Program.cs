@@ -112,6 +112,10 @@ internal static class Program
         await using ServiceBusClient incoming = new(listenConnection, busOptions);
         await using ServiceBusSender sender = outgoing.CreateSender("notifycommand");
         await using ServiceBusReceiver reader = incoming.CreateReceiver("notifycommand");
+        await using ServiceBusClient routed = new(routeConnection, busOptions);
+        await using ServiceBusReceiver receiptReader = routed.CreateReceiver(VerificationReceiptQueue);
+        Stage("routed_receipt_sequence");
+        long nextReceipt = await RoutedReceiptObservation.CaptureNextSequenceAsync(receiptReader, cancellationToken);
         // No receive, complete, abandon, purge or cancellation on the shared queue.
         Stage("queue_send");
         await sender.SendMessageAsync(new ServiceBusMessage(JsonSerializer.Serialize(command))
@@ -167,9 +171,8 @@ internal static class Program
         Passed("live_verified_delivery_receipt_published");
 
         Stage("routed_delivery_receipt");
-        await using ServiceBusClient routed = new(routeConnection, busOptions);
-        await using ServiceBusReceiver receiptReader = routed.CreateReceiver(VerificationReceiptQueue);
-        await ObserveRoutedReceiptAsync(receiptReader, eventID, command, identity.ID, providerID, cancellationToken);
+        await RoutedReceiptObservation.ObserveAsync(receiptReader, nextReceipt, eventID, command, identity.ID, providerID,
+            cancellationToken);
         Passed("live_routed_delivery_receipt_observed");
     }
 
@@ -192,41 +195,6 @@ internal static class Program
     }
 
     private const string VerificationReceiptQueue = "notificationdeliveryevent-test-verification";
-
-    private static async Task ObserveRoutedReceiptAsync(ServiceBusReceiver reader, string eventID, NotifyCommand command,
-        string submissionID, string providerID, CancellationToken cancellationToken)
-    {
-        // Inspect metadata on a bounded, test-only queue. Only this run's exact
-        // message ID can authorize reading the event body. Peek never settles it.
-        JsonSerializerOptions json = new(JsonSerializerDefaults.Web);
-        long? nextSequence = null;
-        int examined = 0;
-        for (int attempt = 0; attempt < 12; attempt++)
-        {
-            IReadOnlyList<ServiceBusReceivedMessage> messages = await reader.PeekMessagesAsync(100, nextSequence, cancellationToken);
-            foreach (ServiceBusReceivedMessage message in messages)
-            {
-                Require(++examined <= 1000, "live_routed_receipt_scan_limit");
-                if (message.MessageId != eventID) continue;
-                Require(message.ContentType == "application/json" && message.Body.ToMemory().Length <= 8192,
-                    "live_routed_receipt_mismatch");
-                NotificationDeliveryEvent? route;
-                try { route = JsonSerializer.Deserialize<NotificationDeliveryEvent>(message.Body.ToMemory().Span, json); }
-                catch (JsonException) { throw new VerificationFailure("live_routed_receipt_mismatch"); }
-                Require(route != null && route.ID == eventID && route.Tenant == command.Tenant
-                    && route.NotificationID == command.ID && route.Channel == command.Channel
-                    && route.SubmissionID == submissionID && route.ProviderMessageID == providerID
-                    && route.Provider == "resend" && route.Kind == NotificationDeliveryKind.Delivered,
-                    "live_routed_receipt_mismatch");
-                return;
-            }
-            if (messages.Count != 0)
-                nextSequence = messages[^1].SequenceNumber + 1;
-            else
-                await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
-        }
-        throw new VerificationFailure("live_routed_receipt_missing");
-    }
 
     private static string QueueConnection(string setting, string queueName = "notifycommand")
     {

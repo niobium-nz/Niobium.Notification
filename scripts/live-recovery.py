@@ -26,6 +26,7 @@ ERRORS = {
     "live_receipt_correlation_missing", "live_receipt_identity_changed",
     "live_receipt_correlation_held", "live_receipt_evidence_incomplete", "live_receipt_query_limit",
     "live_routed_receipt_scan_limit", "live_routed_receipt_mismatch", "live_routed_receipt_missing",
+    "live_routed_receipt_sequence_invalid",
 }
 ROOT = Path(__file__).resolve().parent.parent
 PROJECT = ROOT / "src/Niobium.Notification.Deployment.Tests/Niobium.Notification.Deployment.Tests.csproj"
