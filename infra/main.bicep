@@ -20,6 +20,19 @@ param customDomainName string = ''
 @description('Name of the Queues, separated by comma.')
 param serviceBusQueueNames string = ''
 
+type NotificationDeliveryRoute = {
+  @minLength(1)
+  @maxLength(50)
+  channel: string
+  @minLength(27)
+  @maxLength(48)
+  queue: string
+}
+
+@description('Explicit channel to queue routes for additional delivery receipt destinations.')
+@maxLength(32)
+param notificationDeliveryRoutes NotificationDeliveryRoute[] = []
+
 @description('Names of storage tables, separated by comma.')
 param storageTableNames string = ''
 
@@ -43,10 +56,11 @@ module sharedManagedIdentity 'br/public:avm/res/managed-identity/user-assigned-i
 }
 
 var serviceBusNamespaceName = '${appShortName}-${abbrs.serviceBusNamespaces}${environmentName}'
+var routedReceiptQueueNames = [for route in notificationDeliveryRoutes: route.queue]
 module serviceBus 'service-bus.bicep' = {
   params: {
     serviceBusNamespaceName: serviceBusNamespaceName
-    serviceBusQueueNames: empty(serviceBusQueueNames) ? [] : split(serviceBusQueueNames, ',')
+    serviceBusQueueNames: union(empty(serviceBusQueueNames) ? [] : split(serviceBusQueueNames, ','), routedReceiptQueueNames)
   }
 }
 var serviceBusSettings = [ 
@@ -61,6 +75,10 @@ var serviceBusSettings = [
     { 
         name: 'AzureWebJobsServiceBus__clientId'
         value: sharedManagedIdentity.outputs.clientId
+    }
+    {
+        name: 'NOTIFICATIONDELIVERYROUTINGOPTIONS__ROUTESJSON'
+        value: string(notificationDeliveryRoutes)
     }
 ]
 

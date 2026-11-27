@@ -263,6 +263,11 @@ environment variables, using the same pattern for queues and tables:
 | `serviceBusQueueNames` | `SERVICE_BUS_QUEUE_NAMES` | `subscribecommand,notifycommand,subscribedevent,capturenotificationreceiptcommand,notificationdeliveryevent` |
 | `storageTableNames` | `STORAGE_TABLE_NAMES` | `Subscription,Template,NotificationSubmission,NotificationReceipt` |
 
+`notificationDeliveryRoutes` adds named receipt queues to the service-owned queue
+list and passes those routes to the Function App. Declare these destinations in
+`main.bicepparam` by environment. The test fixture route is isolated to the test
+namespace. See [receipt consumer routing](provider-delivery-receipts.md#consumer-contract).
+
 The table list includes historical service-owned tables as well as the new inbox.
 Table names use singular PascalCase entity names: the Niobium repository defaults
 to `typeof(TEntity).Name`. `NotificationSubmission` therefore matches its persisted

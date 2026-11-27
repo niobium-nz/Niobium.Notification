@@ -8,6 +8,7 @@ CHECKS = (
     "live_queue_provider_acceptance", "live_scheduled_recovery_observed",
     "live_owned_lost_outcome_snapshot", "live_same_provider_submission_recovered",
     "live_frozen_payload_and_window_preserved", "live_verified_delivery_receipt_published",
+    "live_routed_delivery_receipt_observed",
 )
 ERRORS = {
     "live_recovery_deadline_exceeded", "live_recovery_failed_details_suppressed",
@@ -24,6 +25,8 @@ ERRORS = {
     "live_queue_access_denied", "live_queue_quota_exceeded", "live_queue_resource_missing",
     "live_receipt_correlation_missing", "live_receipt_identity_changed",
     "live_receipt_correlation_held", "live_receipt_evidence_incomplete", "live_receipt_query_limit",
+    "live_routed_receipt_scan_limit", "live_routed_receipt_mismatch", "live_routed_receipt_missing",
+    "live_routed_receipt_sequence_invalid",
 }
 ROOT = Path(__file__).resolve().parent.parent
 PROJECT = ROOT / "src/Niobium.Notification.Deployment.Tests/Niobium.Notification.Deployment.Tests.csproj"
@@ -53,12 +56,17 @@ def prepare(environ, failure, runner=subprocess.run, budget=None):
     if result.returncode:
         raise failure("live_recovery_build_failed_output_suppressed")
     child_environment = dict(environ)
-    for permission, setting in (("2", "TEST_RECOVERY_SEND_CONNECTION"), ("8", "TEST_RECOVERY_LISTEN_CONNECTION")):
+    keys = (
+        ("notifycommand", "2", "TEST_RECOVERY_SEND_CONNECTION"),
+        ("notifycommand", "8", "TEST_RECOVERY_LISTEN_CONNECTION"),
+        ("notificationdeliveryevent-test-verification", "8", "TEST_DELIVERY_ROUTE_LISTEN_CONNECTION"),
+    )
+    for queue, permission, setting in keys:
         # The fixture reads existing queue-scoped keys through the test runner's
         # identity. No root key, rotation, runtime setting or GITHUB_ENV export.
         result = execute(["az", "servicebus", "queue", "authorization-rule", "keys", "list",
                           "--resource-group", group, "--namespace-name", "niobiumnotify-sb-test",
-                          "--queue-name", "notifycommand", "--name", "notifycommand-" + permission,
+                          "--queue-name", queue, "--name", queue + "-" + permission,
                           "--query", "primaryConnectionString", "--only-show-errors", "--output", "tsv"],
                          environ, 60, failure, runner, budget)
         connection = result.stdout.strip()

@@ -77,6 +77,7 @@ internal static class Program
             && origin.Host.EndsWith(".azurewebsites.net", StringComparison.Ordinal), "live_test_host_required");
         string sendConnection = QueueConnection("TEST_RECOVERY_SEND_CONNECTION");
         string listenConnection = QueueConnection("TEST_RECOVERY_LISTEN_CONNECTION");
+        string routeConnection = QueueConnection("TEST_DELIVERY_ROUTE_LISTEN_CONNECTION", VerificationReceiptQueue);
         string recipient = Env("TEST_NOTIFICATION_RECIPIENT");
         Require(new MailAddress(recipient).Address == recipient && recipient.Length <= 50, "live_test_recipient_required");
         Guid tenant = Guid.Parse(Env("TEST_NOTIFICATION_TENANT"));
@@ -111,6 +112,10 @@ internal static class Program
         await using ServiceBusClient incoming = new(listenConnection, busOptions);
         await using ServiceBusSender sender = outgoing.CreateSender("notifycommand");
         await using ServiceBusReceiver reader = incoming.CreateReceiver("notifycommand");
+        await using ServiceBusClient routed = new(routeConnection, busOptions);
+        await using ServiceBusReceiver receiptReader = routed.CreateReceiver(VerificationReceiptQueue);
+        Stage("routed_receipt_sequence");
+        long nextReceipt = await RoutedReceiptObservation.CaptureNextSequenceAsync(receiptReader, cancellationToken);
         // No receive, complete, abandon, purge or cancellation on the shared queue.
         Stage("queue_send");
         await sender.SendMessageAsync(new ServiceBusMessage(JsonSerializer.Serialize(command))
@@ -162,8 +167,13 @@ internal static class Program
         // manufacture a receipt or send another email to make verification pass.
         Stage("verified_delivery_receipt");
         OwnedReceiptFixture receipt = new(identity, accepted);
-        await receipt.WaitForPublishedDeliveryAsync(tables.GetTableClient(nameof(NotificationReceipt)), cancellationToken);
+        string eventID = await receipt.WaitForPublishedDeliveryAsync(tables.GetTableClient(nameof(NotificationReceipt)), cancellationToken);
         Passed("live_verified_delivery_receipt_published");
+
+        Stage("routed_delivery_receipt");
+        await RoutedReceiptObservation.ObserveAsync(receiptReader, nextReceipt, eventID, command, identity.ID, providerID,
+            cancellationToken);
+        Passed("live_routed_delivery_receipt_observed");
     }
 
     private static async Task<TableEntity> AcceptedAsync(TableClient table, OwnedRecoveryFixture fixture, CancellationToken cancellationToken)
@@ -184,11 +194,13 @@ internal static class Program
         }
     }
 
-    private static string QueueConnection(string setting)
+    private const string VerificationReceiptQueue = "notificationdeliveryevent-test-verification";
+
+    private static string QueueConnection(string setting, string queueName = "notifycommand")
     {
         string connection = Env(setting);
         ServiceBusConnectionStringProperties settings = ServiceBusConnectionStringProperties.Parse(connection);
-        Require(settings.FullyQualifiedNamespace == BusHost && settings.EntityPath == "notifycommand", "live_test_queue_required");
+        Require(settings.FullyQualifiedNamespace == BusHost && settings.EntityPath == queueName, "live_test_queue_required");
         return connection;
     }
 

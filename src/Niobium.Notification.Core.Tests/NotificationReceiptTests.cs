@@ -55,6 +55,7 @@ public sealed class NotificationReceiptTests
         internal readonly ReceiptStore Receipts = new();
         internal readonly DurableNotificationTests.MemoryStore Submissions = new();
         internal readonly Mock<IMessagingBroker<NotificationDeliveryEvent>> Events = new(MockBehavior.Strict);
+        internal readonly Mock<INotificationDeliveryRoutes> Routes = new(MockBehavior.Strict);
         internal readonly List<NotificationDeliveryEvent> Published = [];
         internal readonly NotificationSubmission Identity = NotificationSubmission.Create(new NotifyCommand
         {
@@ -68,12 +69,14 @@ public sealed class NotificationReceiptTests
             Events.Setup(q => q.EnqueueAsync(It.IsAny<IEnumerable<MessagingEntry<NotificationDeliveryEvent>>>(), It.IsAny<CancellationToken>()))
                 .Callback<IEnumerable<MessagingEntry<NotificationDeliveryEvent>>, CancellationToken>((entries, _) => Published.AddRange(entries.Select(entry => entry.Value!)))
                 .Returns(Task.CompletedTask);
+            Routes.Setup(r => r.PublishAsync(It.IsAny<MessagingEntry<NotificationDeliveryEvent>>(), It.IsAny<CancellationToken>()))
+                .Returns(Task.CompletedTask);
         }
 
         internal CaptureNotificationReceiptCommand Command(NotificationCorrelation? correlation = null, string eventID = "provider-event", string providerID = "provider-message", string body = "verified bytes")
             => CaptureNotificationReceiptCommand.Capture("resend", eventID, providerID, NotificationDeliveryKind.Delivered,
                 Now, Now.AddSeconds(1), System.Text.Encoding.UTF8.GetBytes(body), correlation ?? Identity.GetReceiptCorrelation());
-        internal CaptureNotificationReceiptFlow Flow() => new(Receipts.Domains(), Submissions.Domains(), Events.Object, new DurableNotificationTests.Clock { Now = Now });
+        internal CaptureNotificationReceiptFlow Flow() => new(Receipts.Domains(), Submissions.Domains(), Events.Object, Routes.Object, new DurableNotificationTests.Clock { Now = Now });
     }
 
     [TestMethod]
@@ -111,6 +114,33 @@ public sealed class NotificationReceiptTests
         await s.Flow().RunAsync(s.Command());
         Assert.AreEqual((int)ReceiptPublication.Published, s.Receipts.Entry.PublicationCode);
         Assert.AreEqual(1, s.Receipts.Creates);
+    }
+
+    [TestMethod]
+    public async Task UncertainRouteSend_KeepsReceiptPendingAndRetriesTheSameIdentity()
+    {
+        Scenario s = new();
+        List<string> routed = [];
+        int calls = 0;
+        s.Routes.Setup(r => r.PublishAsync(It.IsAny<MessagingEntry<NotificationDeliveryEvent>>(), It.IsAny<CancellationToken>()))
+            .Returns((MessagingEntry<NotificationDeliveryEvent> entry, CancellationToken _) =>
+            {
+                Assert.AreEqual(s.Published.Last().ID, entry.ID);
+                routed.Add(entry.ID);
+                return ++calls == 1 ? Task.FromException(new IOException("Synthetic route acknowledgement loss")) : Task.CompletedTask;
+            });
+        CaptureNotificationReceiptCommand command = s.Command();
+        await Assert.ThrowsExactlyAsync<IOException>(() => s.Flow().RunAsync(command));
+        Assert.AreEqual((int)ReceiptPublication.Pending, s.Receipts.Entry!.PublicationCode);
+        Assert.IsNull(s.Receipts.Entry.PublishedAt);
+        await s.Flow().RunAsync(command);
+        await s.Flow().RunAsync(command);
+        Assert.AreEqual((int)ReceiptPublication.Published, s.Receipts.Entry!.PublicationCode);
+        Assert.HasCount(2, routed);
+        Assert.AreEqual(routed[0], routed[1]);
+        Assert.HasCount(2, s.Published);
+        Assert.AreEqual(1, s.Receipts.Creates);
+        Assert.AreEqual(1, s.Submissions.Entry!.Attempts);
     }
 
     [TestMethod]

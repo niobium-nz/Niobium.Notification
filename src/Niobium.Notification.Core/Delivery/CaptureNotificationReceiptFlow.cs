@@ -6,6 +6,7 @@ public sealed class CaptureNotificationReceiptFlow(
     IDomainRepository<NotificationReceiptDomain, NotificationReceipt> receipts,
     IDomainRepository<NotificationSubmissionDomain, NotificationSubmission> submissions,
     IMessagingBroker<NotificationDeliveryEvent> events,
+    INotificationDeliveryRoutes routes,
     TimeProvider clock) : IFlow
 {
     public async Task RunAsync(CaptureNotificationReceiptCommand command, CancellationToken cancellationToken = default)
@@ -31,7 +32,11 @@ public sealed class CaptureNotificationReceiptFlow(
         // A failure here leaves that broker command available for redelivery.
         // Lost publication acknowledgements may repeat this stable event ID;
         // consumers must deduplicate it. There is no cross-service transaction.
-        await events.EnqueueAsync(new MessagingEntry<NotificationDeliveryEvent> { ID = delivery.ID, Value = delivery }, cancellationToken);
+        MessagingEntry<NotificationDeliveryEvent> entry = new() { ID = delivery.ID, Value = delivery };
+        await events.EnqueueAsync(entry, cancellationToken);
+        // All configured destinations must accept the event before completing
+        // publication. Redelivery preserves its identity on every destination.
+        await routes.PublishAsync(entry, cancellationToken);
         await receipt.MarkPublishedAsync(clock.GetUtcNow(), cancellationToken);
     }
 }

@@ -70,7 +70,7 @@ public sealed class ReceiptRecoveryTests
         Mock<IMessagingBroker<NotificationDeliveryEvent>> events = new(MockBehavior.Strict);
         events.Setup(q => q.EnqueueAsync(It.IsAny<IEnumerable<MessagingEntry<NotificationDeliveryEvent>>>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new IOException("Synthetic publication failure"));
-        CaptureNotificationReceiptFlow Flow() => new(storage.ReceiptDomains(), storage.Domains(), events.Object, TimeProvider.System);
+        CaptureNotificationReceiptFlow Flow() => new(storage.ReceiptDomains(), storage.Domains(), events.Object, Mock.Of<INotificationDeliveryRoutes>(), TimeProvider.System);
         await Assert.ThrowsExactlyAsync<IOException>(() => Flow().RunAsync(command));
         NotificationReceipt identity = NotificationReceipt.Create(command);
         NotificationReceipt pending = (await storage.ReceiptRepository().RetrieveAsync(identity.Provider, identity.ID))!;
@@ -105,7 +105,7 @@ public sealed class ReceiptRecoveryTests
         events.Setup(q => q.EnqueueAsync(It.IsAny<IEnumerable<MessagingEntry<NotificationDeliveryEvent>>>(), It.IsAny<CancellationToken>()))
             .Callback<IEnumerable<MessagingEntry<NotificationDeliveryEvent>>, CancellationToken>((entries, _) => published.AddRange(entries.Select(entry => entry.Value!)))
             .Returns(Task.CompletedTask);
-        CaptureNotificationReceiptFlow flow = new(storage.ReceiptDomains(), storage.Domains(), events.Object, TimeProvider.System);
+        CaptureNotificationReceiptFlow flow = new(storage.ReceiptDomains(), storage.Domains(), events.Object, Mock.Of<INotificationDeliveryRoutes>(), TimeProvider.System);
         await flow.RunAsync(Command(submission, "delivered", NotificationDeliveryKind.Delivered));
         CaptureNotificationReceiptCommand delayed = CaptureNotificationReceiptCommand.Capture("resend", "delayed", "synthetic-provider-message",
             NotificationDeliveryKind.Delayed, Now.AddSeconds(-1), Now.AddSeconds(2), "delayed"u8, submission.GetReceiptCorrelation());

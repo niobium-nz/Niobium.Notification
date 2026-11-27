@@ -35,15 +35,21 @@ class LiveRecoveryTests(unittest.TestCase):
     def test_only_existing_queue_scoped_keys_enter_child_environment(self):
         runner = Mock(side_effect=[subprocess.CompletedProcess([], 0, "", ""),
                                   subprocess.CompletedProcess([], 0, "sensitive-send\n", ""),
-                                  subprocess.CompletedProcess([], 0, "sensitive-listen\n", "")])
+                                  subprocess.CompletedProcess([], 0, "sensitive-listen\n", ""),
+                                  subprocess.CompletedProcess([], 0, "sensitive-route-listen\n", "")])
         child = live.prepare(ENV, RuntimeError, runner)
         self.assertEqual("sensitive-send", child["TEST_RECOVERY_SEND_CONNECTION"])
         self.assertEqual("sensitive-listen", child["TEST_RECOVERY_LISTEN_CONNECTION"])
+        self.assertEqual("sensitive-route-listen", child["TEST_DELIVERY_ROUTE_LISTEN_CONNECTION"])
         self.assertNotIn("TEST_RECOVERY_SEND_CONNECTION", ENV)
-        for call, rule in zip(runner.call_args_list[1:], ("notifycommand-2", "notifycommand-8")):
+        self.assertNotIn("TEST_DELIVERY_ROUTE_LISTEN_CONNECTION", ENV)
+        expected = (("notifycommand", "notifycommand-2"), ("notifycommand", "notifycommand-8"),
+                    ("notificationdeliveryevent-test-verification", "notificationdeliveryevent-test-verification-8"))
+        self.assertEqual(4, runner.call_count)
+        for call, (queue, rule) in zip(runner.call_args_list[1:], expected):
             arguments = call.args[0]
             self.assertIn(rule, arguments)
-            self.assertIn("notifycommand", arguments)
+            self.assertIn(queue, arguments)
             self.assertIn("niobiumnotify-sb-test", arguments)
             self.assertNotIn("RootManageSharedAccessKey", arguments)
             self.assertTrue(call.kwargs["capture_output"])
