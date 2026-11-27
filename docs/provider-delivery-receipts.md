@@ -86,8 +86,10 @@ the existing Basic tier and configure named destinations explicitly. Follow the
 Set `notificationDeliveryRoutes` in the environment's Bicep parameters with a
 channel and queue for each consumer. Channel matches use ordinal case-sensitive
 comparison. Queue names must use the `notificationdeliveryevent-` prefix followed
-by a lowercase alphanumeric or hyphenated name. Supply a separate destination for
-each independently consuming service. Infrastructure provisions the additional queue
+by a lowercase alphanumeric or hyphenated name. Queue names allow at most 48
+characters so the provisioned `-2` and `-8` authorization-rule names meet Azure's
+50-character limit. Supply a separate destination for each independently
+consuming service. Infrastructure provisions the additional queue
 and supplies the same route configuration to the Function App. The named-queue
 adapter uses the Notification managed identity in the existing namespace.
 Give each consumer Listen access scoped to its own queue and verify that grant

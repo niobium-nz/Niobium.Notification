@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Azure.Messaging.ServiceBus;
 using Microsoft.Extensions.Configuration;
 using Moq;
@@ -85,6 +86,21 @@ public sealed class ServiceBusNotificationDeliveryRoutesTests
         InvalidOperationException error = Assert.ThrowsExactly<InvalidOperationException>(() =>
             new ServiceBusNotificationDeliveryRoutes(options, () => throw new AssertFailedException("Unexpected bus access.")));
         Assert.AreEqual("Invalid Notification delivery route configuration.", error.Message);
+    }
+
+    [TestMethod]
+    public void QueueNameLeavesRoomForProvisionedAuthorizationRules()
+    {
+        const string prefix = "notificationdeliveryevent-";
+        string maximum = prefix + new string('a', 22);
+        NotificationDeliveryRoutingOptions options = new()
+        {
+            RoutesJson = JsonSerializer.Serialize(new[] { new { channel = "Notice", queue = maximum } }),
+        };
+        CollectionAssert.AreEqual(new[] { maximum }, options.ReadRoutes()["Notice"]);
+
+        options.RoutesJson = JsonSerializer.Serialize(new[] { new { channel = "Notice", queue = maximum + "a" } });
+        Assert.ThrowsExactly<InvalidOperationException>(() => options.ReadRoutes());
     }
 
     [TestMethod]

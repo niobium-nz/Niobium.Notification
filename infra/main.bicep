@@ -20,8 +20,18 @@ param customDomainName string = ''
 @description('Name of the Queues, separated by comma.')
 param serviceBusQueueNames string = ''
 
+type NotificationDeliveryRoute = {
+  @minLength(1)
+  @maxLength(50)
+  channel: string
+  @minLength(27)
+  @maxLength(48)
+  queue: string
+}
+
 @description('Explicit channel to queue routes for additional delivery receipt destinations.')
-param notificationDeliveryRoutes array = []
+@maxLength(32)
+param notificationDeliveryRoutes NotificationDeliveryRoute[] = []
 
 @description('Names of storage tables, separated by comma.')
 param storageTableNames string = ''

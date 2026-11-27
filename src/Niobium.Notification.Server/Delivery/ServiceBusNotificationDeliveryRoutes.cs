@@ -37,7 +37,7 @@ internal sealed class NotificationDeliveryRoutingOptions
     }
 
     private static bool Valid(Route? route)
-        => route is { Channel: { Length: > 0 and <= 50 } channel, Queue: { Length: > 26 and <= 120 } queue }
+        => route is { Channel: { Length: > 0 and <= 50 } channel, Queue: { Length: > 26 and <= 48 } queue }
             && channel == channel.Trim() && !channel.Any(Char.IsControl)
             && queue.StartsWith("notificationdeliveryevent-", StringComparison.Ordinal)
             && Char.IsAsciiLetterOrDigit(queue[^1])
