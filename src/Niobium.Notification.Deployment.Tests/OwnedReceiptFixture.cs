@@ -21,21 +21,24 @@ internal sealed class OwnedReceiptFixture
             "live_receipt_correlation_missing");
     }
 
-    internal async Task WaitForPublishedDeliveryAsync(TableClient receipts, CancellationToken cancellationToken)
+    internal async Task<string> WaitForPublishedDeliveryAsync(TableClient receipts, CancellationToken cancellationToken)
     {
         while (true)
         {
-            bool published = await HasPublishedDeliveryAsync(receipts, cancellationToken);
-            if (published) return;
+            string? eventID = await FindPublishedEventAsync(receipts, cancellationToken);
+            if (eventID != null) return eventID;
             await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
         }
     }
 
     internal async Task<bool> HasPublishedDeliveryAsync(TableClient receipts, CancellationToken cancellationToken)
+        => await FindPublishedEventAsync(receipts, cancellationToken) != null;
+
+    private async Task<string?> FindPublishedEventAsync(TableClient receipts, CancellationToken cancellationToken)
     {
         string filter = TableClient.CreateQueryFilter($"PartitionKey eq {"resend"} and Tenant eq {identity.Tenant} and SubmissionID eq {identity.ID}");
         int count = 0;
-        bool delivered = false;
+        string? eventID = null;
         await foreach (TableEntity receipt in receipts.QueryAsync<TableEntity>(filter, maxPerPage: 100, cancellationToken: cancellationToken))
         {
             Require(++count <= 100, "live_receipt_query_limit");
@@ -59,10 +62,10 @@ internal sealed class OwnedReceiptFixture
             {
                 Require(receipt.GetDateTimeOffset(nameof(NotificationReceipt.PublishedAt)) != null,
                     "live_receipt_evidence_incomplete");
-                delivered = true;
+                eventID ??= $"{receipt.PartitionKey}/{receipt.RowKey}";
             }
         }
-        return delivered;
+        return eventID;
     }
 
     private static void Require(bool valid, string code) { if (!valid) throw new VerificationFailure(code); }

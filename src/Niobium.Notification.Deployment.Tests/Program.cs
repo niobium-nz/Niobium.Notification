@@ -77,6 +77,7 @@ internal static class Program
             && origin.Host.EndsWith(".azurewebsites.net", StringComparison.Ordinal), "live_test_host_required");
         string sendConnection = QueueConnection("TEST_RECOVERY_SEND_CONNECTION");
         string listenConnection = QueueConnection("TEST_RECOVERY_LISTEN_CONNECTION");
+        string routeConnection = QueueConnection("TEST_DELIVERY_ROUTE_LISTEN_CONNECTION", VerificationReceiptQueue);
         string recipient = Env("TEST_NOTIFICATION_RECIPIENT");
         Require(new MailAddress(recipient).Address == recipient && recipient.Length <= 50, "live_test_recipient_required");
         Guid tenant = Guid.Parse(Env("TEST_NOTIFICATION_TENANT"));
@@ -162,8 +163,14 @@ internal static class Program
         // manufacture a receipt or send another email to make verification pass.
         Stage("verified_delivery_receipt");
         OwnedReceiptFixture receipt = new(identity, accepted);
-        await receipt.WaitForPublishedDeliveryAsync(tables.GetTableClient(nameof(NotificationReceipt)), cancellationToken);
+        string eventID = await receipt.WaitForPublishedDeliveryAsync(tables.GetTableClient(nameof(NotificationReceipt)), cancellationToken);
         Passed("live_verified_delivery_receipt_published");
+
+        Stage("routed_delivery_receipt");
+        await using ServiceBusClient routed = new(routeConnection, busOptions);
+        await using ServiceBusReceiver receiptReader = routed.CreateReceiver(VerificationReceiptQueue);
+        await ObserveRoutedReceiptAsync(receiptReader, eventID, command, identity.ID, providerID, cancellationToken);
+        Passed("live_routed_delivery_receipt_observed");
     }
 
     private static async Task<TableEntity> AcceptedAsync(TableClient table, OwnedRecoveryFixture fixture, CancellationToken cancellationToken)
@@ -184,11 +191,48 @@ internal static class Program
         }
     }
 
-    private static string QueueConnection(string setting)
+    private const string VerificationReceiptQueue = "notificationdeliveryevent-test-verification";
+
+    private static async Task ObserveRoutedReceiptAsync(ServiceBusReceiver reader, string eventID, NotifyCommand command,
+        string submissionID, string providerID, CancellationToken cancellationToken)
+    {
+        // Inspect metadata on a bounded, test-only queue. Only this run's exact
+        // message ID can authorize reading the event body. Peek never settles it.
+        JsonSerializerOptions json = new(JsonSerializerDefaults.Web);
+        long? nextSequence = null;
+        int examined = 0;
+        for (int attempt = 0; attempt < 12; attempt++)
+        {
+            IReadOnlyList<ServiceBusReceivedMessage> messages = await reader.PeekMessagesAsync(100, nextSequence, cancellationToken);
+            foreach (ServiceBusReceivedMessage message in messages)
+            {
+                Require(++examined <= 1000, "live_routed_receipt_scan_limit");
+                if (message.MessageId != eventID) continue;
+                Require(message.ContentType == "application/json" && message.Body.ToMemory().Length <= 8192,
+                    "live_routed_receipt_mismatch");
+                NotificationDeliveryEvent? route;
+                try { route = JsonSerializer.Deserialize<NotificationDeliveryEvent>(message.Body.ToMemory().Span, json); }
+                catch (JsonException) { throw new VerificationFailure("live_routed_receipt_mismatch"); }
+                Require(route != null && route.ID == eventID && route.Tenant == command.Tenant
+                    && route.NotificationID == command.ID && route.Channel == command.Channel
+                    && route.SubmissionID == submissionID && route.ProviderMessageID == providerID
+                    && route.Provider == "resend" && route.Kind == NotificationDeliveryKind.Delivered,
+                    "live_routed_receipt_mismatch");
+                return;
+            }
+            if (messages.Count != 0)
+                nextSequence = messages[^1].SequenceNumber + 1;
+            else
+                await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+        }
+        throw new VerificationFailure("live_routed_receipt_missing");
+    }
+
+    private static string QueueConnection(string setting, string queueName = "notifycommand")
     {
         string connection = Env(setting);
         ServiceBusConnectionStringProperties settings = ServiceBusConnectionStringProperties.Parse(connection);
-        Require(settings.FullyQualifiedNamespace == BusHost && settings.EntityPath == "notifycommand", "live_test_queue_required");
+        Require(settings.FullyQualifiedNamespace == BusHost && settings.EntityPath == queueName, "live_test_queue_required");
         return connection;
     }
 

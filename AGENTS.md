@@ -12,7 +12,9 @@ Read [provider delivery receipts](docs/provider-delivery-receipts.md) for webhoo
 correlation, event publication and delivery changes. Verify signatures over the
 raw request, durably queue receipts before acknowledgement and preserve legacy
 uncorrelated evidence. Models own opaque correlation and event identities. Domains
-own receipt transitions and publication evidence.
+own receipt transitions and publication evidence. Keep the type-derived default
+queue for typed brokers and configure routed destinations explicitly in
+`infra/main.bicepparam`. See the [Niobium messaging convention](https://github.com/niobium-nz/Niobium/blob/ba660a5c12ca92ae0026625b368eb03e631a34e3/docs/messaging.md#confirmed-routing-convention).
 
 Operators obtain data access through the existing manual process. The approved
 [operator recovery design](docs/operator-recovery.md) and
